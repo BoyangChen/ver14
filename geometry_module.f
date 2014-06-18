@@ -6,7 +6,7 @@
       
       implicit none
       
-      integer, parameter :: name_length=10 ! length for the name of the geo. quantity
+      !integer, parameter :: name_length=10 ! length for the name of the geo. quantity
       
       !---- define geometrical quantities ------
       type point
@@ -17,26 +17,43 @@
         type(point) :: points(2)
       end type edge
       
-      type surface
-        character(len=name_length) :: its_type
-        type(point),allocatable :: points(:)
-        type(edge),allocatable :: edges(:)  
-      end type surface
+      type triangle
+        type(point) :: points(3)
+        type(edge) :: edges(3)  
+      end type triangle
       
-      type volume
-        character(len=name_length) :: its_type
-        type(point),allocatable :: points(:)
-        type(edge),allocatable :: edges(:)
-        type(surface),allocatable :: surfaces(:)
-      end type volume
+      type quadrilateral
+        type(point) :: points(4)
+        type(edge) :: edges(4)  
+      end type quadrilateral
+      
+      type tetrahedron
+        type(point) :: points(4)
+        type(edge) :: edges(6)
+        type(triangle) :: triangles(4)
+      end type tetrahedron
+      
+      type wedge
+        type(point) :: points(6)
+        type(edge) :: edges(9)
+        type(triangle) :: triangles(2)
+        type(quadrilateral) :: quadrilaterals(3)
+      end type wedge
+      
+      type brick
+        type(point) :: points(8)
+        type(edge) :: edges(12)
+        type(quadrilateral) :: quadrilaterals(6)
+      end type brick
+      
       !-----------------------------------------
       
       
       
-      
+      ! define initiation and assignment procedures
       contains
       
-      ! define initiation and assignment procedures
+      
       
       ! prepare a point with zero coordinates
       subroutine prepare_point(this_point)
@@ -46,17 +63,7 @@
       	this_point%x(:)=zero
       
       end subroutine prepare_point
- 
-      ! place a point on desired coordinates
-      subroutine place_point(this_point,x)
-      
-      	type(point),intent(inout) :: this_point
-        real(kind=dp),intent(in) :: x(:)
-      	
-      	this_point%x(:)=x(:)
-      
-      end subroutine place_point 
-      
+    
       
       ! prepare an edge
       subroutine prepare_edge(this_edge)
@@ -72,6 +79,144 @@
         enddo
       
       end subroutine prepare_edge
+
+   
+      ! prepare a triangle
+      subroutine prepare_triangle(this_surface)
+      
+        type(triangle),intent(inout) :: this_surface
+        
+      	integer :: i
+      	
+        ! prepare integer variable
+        i=0
+        
+        do i=1,size(this_surface%points)
+            call prepare_point(this_surface%points(i))
+        end do
+        
+        do i=1,size(this_surface%edges)
+            call prepare_edge(this_surface%edges(i))
+        end do
+      
+      end subroutine prepare_triangle
+      
+
+      ! prepare a quadrilateral
+      subroutine prepare_quadrilateral(this_surface)
+      
+        type(quadrilateral),intent(inout) :: this_surface
+        
+      	integer :: i
+      	
+        ! prepare integer variable
+        i=0
+        
+        do i=1,size(this_surface%points)
+            call prepare_point(this_surface%points(i))
+        end do
+        
+        do i=1,size(this_surface%edges)
+            call prepare_edge(this_surface%edges(i))
+        end do
+      
+      end subroutine prepare_quadrilateral
+ 
+
+      ! prepare a tetrahedron
+      subroutine prepare_tetrahedron(this_volume)
+      
+        type(tetrahedron),intent(inout) :: this_volume
+        
+      	integer :: i
+      	
+        ! prepare integer variable
+        i=0
+        
+        do i=1,size(this_volume%points)
+            call prepare_point(this_volume%points(i))
+        end do
+        
+        do i=1,size(this_volume%edges)
+            call prepare_edge(this_volume%edges(i))
+        end do
+        
+        do i=1,size(this_volume%triangles)
+            call prepare_triangle(this_volume%triangles(i))
+        end do
+      
+      end subroutine prepare_tetrahedron
+
+      
+      ! prepare a wedge
+      subroutine prepare_wedge(this_volume)
+      
+        type(wedge),intent(inout) :: this_volume
+        
+      	integer :: i
+      	
+        ! prepare integer variable
+        i=0
+        
+        do i=1,size(this_volume%points)
+            call prepare_point(this_volume%points(i))
+        end do
+        
+        do i=1,size(this_volume%edges)
+            call prepare_edge(this_volume%edges(i))
+        end do
+        
+        do i=1,size(this_volume%triangles)
+            call prepare_triangle(this_volume%triangles(i))
+        end do
+        
+        do i=1,size(this_volume%quadrilaterals)
+            call prepare_quadrilateral(this_volume%quadrilaterals(i))
+        end do
+      
+      end subroutine prepare_wedge
+      
+      
+      ! prepare a brick
+      subroutine prepare_brick(this_volume)
+      
+        type(brick),intent(inout) :: this_volume
+        
+      	integer :: i
+      	
+        ! prepare integer variable
+        i=0
+        
+        do i=1,size(this_volume%points)
+            call prepare_point(this_volume%points(i))
+        end do
+        
+        do i=1,size(this_volume%edges)
+            call prepare_edge(this_volume%edges(i))
+        end do
+        
+        do i=1,size(this_volume%quadrilaterals)
+            call prepare_quadrilateral(this_volume%quadrilaterals(i))
+        end do
+      
+      end subroutine prepare_brick
+ 
+ 
+ 
+      ! place a point on desired coordinates
+      subroutine place_point(this_point,x)
+      
+      	type(point),intent(inout) :: this_point
+        real(kind=dp),intent(in) :: x(:)
+      	
+        if(size(this_point%x)==size(x)) then
+            this_point%x(:)=x(:)
+        else
+            stop "dimension mismatch in place_point"
+        end if
+      
+      end subroutine place_point 
+      
       
       ! place an edge on desired locations
       subroutine place_edge(this_edge,points)
@@ -79,180 +224,117 @@
       	type(edge),intent(inout) :: this_edge
         type(point),intent(in) :: points(:)
       	
-        this_edge%points(:)=points(:)
-      
-      end subroutine place_edge   
-      
-      
-      subroutine prepare_surface(this_surface,this_type)
-      
-      	type(surface),intent(inout) :: this_surface
-      	character(len=name_length),intent(in) :: this_type
-      	
-      	integer :: number_of_points, number_of_edges,i
-      	
-        ! prepare integer variables
-        number_of_points=0
-        number_of_edges=0
-        i=0
-      	
-        ! assign the designated type to its type parameter
-        this_surface%its_type=this_type
-      	
-        ! define the numbers of its respective building elements
-        ! according to its type
-        select case(this_type)   	
-            case('triangle')
-                number_of_points=3
-                number_of_edges=3		
-            case('quadrilateral')
-                number_of_points=4
-                number_of_edges=4
-            case default
-                write(msg_file,*)'unsupported type name for surface'
-                return    			
-        end select
-        
-        ! allocate space for its building elements
-        
-        ! if this geo. quantity has already been prepared/used
-        if(allocated(this_surface%points) .or. &
-          allocated(this_surface%edges)) then 
-          ! if it has been prepared according to the correct dimensions
-          if(size(this_surface%points)==number_of_points .and. &
-            size(this_surface%edges)==number_of_edges) then
-            ! do nothing
-          else
-            ! deallocate space associated with these quantities
-            deallocate(this_surface%points,this_surface%edges,&
-            stat=deallocate_status)
-            ! check success/failure of space deallocation
-            if (deallocate_status /= 0) &
-                stop "*** Deallocation failed ***" 
-            
-            ! reallocate appropriate space according to the correct dimensions
-            allocate(this_surface%points(number_of_points), &
-            this_surface%edges(number_of_edges),stat=allocate_status)
-            ! check success/failure of space allocation
-            if (allocate_status /= 0) &
-                stop "*** Not enough memory ***"          
-          end if
-        
-        ! if this geo. quantity has not been prepared
+        if(size(this_edge%points)==size(points)) then    
+            this_edge%points(:)=points(:)
         else
-          ! allocate appropriate space according to the correct dimensions
-          allocate(this_surface%points(number_of_points), &
-          this_surface%edges(number_of_edges),stat=allocate_status)
-          ! check success/failure of space allocation
-          if (allocate_status /= 0) &
-            stop "*** Not enough memory ***"  
-        
+            stop "dimension mismatch in place_edge"
         end if
-        
-        ! prepare its points and edges
-        do i=1,number_of_points
-            call prepare_point(this_surface%points(i))
-        end do
-        do i=1,number_of_edges
-            call prepare_edge(this_surface%edges(i))
-        end do  
       
-      return
-      end subroutine prepare_surface
+      end subroutine place_edge
+  
+  
+      ! place a triangle
+      subroutine place_triangle(this_surface,edges,points)
       
-      
-      
-      
-      subroutine prepare_volume(this_volume,this_type)
-
-      	type(volume),intent(inout) :: this_volume
-      	character(len=namelength),intent(in) :: this_type
+        type(triangle),intent(inout) :: this_surface
+        type(edge),intent(in) :: edges(:)
+        type(point),intent(in) :: points(:)
         
-      	integer :: number_of_points, number_of_edges, &
-        number_of_surfaces, i
-      	
-        number_of_points=0
-        number_of_edges=0
-        number_of_surfaces=0
-        i=0
-      	
-      	this_volume%its_type=this_type
-      	
-      	select case(this_type)   	
-            case('tetrahedron')
-                number_of_points=4
-                number_of_edges=6
-                number_of_surfaces=4
-            case('wedge')
-                number_of_points=6
-                number_of_edges=9
-                number_of_surfaces=5           
-            case('brick')
-                number_of_points=8
-                number_of_edges=12
-                number_of_surfaces=6	
-            case default
-                write(msg_file,*)'unsupported type name for volume'
-                return 
-        end select      
-
-        
-        ! allocate space for its building elements
-        
-        ! if this geo. quantity has already been prepared/used
-        if(allocated(this_volume%points) .or. &
-          allocated(this_volume%edges) .or. &
-          allocated(this_volume%surfaces)) then 
-          ! if it has been prepared according to the correct dimensions
-          if(size(this_volume%points)==number_of_points .and. &
-            size(this_volume%edges)==number_of_edges .and. &
-            size(this_volume%surfaces)==number_of_surfaces) then
-            ! do nothing
-          else
-            ! deallocate space associated with these quantities
-            deallocate(this_volume%points,this_volume%edges,&
-            this_volume%surfaces,stat=deallocate_status)
-            ! check success/failure of space deallocation
-            if (deallocate_status /= 0) &
-                stop "*** Deallocation failed ***" 
-            
-            ! reallocate appropriate space according to the correct dimensions
-            allocate(this_volume%points(number_of_points), &
-            this_volume%edges(number_of_edges), &
-            this_volume%surfaces(number_of_surfaces), &
-            stat=allocate_status)
-            ! check success/failure of space allocation
-            if (allocate_status /= 0) &
-                stop "*** Not enough memory ***"          
-          end if
-        
-        ! if this geo. quantity has not been prepared
+        if(size(this_surface%edges)==size(edges) .and. &
+           size(this_surface%points)==size(points)) then
+            this_surface%edges(:)=edges(:)
+            this_surface%points(:)=points(:)
         else
-          ! allocate appropriate space according to the correct dimensions
-          allocate(this_volume%points(number_of_points), &
-          this_volume%edges(number_of_edges), &
-          this_volume%surfaces(number_of_surfaces), &
-          stat=allocate_status)
-          ! check success/failure of space allocation
-          if (allocate_status /= 0) &
-              stop "*** Not enough memory ***" 
-        
+            stop "dimension mismatch in place_triangle"
         end if
-        
-        ! prepare its points, edges and surfaces
-        do i=1,number_of_points
-            call prepare_point(this_volume%points(i))
-        end do
-        do i=1,number_of_edges
-            call prepare_edge(this_volume%edges(i))
-        end do  
-        do i=1,number_of_surfaces
-            call prepare_surface(this_volume%surfaces(i))
-        end do        
-        
-      return
-      end subroutine prepare_volume
       
+      end subroutine place_triangle
+      
+
+      ! place a quadrilateral
+      subroutine place_quadrilateral(this_surface,edges,points)
+      
+        type(quadrilateral),intent(inout) :: this_surface
+        type(edge),intent(in) :: edges(:)
+        type(point),intent(in) :: points(:)
+        
+        if(size(this_surface%edges)==size(edges) .and. &
+           size(this_surface%points)==size(points)) then
+            this_surface%edges(:)=edges(:)
+            this_surface%points(:)=points(:)
+        else
+            stop "dimension mismatch in place_quadrilateral"
+        end if
+      
+      end subroutine place_quadrilateral
+      
+      
+      ! place a tetrahedron
+      subroutine place_tetrahedron(this_volume,triangles,edges,points)
+      
+        type(tetrahedron),intent(inout) :: this_volume
+        type(triangle),intent(in) :: triangles(:)
+        type(edge),intent(in) :: edges(:)
+        type(point),intent(in) :: points(:)
+        
+        if(size(this_volume%triangles)==size(triangles) .and. &
+           size(this_volume%edges)==size(edges) .and. &
+           size(this_volume%points)==size(points)) then
+            this_volume%triangles(:)=triangles(:)
+            this_volume%edges(:)=edges(:)
+            this_volume%points(:)=points(:)
+        else
+            stop "dimension mismatch in place_tetrahedron"
+        end if
+      
+      end subroutine place_tetrahedron   
+      
+      
+      ! place a wedge
+      subroutine place_wedge(this_volume,quadrilaterals,triangles, & 
+      edges,points)
+      
+        type(wedge),intent(inout) :: this_volume
+        type(quadrilateral),intent(in) :: quadrilaterals(:)
+        type(triangle),intent(in) :: triangles(:)
+        type(edge),intent(in) :: edges(:)
+        type(point),intent(in) :: points(:)
+        
+        if(size(this_volume%quadrilaterals)==size(quadrilaterals).and.&
+           size(this_volume%triangles)==size(triangles) .and. &
+           size(this_volume%edges)==size(edges) .and. &
+           size(this_volume%points)==size(points)) then
+            this_volume%quadrilaterals(:)=quadrilaterals(:)
+            this_volume%triangles(:)=triangles(:)
+            this_volume%edges(:)=edges(:)
+            this_volume%points(:)=points(:)
+        else
+            stop "dimension mismatch in place_wedge"
+        end if
+      
+      end subroutine place_wedge
+      
+      
+      ! place a brick
+      subroutine place_brick(this_volume,quadrilaterals, & 
+      edges,points)
+      
+        type(wedge),intent(inout) :: this_volume
+        type(quadrilateral),intent(in) :: quadrilaterals(:)
+        type(edge),intent(in) :: edges(:)
+        type(point),intent(in) :: points(:)
+        
+        if(size(this_volume%quadrilaterals)==size(quadrilaterals).and.&
+           size(this_volume%edges)==size(edges) .and. &
+           size(this_volume%points)==size(points)) then
+            this_volume%quadrilaterals(:)=quadrilaterals(:)
+            this_volume%edges(:)=edges(:)
+            this_volume%points(:)=points(:)
+        else
+            stop "dimension mismatch in place_brick"
+        end if
+      
+      end subroutine place_brick
       
       
       
