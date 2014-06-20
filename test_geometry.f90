@@ -32,7 +32,8 @@
 
         ! initiation
         do i=1, size(points)
-        call points(i)%prepare
+        !call points(i)%prepare
+        call prepare(points(i))
         !print*, points(i)%x(:)
         end do
         
@@ -50,7 +51,8 @@
 
         ! initiation
         do i=1, size(edges)
-        call edges(i)%prepare
+        !call edges(i)%prepare
+        call prepare(edges(i))
         !print*, 'edge',i,'points:',edges(i)%points
         end do
         
@@ -62,7 +64,7 @@
 
         ! initiation
         do i=1, size(triangles)
-        call triangles(i)%prepare
+        !call triangles(i)%prepare
         !print*,triangles(i)%points
         !print*,triangles(i)%edges
         end do
@@ -76,7 +78,8 @@
 
         ! initiation
         do i=1, size(quadrilaterals)
-        call quadrilaterals(i)%prepare
+        !call quadrilaterals(i)%prepare
+        call prepare(quadrilaterals(i))
         !print*,quadrilaterals(i)%points
         !print*,quadrilaterals(i)%edges
         end do
@@ -90,7 +93,7 @@
 
         ! initiation
         do i=1, size(tetrahedrons)
-        call tetrahedrons(i)%prepare
+        !call tetrahedrons(i)%prepare
         !print*,tetrahedrons(i)%points
         !print*,tetrahedrons(i)%edges
         !print*,tetrahedrons(i)%triangles
@@ -107,7 +110,8 @@
 
         ! initiation
         do i=1, size(wedges)
-        call wedges(i)%prepare
+        !call wedges(i)%prepare
+        call prepare(wedges(i))
         !print*,wedges(i)%points
         !print*,wedges(i)%edges
         !print*,wedges(i)%triangles
@@ -126,17 +130,18 @@
 
         ! initiation
         do i=1, size(bricks)
-        call bricks(i)%prepare
-        print*,bricks(i)%points
-        print*,bricks(i)%edges
-        print*,bricks(i)%quadrilaterals
+        !call bricks(i)%prepare
+        call prepare(bricks(i))
+        !print*,bricks(i)%points
+        !print*,bricks(i)%edges
+        !print*,bricks(i)%quadrilaterals
         end do
         
         ! implicit constructor
         bricks(3)=brick([1,6,3,4,9,6,2,4],[1,5,2,3,7,4,1,3,5,2,5,3],[9,2,4,7,1,3])
-        print*,bricks(3)%points
-        print*,bricks(3)%edges
-        print*,bricks(3)%quadrilaterals
+        !print*,bricks(3)%points
+        !print*,bricks(3)%edges
+        !print*,bricks(3)%quadrilaterals
         
         
         

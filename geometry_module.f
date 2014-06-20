@@ -11,31 +11,31 @@
       !---- define geometrical quantities ------
       type, public :: point
         real(kind=dp) :: x(3)
-        contains
-          procedure :: prepare => prepare_point
+        !contains
+          !procedure :: prepare => prepare_point
           !procedure :: build => build_point
       end type point
       
       type, public :: edge
         integer :: points(2)
-        contains
-          procedure :: prepare => prepare_edge
+        !contains
+          !procedure :: prepare => prepare_edge
           !procedure :: build => build_edge
       end type edge
       
       type, public :: triangle
         integer :: points(3)
         integer :: edges(3)  
-        contains
-          procedure :: prepare => prepare_triangle
+        !contains
+          !procedure :: prepare => prepare_triangle
           !procedure :: build => build_triangle
       end type triangle
       
       type, public :: quadrilateral
         integer :: points(4)
         integer :: edges(4)  
-        contains
-          procedure :: prepare => prepare_quadrilateral
+        !contains
+          !procedure :: prepare => prepare_quadrilateral
           !procedure :: build => build_quadrilateral
       end type quadrilateral
       
@@ -43,8 +43,8 @@
         integer :: points(4)
         integer :: edges(6)
         integer :: triangles(4)
-        contains
-          procedure :: prepare => prepare_tetrahedron
+        !contains
+          !procedure :: prepare => prepare_tetrahedron
           !procedure :: build => build_tetrahedron
       end type tetrahedron
       
@@ -53,8 +53,8 @@
         integer :: edges(9)
         integer :: triangles(2)
         integer :: quadrilaterals(3)
-        contains
-          procedure :: prepare => prepare_wedge
+        !contains
+          !procedure :: prepare => prepare_wedge
           !procedure :: build => build_wedge
       end type wedge
       
@@ -62,13 +62,23 @@
         integer :: points(8)
         integer :: edges(12)
         integer :: quadrilaterals(6)
-        contains
-          procedure :: prepare => prepare_brick
+        !contains
+          !procedure :: prepare => prepare_brick
           !procedure :: build => build_brick
       end type brick
       
 
-      
+      interface prepare
+        module procedure prepare_point
+        module procedure prepare_edge
+        module procedure prepare_triangle
+        module procedure prepare_quadrilateral
+        module procedure prepare_tetrahedron
+        module procedure prepare_wedge
+        module procedure prepare_brick
+      end interface
+
+      public :: prepare
       
       
       ! define initiation procedures
@@ -79,7 +89,7 @@
       ! prepare a point with zero coordinates
       subroutine prepare_point(this_point)
       
-      	class(point),intent(inout) :: this_point
+      	type(point),intent(inout) :: this_point
       	
       	this_point%x(:)=zero
         !this_point=point(zero) ! cannot use implicit constructor here
@@ -90,7 +100,7 @@
       ! prepare an edge
       subroutine prepare_edge(this_edge)
       
-      	class(edge),intent(inout) :: this_edge
+      	type(edge),intent(inout) :: this_edge
       	
         this_edge%points(:)=0
       
@@ -100,7 +110,7 @@
       ! prepare a triangle
       subroutine prepare_triangle(this_surface)
       
-        class(triangle),intent(inout) :: this_surface
+        type(triangle),intent(inout) :: this_surface
  
         this_surface%points(:)=0       
         this_surface%edges(:)=0
@@ -111,7 +121,7 @@
       ! prepare a quadrilateral
       subroutine prepare_quadrilateral(this_surface)
       
-        class(quadrilateral),intent(inout) :: this_surface
+        type(quadrilateral),intent(inout) :: this_surface
         
         this_surface%points(:)=0   
         this_surface%edges(:)=0
@@ -122,7 +132,7 @@
       ! prepare a tetrahedron
       subroutine prepare_tetrahedron(this_volume)
       
-        class(tetrahedron),intent(inout) :: this_volume
+        type(tetrahedron),intent(inout) :: this_volume
         
         this_volume%points(:)=0
         this_volume%edges(:)=0
@@ -134,7 +144,7 @@
       ! prepare a wedge
       subroutine prepare_wedge(this_volume)
       
-        class(wedge),intent(inout) :: this_volume
+        type(wedge),intent(inout) :: this_volume
         
         this_volume%points(:)=0       
         this_volume%edges(:)=0      
@@ -147,7 +157,7 @@
       ! prepare a brick
       subroutine prepare_brick(this_volume)
       
-        class(brick),intent(inout) :: this_volume
+        type(brick),intent(inout) :: this_volume
         
       	this_volume%points(:)=0
         this_volume%edges(:)=0
