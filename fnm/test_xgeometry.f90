@@ -2,8 +2,8 @@
 
 ! include useful modules
 
-        include 'parameter_module.f'
-        include 'xgeometry_module.f'
+        include 'parameter_module.f90'
+        include 'xgeometry_module.f90'
 
         program test
         use parameter_module
