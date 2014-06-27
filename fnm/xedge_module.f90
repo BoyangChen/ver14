@@ -4,12 +4,14 @@
       implicit none
       private
       
+      type, public :: edge ! breakable edge
+        integer :: end_node(2)
+      end type edge 
+      
       type, public :: xedge ! breakable edge
-        integer :: end_nodes(2)
-        integer,allocatable :: floating_nodes(:)
-        integer :: current_status
-        integer :: parent
-        integer,allocatable :: children(:)
+        integer :: end_node(2)
+        integer,allocatable :: flo_node(:)
+        integer :: curr_status
       end type xedge 
 
       interface empty
@@ -35,17 +37,11 @@
         
         integer :: istat
       	
-        this_xedge%end_nodes(:)=0
-        this_xedge%current_status=0
-        this_xedge%parent=0
+        this_xedge%end_node(:)=0
+        this_xedge%curr_status=0
 
-        if(allocated(this_xedge%floating_nodes)) then
-        deallocate(this_xedge%floating_nodes,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_xedge**"
-        end if
-
-        if(allocated(this_xedge%children)) then
-        deallocate(this_xedge%children,stat=istat)
+        if(allocated(this_xedge%flo_node)) then
+        deallocate(this_xedge%flo_node,stat=istat)
             if(istat/=0) stop"**deallocation error in empty_xedge**"
         end if
 
@@ -55,62 +51,43 @@
 
      
       ! update a breakable edge
-      subroutine update_xedge(this_xedge,current_status,end_nodes,&
-      & floating_nodes,parent,children)
+      subroutine update_xedge(this_xedge,curr_status,end_node,&
+      & flo_node)
       
       	type(xedge),intent(inout) :: this_xedge
-        integer,optional,intent(in) :: current_status,parent
-        integer,optional,intent(in) :: end_nodes(:),floating_nodes(:),children(:)
+        integer,optional,intent(in) :: curr_status
+        integer,optional,intent(in) :: end_node(:),flo_node(:)
         
         integer :: istat
       	
-        if(present(current_status)) this_xedge%current_status=current_status
+        if(present(curr_status)) this_xedge%curr_status=curr_status
         
-        if(present(parent)) this_xedge%parent=parent
-        
-        if(present(end_nodes)) then
-            if(size(end_nodes)==size(this_xedge%end_nodes)) then
-                this_xedge%end_nodes(:)=end_nodes(:)
+        if(present(end_node)) then
+            if(size(end_node)==size(this_xedge%end_node)) then
+                this_xedge%end_node(:)=end_node(:)
             else
-                stop"**wrong size for xedge end_nodes component**"
+                stop"**wrong size for xedge end_node component**"
             end if
         end if
         
-        if(present(floating_nodes)) then
-            if(allocated(this_xedge%floating_nodes)) then
-                if(size(floating_nodes)==size(this_xedge%floating_nodes)) then
-                    this_xedge%floating_nodes(:)=floating_nodes(:)
+        if(present(flo_node)) then
+            if(allocated(this_xedge%flo_node)) then
+                if(size(flo_node)==size(this_xedge%flo_node)) then
+                    this_xedge%flo_node(:)=flo_node(:)
                 else
-                    deallocate(this_xedge%floating_nodes,stat=istat)
+                    deallocate(this_xedge%flo_node,stat=istat)
                     if(istat/=0) stop"**deallocation error in update_xedge**"
-                    allocate(this_xedge%floating_nodes(size(floating_nodes)),stat=istat)
+                    allocate(this_xedge%flo_node(size(flo_node)),stat=istat)
                     if(istat/=0) stop"**reallocation error in update_xedge**"
-                    this_xedge%floating_nodes(:)=floating_nodes(:)
+                    this_xedge%flo_node(:)=flo_node(:)
                 end if         
             else
-                allocate(this_xedge%floating_nodes(size(floating_nodes)),stat=istat)
+                allocate(this_xedge%flo_node(size(flo_node)),stat=istat)
                 if(istat/=0) stop"**allocation error in update_xedge**"
-                this_xedge%floating_nodes(:)=floating_nodes(:)            
+                this_xedge%flo_node(:)=flo_node(:)            
             end if
         end if
         
-        if(present(children)) then
-            if(allocated(this_xedge%children)) then
-                if(size(children)==size(this_xedge%children)) then
-                    this_xedge%children(:)=children(:)
-                else
-                    deallocate(this_xedge%children,stat=istat)
-                    if(istat/=0) stop"**deallocation error in update_xedge**"
-                    allocate(this_xedge%children(size(children)),stat=istat)
-                    if(istat/=0) stop"**reallocation error in update_xedge**"
-                    this_xedge%children(:)=children(:)
-                end if         
-            else
-                allocate(this_xedge%children(size(children)),stat=istat)
-                if(istat/=0) stop"**allocation error in update_xedge**"
-                this_xedge%children(:)=children(:)            
-            end if
-        end if
 
       end subroutine update_xedge   
     

@@ -1,17 +1,23 @@
     module xtriangle_module
       use parameter_module
+      use subelement_module
       
       implicit none
       private
 
+      integer,parameter :: nnode=3, nedge=3
+
+      type, public :: triangle ! breakable triangle
+        integer :: end_node(nnode)
+      end type triangle
+      
 
       type, public :: xtriangle ! breakable triangle
-        integer :: end_nodes(3)
-        integer :: edges(3)
-        integer,allocatable :: floating_nodes(:)
-        integer :: current_status
-        integer :: parent
-        integer,allocatable :: children(:)
+        integer :: end_node(nnode) ! cnc to glb node arrays for accessing glb real(vertex) node numbers
+        integer :: edge(nedge) ! cnc to glb edge arrays for accessing status var. and glb flo node numbers
+        integer,allocatable :: flo_node(:) ! assigned to this surface, in addition to the flo nodes on edge
+        integer :: curr_status
+        type(subelement),allocatable :: sub_elem(:) ! sub element connectivities
       end type xtriangle
       
       interface empty
@@ -27,8 +33,10 @@
 
  
       contains
-      
-      
+
+
+
+
       ! empty a breakable triangle
       subroutine empty_xtriangle(this_xtriangle)
       
@@ -36,18 +44,12 @@
         
         integer :: istat
       	
-        this_xtriangle%end_nodes(:)=0
-        this_xtriangle%edges(:)=0
-        this_xtriangle%current_status=0
-        this_xtriangle%parent=0
+        this_xtriangle%end_node(:)=0
+        this_xtriangle%edge(:)=0
+        this_xtriangle%curr_status=0
 
-        if(allocated(this_xtriangle%floating_nodes)) then
-        deallocate(this_xtriangle%floating_nodes,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_xtriangle**"
-        end if
-
-        if(allocated(this_xtriangle%children)) then
-        deallocate(this_xtriangle%children,stat=istat)
+        if(allocated(this_xtriangle%flo_node)) then
+        deallocate(this_xtriangle%flo_node,stat=istat)
             if(istat/=0) stop"**deallocation error in empty_xtriangle**"
         end if
 
@@ -57,73 +59,52 @@
 
      
       ! update a breakable triangle
-      subroutine update_xtriangle(this_xtriangle,current_status,end_nodes,&
-      & edges,floating_nodes,parent,children)
+      subroutine update_xtriangle(this_xtriangle,curr_status,end_node,&
+      & edge,flo_node)
       
       	type(xtriangle),intent(inout) :: this_xtriangle
-        integer,optional,intent(in) :: current_status,parent
-        integer,optional,intent(in) :: end_nodes(:),edges(:),floating_nodes(:),children(:)
+        integer,optional,intent(in) :: curr_status
+        integer,optional,intent(in) :: end_node(:),edge(:),flo_node(:)
         
         integer :: istat
       	
-        if(present(current_status)) this_xtriangle%current_status=current_status
+        if(present(curr_status)) this_xtriangle%curr_status=curr_status
         
-        if(present(parent)) this_xtriangle%parent=parent
-        
-        if(present(end_nodes)) then
-            if(size(end_nodes)==size(this_xtriangle%end_nodes)) then
-                this_xtriangle%end_nodes(:)=end_nodes(:)
+        if(present(end_node)) then
+            if(size(end_node)==size(this_xtriangle%end_node)) then
+                this_xtriangle%end_node(:)=end_node(:)
             else
-                stop"**wrong size for xtriangle end_nodes component**"
+                stop"**wrong size for xtriangle end_node component**"
             end if
         end if
         
-        if(present(edges)) then
-            if(size(edges)==size(this_xtriangle%edges)) then
-                this_xtriangle%edges(:)=edges(:)
+        if(present(edge)) then
+            if(size(edge)==size(this_xtriangle%edge)) then
+                this_xtriangle%edge(:)=edge(:)
             else
-                stop"**wrong size for xtriangle edges component**"
+                stop"**wrong size for xtriangle edge component**"
             end if
         end if
         
-        if(present(floating_nodes)) then
-            if(allocated(this_xtriangle%floating_nodes)) then
-                if(size(floating_nodes)==size(this_xtriangle%floating_nodes)) then
-                    this_xtriangle%floating_nodes(:)=floating_nodes(:)
+        if(present(flo_node)) then
+            if(allocated(this_xtriangle%flo_node)) then
+                if(size(flo_node)==size(this_xtriangle%flo_node)) then
+                    this_xtriangle%flo_node(:)=flo_node(:)
                 else
-                    deallocate(this_xtriangle%floating_nodes,stat=istat)
+                    deallocate(this_xtriangle%flo_node,stat=istat)
                     if(istat/=0) stop"**deallocation error in update_xtriangle**"
-                    allocate(this_xtriangle%floating_nodes(size(floating_nodes)),stat=istat)
+                    allocate(this_xtriangle%flo_node(size(flo_node)),stat=istat)
                     if(istat/=0) stop"**reallocation error in update_xtriangle**"
-                    this_xtriangle%floating_nodes(:)=floating_nodes(:)
+                    this_xtriangle%flo_node(:)=flo_node(:)
                 end if         
             else
-                allocate(this_xtriangle%floating_nodes(size(floating_nodes)),stat=istat)
+                allocate(this_xtriangle%flo_node(size(flo_node)),stat=istat)
                 if(istat/=0) stop"**allocation error in update_xtriangle**"
-                this_xtriangle%floating_nodes(:)=floating_nodes(:)            
-            end if
-        end if
-        
-        if(present(children)) then
-            if(allocated(this_xtriangle%children)) then
-                if(size(children)==size(this_xtriangle%children)) then
-                    this_xtriangle%children(:)=children(:)
-                else
-                    deallocate(this_xtriangle%children,stat=istat)
-                    if(istat/=0) stop"**deallocation error in update_xtriangle**"
-                    allocate(this_xtriangle%children(size(children)),stat=istat)
-                    if(istat/=0) stop"**reallocation error in update_xtriangle**"
-                    this_xtriangle%children(:)=children(:)
-                end if         
-            else
-                allocate(this_xtriangle%children(size(children)),stat=istat)
-                if(istat/=0) stop"**allocation error in update_xtriangle**"
-                this_xtriangle%children(:)=children(:)            
+                this_xtriangle%flo_node(:)=flo_node(:)            
             end if
         end if
 
-      end subroutine update_xtriangle 
-      
+      end subroutine update_xtriangle      
       
       
     end module xtriangle_module

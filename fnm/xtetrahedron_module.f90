@@ -1,19 +1,25 @@
     module xtetrahedron_module
       use parameter_module
+      use subelement_module
 
       implicit none
       private
 
+      integer,parameter :: nnode=4, nedge=6, ntri=4, nquad=0
+
+      type, public :: tetrahedron ! breakable tetrahedron
+        integer :: end_node(nnode)
+      end type tetrahedron
 
       type, public :: xtetrahedron ! breakable tetrahedron
-        integer :: end_nodes(4)
-        integer :: edges(6)
-        integer :: tris(4)
-        integer,allocatable :: floating_nodes(:)
-        integer :: current_status
-        integer :: parent
-        integer,allocatable :: children(:)
+        integer :: end_node(nnode) ! cnc to glb node arrays for accessing glb real(vertex) node numbers
+        integer :: edge(nedge) ! cnc to glb edge arrays for accessing status var. and glb flo node numbers
+        integer :: tri(ntri) ! cnc to glb tri arrays for accessing glb flo node numbers assoc. with the tri face
+        integer,allocatable :: flo_node(:) ! assigned to this volume, in addition to the flo nodes on edges and faces
+        integer :: curr_status
+        type(subelement),allocatable :: sub_elem(:) ! sub element connectivities
       end type xtetrahedron
+
 
       interface empty
         module procedure empty_xtetrahedron
@@ -39,19 +45,13 @@
 
         integer :: istat
 
-        this_xtetrahedron%end_nodes(:)=0
-        this_xtetrahedron%edges(:)=0
-        this_xtetrahedron%tris(:)=0
-        this_xtetrahedron%current_status=0
-        this_xtetrahedron%parent=0
+        this_xtetrahedron%end_node(:)=0
+        this_xtetrahedron%edge(:)=0
+        this_xtetrahedron%tri(:)=0
+        this_xtetrahedron%curr_status=0
 
-        if(allocated(this_xtetrahedron%floating_nodes)) then
-        deallocate(this_xtetrahedron%floating_nodes,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_xtetrahedron**"
-        end if
-
-        if(allocated(this_xtetrahedron%children)) then
-        deallocate(this_xtetrahedron%children,stat=istat)
+        if(allocated(this_xtetrahedron%flo_node)) then
+        deallocate(this_xtetrahedron%flo_node,stat=istat)
             if(istat/=0) stop"**deallocation error in empty_xtetrahedron**"
         end if
 
@@ -61,77 +61,57 @@
 
 
       ! update a breakable tetrahedron
-      subroutine update_xtetrahedron(this_xtetrahedron,current_status,end_nodes,&
-      & edges,tris,floating_nodes,parent,children)
+      subroutine update_xtetrahedron(this_xtetrahedron,curr_status,end_node,&
+      & edge,tri,flo_node)
 
       	type(xtetrahedron),intent(inout) :: this_xtetrahedron
-        integer,optional,intent(in) :: current_status,parent
-        integer,optional,intent(in) :: end_nodes(:),edges(:),tris(:)
-        integer,optional,intent(in) :: floating_nodes(:),children(:)
+        integer,optional,intent(in) :: curr_status
+        integer,optional,intent(in) :: end_node(:),edge(:),tri(:)
+        integer,optional,intent(in) :: flo_node(:)
 
         integer :: istat
 
-        if(present(current_status)) this_xtetrahedron%current_status=current_status
+        if(present(curr_status)) this_xtetrahedron%curr_status=curr_status
 
-        if(present(parent)) this_xtetrahedron%parent=parent
-
-        if(present(end_nodes)) then
-            if(size(end_nodes)==size(this_xtetrahedron%end_nodes)) then
-                this_xtetrahedron%end_nodes(:)=end_nodes(:)
+        if(present(end_node)) then
+            if(size(end_node)==size(this_xtetrahedron%end_node)) then
+                this_xtetrahedron%end_node(:)=end_node(:)
             else
-                stop"**wrong size for xtetrahedron end_nodes component**"
+                stop"**wrong size for xtetrahedron end_node component**"
             end if
         end if
 
-        if(present(edges)) then
-            if(size(edges)==size(this_xtetrahedron%edges)) then
-                this_xtetrahedron%edges(:)=edges(:)
+        if(present(edge)) then
+            if(size(edge)==size(this_xtetrahedron%edge)) then
+                this_xtetrahedron%edge(:)=edge(:)
             else
-                stop"**wrong size for xtetrahedron edges component**"
+                stop"**wrong size for xtetrahedron edge component**"
             end if
         end if
 
-        if(present(tris)) then
-            if(size(tris)==size(this_xtetrahedron%tris)) then
-                this_xtetrahedron%tris(:)=tris(:)
+        if(present(tri)) then
+            if(size(tri)==size(this_xtetrahedron%tri)) then
+                this_xtetrahedron%tri(:)=tri(:)
             else
-                stop"**wrong size for xtetrahedron tris component**"
+                stop"**wrong size for xtetrahedron tri component**"
             end if
         end if
 
-        if(present(floating_nodes)) then
-            if(allocated(this_xtetrahedron%floating_nodes)) then
-                if(size(floating_nodes)==size(this_xtetrahedron%floating_nodes)) then
-                    this_xtetrahedron%floating_nodes(:)=floating_nodes(:)
+        if(present(flo_node)) then
+            if(allocated(this_xtetrahedron%flo_node)) then
+                if(size(flo_node)==size(this_xtetrahedron%flo_node)) then
+                    this_xtetrahedron%flo_node(:)=flo_node(:)
                 else
-                    deallocate(this_xtetrahedron%floating_nodes,stat=istat)
+                    deallocate(this_xtetrahedron%flo_node,stat=istat)
                     if(istat/=0) stop"**deallocation error in update_xtetrahedron**"
-                    allocate(this_xtetrahedron%floating_nodes(size(floating_nodes)),stat=istat)
+                    allocate(this_xtetrahedron%flo_node(size(flo_node)),stat=istat)
                     if(istat/=0) stop"**reallocation error in update_xtetrahedron**"
-                    this_xtetrahedron%floating_nodes(:)=floating_nodes(:)
+                    this_xtetrahedron%flo_node(:)=flo_node(:)
                 end if
             else
-                allocate(this_xtetrahedron%floating_nodes(size(floating_nodes)),stat=istat)
+                allocate(this_xtetrahedron%flo_node(size(flo_node)),stat=istat)
                 if(istat/=0) stop"**allocation error in update_xtetrahedron**"
-                this_xtetrahedron%floating_nodes(:)=floating_nodes(:)
-            end if
-        end if
-
-        if(present(children)) then
-            if(allocated(this_xtetrahedron%children)) then
-                if(size(children)==size(this_xtetrahedron%children)) then
-                    this_xtetrahedron%children(:)=children(:)
-                else
-                    deallocate(this_xtetrahedron%children,stat=istat)
-                    if(istat/=0) stop"**deallocation error in update_xtetrahedron**"
-                    allocate(this_xtetrahedron%children(size(children)),stat=istat)
-                    if(istat/=0) stop"**reallocation error in update_xtetrahedron**"
-                    this_xtetrahedron%children(:)=children(:)
-                end if
-            else
-                allocate(this_xtetrahedron%children(size(children)),stat=istat)
-                if(istat/=0) stop"**allocation error in update_xtetrahedron**"
-                this_xtetrahedron%children(:)=children(:)
+                this_xtetrahedron%flo_node(:)=flo_node(:)
             end if
         end if
 

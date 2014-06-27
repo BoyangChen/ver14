@@ -17,7 +17,7 @@
     end type :: brick_intg_point
     
     type, public :: brick_element 
-        type(xbrick) :: connec ! node, edge, face indices in their respective global arrays
+        type(brick) :: connec ! node, edge, face indices in their respective global arrays
         type(brick_intg_point) :: intg_points(nintg) ! x, xi, stress, strain, sdv
         real(kind=dp) :: K_matrix(ndof,ndof), F_vector(ndof) ! k matrix and f vector
         real(kind=dp) :: avg_glb_stress(nst), avg_lcl_stress(nst)
@@ -32,12 +32,6 @@
         real(kind=dp) :: avg_glb_stress(nst), avg_lcl_stress(nst)
         real(kind=dp) :: avg_glb_strain(nst), avg_lcl_strain(nst)
         real(kind=dp),allocatable :: avg_sdv(:)
-         ! sub-element connectivities
-        integer,allocatable :: cncsub_tetra(4,:)
-        integer,allocatable :: cncsub_wedge(6,:)
-        integer,allocatable :: cncsub_brick(8,:)
-        integer,allocatable :: cncsub_coh3d6(6,:)
-        integer,allocatable :: cncsub_coh3d8(8,:)
     end type
     
     interface empty

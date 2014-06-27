@@ -1,17 +1,23 @@
     module xquadrilateral_module
       use parameter_module
+      use subelement_module
       
       implicit none
       private
 
+      integer,parameter :: nnode=4, nedge=4
+
+      type, public :: quadrilateral ! breakable quadrilateral
+        integer :: end_node(nnode)
+      end type quadrilateral
+      
 
       type, public :: xquadrilateral ! breakable quadrilateral
-        integer :: end_nodes(4)
-        integer :: edges(4)
-        integer,allocatable :: floating_nodes(:)
-        integer :: current_status
-        integer :: parent
-        integer,allocatable :: children(:)
+        integer :: end_node(nnode) ! cnc to glb node arrays for accessing glb real(vertex) node numbers
+        integer :: edge(nedge) ! cnc to glb edge arrays for accessing status var. and glb flo node numbers
+        integer,allocatable :: flo_node(:) ! assigned to this surface, in addition to the flo nodes on edge
+        integer :: curr_status
+        type(subelement),allocatable :: sub_elem(:) ! sub element connectivities
       end type xquadrilateral
       
       interface empty
@@ -38,18 +44,12 @@
         
         integer :: istat
       	
-        this_xquadrilateral%end_nodes(:)=0
-        this_xquadrilateral%edges(:)=0
-        this_xquadrilateral%current_status=0
-        this_xquadrilateral%parent=0
+        this_xquadrilateral%end_node(:)=0
+        this_xquadrilateral%edge(:)=0
+        this_xquadrilateral%curr_status=0
 
-        if(allocated(this_xquadrilateral%floating_nodes)) then
-        deallocate(this_xquadrilateral%floating_nodes,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_xquadrilateral**"
-        end if
-
-        if(allocated(this_xquadrilateral%children)) then
-        deallocate(this_xquadrilateral%children,stat=istat)
+        if(allocated(this_xquadrilateral%flo_node)) then
+        deallocate(this_xquadrilateral%flo_node,stat=istat)
             if(istat/=0) stop"**deallocation error in empty_xquadrilateral**"
         end if
 
@@ -59,68 +59,48 @@
 
      
       ! update a breakable quadrilateral
-      subroutine update_xquadrilateral(this_xquadrilateral,current_status,end_nodes,&
-      & edges,floating_nodes,parent,children)
+      subroutine update_xquadrilateral(this_xquadrilateral,curr_status,end_node,&
+      & edge,flo_node)
       
       	type(xquadrilateral),intent(inout) :: this_xquadrilateral
-        integer,optional,intent(in) :: current_status,parent
-        integer,optional,intent(in) :: end_nodes(:),edges(:),floating_nodes(:),children(:)
+        integer,optional,intent(in) :: curr_status
+        integer,optional,intent(in) :: end_node(:),edge(:),flo_node(:)
         
         integer :: istat
       	
-        if(present(current_status)) this_xquadrilateral%current_status=current_status
+        if(present(curr_status)) this_xquadrilateral%curr_status=curr_status
         
-        if(present(parent)) this_xquadrilateral%parent=parent
-        
-        if(present(end_nodes)) then
-            if(size(end_nodes)==size(this_xquadrilateral%end_nodes)) then
-                this_xquadrilateral%end_nodes(:)=end_nodes(:)
+        if(present(end_node)) then
+            if(size(end_node)==size(this_xquadrilateral%end_node)) then
+                this_xquadrilateral%end_node(:)=end_node(:)
             else
-                stop"**wrong size for xquadrilateral end_nodes component**"
+                stop"**wrong size for xquadrilateral end_node component**"
             end if
         end if
         
-        if(present(edges)) then
-            if(size(edges)==size(this_xquadrilateral%edges)) then
-                this_xquadrilateral%edges(:)=edges(:)
+        if(present(edge)) then
+            if(size(edge)==size(this_xquadrilateral%edge)) then
+                this_xquadrilateral%edge(:)=edge(:)
             else
-                stop"**wrong size for xquadrilateral edges component**"
+                stop"**wrong size for xquadrilateral edge component**"
             end if
         end if
         
-        if(present(floating_nodes)) then
-            if(allocated(this_xquadrilateral%floating_nodes)) then
-                if(size(floating_nodes)==size(this_xquadrilateral%floating_nodes)) then
-                    this_xquadrilateral%floating_nodes(:)=floating_nodes(:)
+        if(present(flo_node)) then
+            if(allocated(this_xquadrilateral%flo_node)) then
+                if(size(flo_node)==size(this_xquadrilateral%flo_node)) then
+                    this_xquadrilateral%flo_node(:)=flo_node(:)
                 else
-                    deallocate(this_xquadrilateral%floating_nodes,stat=istat)
+                    deallocate(this_xquadrilateral%flo_node,stat=istat)
                     if(istat/=0) stop"**deallocation error in update_xquadrilateral**"
-                    allocate(this_xquadrilateral%floating_nodes(size(floating_nodes)),stat=istat)
+                    allocate(this_xquadrilateral%flo_node(size(flo_node)),stat=istat)
                     if(istat/=0) stop"**reallocation error in update_xquadrilateral**"
-                    this_xquadrilateral%floating_nodes(:)=floating_nodes(:)
+                    this_xquadrilateral%flo_node(:)=flo_node(:)
                 end if         
             else
-                allocate(this_xquadrilateral%floating_nodes(size(floating_nodes)),stat=istat)
+                allocate(this_xquadrilateral%flo_node(size(flo_node)),stat=istat)
                 if(istat/=0) stop"**allocation error in update_xquadrilateral**"
-                this_xquadrilateral%floating_nodes(:)=floating_nodes(:)            
-            end if
-        end if
-        
-        if(present(children)) then
-            if(allocated(this_xquadrilateral%children)) then
-                if(size(children)==size(this_xquadrilateral%children)) then
-                    this_xquadrilateral%children(:)=children(:)
-                else
-                    deallocate(this_xquadrilateral%children,stat=istat)
-                    if(istat/=0) stop"**deallocation error in update_xquadrilateral**"
-                    allocate(this_xquadrilateral%children(size(children)),stat=istat)
-                    if(istat/=0) stop"**reallocation error in update_xquadrilateral**"
-                    this_xquadrilateral%children(:)=children(:)
-                end if         
-            else
-                allocate(this_xquadrilateral%children(size(children)),stat=istat)
-                if(istat/=0) stop"**allocation error in update_xquadrilateral**"
-                this_xquadrilateral%children(:)=children(:)            
+                this_xquadrilateral%flo_node(:)=flo_node(:)            
             end if
         end if
 

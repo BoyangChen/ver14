@@ -1,19 +1,25 @@
     module xbrick_module
       use parameter_module
+      use subelement_module
 
       implicit none
       private
 
+      integer,parameter :: nnode=8, nedge=12, ntri=0, nquad=6
+
+      type, public :: brick ! breakable brick
+        integer :: end_node(nnode)
+      end type brick
 
       type, public :: xbrick ! breakable brick
-        integer :: end_nodes(8)
-        integer :: edges(12)
-        integer :: quads(6)
-        integer,allocatable :: floating_nodes(:)
-        integer :: current_status
-        integer :: parent
-        integer,allocatable :: children(:)
+        integer :: end_node(nnode) ! cnc to glb node arrays for accessing glb real(vertex) node numbers
+        integer :: edge(nedge) ! cnc to glb edge arrays for accessing status var. and glb flo node numbers
+        integer :: quad(nquad) ! cnc to glb quad arrays for accessing glb flo node numbers assoc. with the quad face
+        integer,allocatable :: flo_node(:) ! assigned to this volume, in addition to the flo nodes on edges and faces
+        integer :: curr_status
+        type(subelement),allocatable :: sub_elem(:) ! sub element connectivities
       end type xbrick
+
 
       interface empty
         module procedure empty_xbrick
@@ -39,19 +45,13 @@
 
         integer :: istat
 
-        this_xbrick%end_nodes(:)=0
-        this_xbrick%edges(:)=0
-        this_xbrick%quads(:)=0
-        this_xbrick%current_status=0
-        this_xbrick%parent=0
+        this_xbrick%end_node(:)=0
+        this_xbrick%edge(:)=0
+        this_xbrick%quad(:)=0
+        this_xbrick%curr_status=0
 
-        if(allocated(this_xbrick%floating_nodes)) then
-        deallocate(this_xbrick%floating_nodes,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_xbrick**"
-        end if
-
-        if(allocated(this_xbrick%children)) then
-        deallocate(this_xbrick%children,stat=istat)
+        if(allocated(this_xbrick%flo_node)) then
+        deallocate(this_xbrick%flo_node,stat=istat)
             if(istat/=0) stop"**deallocation error in empty_xbrick**"
         end if
 
@@ -61,77 +61,57 @@
 
 
       ! update a breakable brick
-      subroutine update_xbrick(this_xbrick,current_status,end_nodes,&
-      & edges,quads,floating_nodes,parent,children)
+      subroutine update_xbrick(this_xbrick,curr_status,end_node,&
+      & edge,quad,flo_node)
 
       	type(xbrick),intent(inout) :: this_xbrick
-        integer,optional,intent(in) :: current_status,parent
-        integer,optional,intent(in) :: end_nodes(:),edges(:),quads(:)
-        integer,optional,intent(in) :: floating_nodes(:),children(:)
+        integer,optional,intent(in) :: curr_status
+        integer,optional,intent(in) :: end_node(:),edge(:),quad(:)
+        integer,optional,intent(in) :: flo_node(:)
 
         integer :: istat
 
-        if(present(current_status)) this_xbrick%current_status=current_status
+        if(present(curr_status)) this_xbrick%curr_status=curr_status
 
-        if(present(parent)) this_xbrick%parent=parent
-
-        if(present(end_nodes)) then
-            if(size(end_nodes)==size(this_xbrick%end_nodes)) then
-                this_xbrick%end_nodes(:)=end_nodes(:)
+        if(present(end_node)) then
+            if(size(end_node)==size(this_xbrick%end_node)) then
+                this_xbrick%end_node(:)=end_node(:)
             else
-                stop"**wrong size for xbrick end_nodes component**"
+                stop"**wrong size for xbrick end_node component**"
             end if
         end if
 
-        if(present(edges)) then
-            if(size(edges)==size(this_xbrick%edges)) then
-                this_xbrick%edges(:)=edges(:)
+        if(present(edge)) then
+            if(size(edge)==size(this_xbrick%edge)) then
+                this_xbrick%edge(:)=edge(:)
             else
-                stop"**wrong size for xbrick edges component**"
+                stop"**wrong size for xbrick edge component**"
             end if
         end if
 
-        if(present(quads)) then
-            if(size(quads)==size(this_xbrick%quads)) then
-                this_xbrick%quads(:)=quads(:)
+        if(present(quad)) then
+            if(size(quad)==size(this_xbrick%quad)) then
+                this_xbrick%quad(:)=quad(:)
             else
-                stop"**wrong size for xbrick quads component**"
+                stop"**wrong size for xbrick quad component**"
             end if
         end if
 
-        if(present(floating_nodes)) then
-            if(allocated(this_xbrick%floating_nodes)) then
-                if(size(floating_nodes)==size(this_xbrick%floating_nodes)) then
-                    this_xbrick%floating_nodes(:)=floating_nodes(:)
+        if(present(flo_node)) then
+            if(allocated(this_xbrick%flo_node)) then
+                if(size(flo_node)==size(this_xbrick%flo_node)) then
+                    this_xbrick%flo_node(:)=flo_node(:)
                 else
-                    deallocate(this_xbrick%floating_nodes,stat=istat)
+                    deallocate(this_xbrick%flo_node,stat=istat)
                     if(istat/=0) stop"**deallocation error in update_xbrick**"
-                    allocate(this_xbrick%floating_nodes(size(floating_nodes)),stat=istat)
+                    allocate(this_xbrick%flo_node(size(flo_node)),stat=istat)
                     if(istat/=0) stop"**reallocation error in update_xbrick**"
-                    this_xbrick%floating_nodes(:)=floating_nodes(:)
+                    this_xbrick%flo_node(:)=flo_node(:)
                 end if
             else
-                allocate(this_xbrick%floating_nodes(size(floating_nodes)),stat=istat)
+                allocate(this_xbrick%flo_node(size(flo_node)),stat=istat)
                 if(istat/=0) stop"**allocation error in update_xbrick**"
-                this_xbrick%floating_nodes(:)=floating_nodes(:)
-            end if
-        end if
-
-        if(present(children)) then
-            if(allocated(this_xbrick%children)) then
-                if(size(children)==size(this_xbrick%children)) then
-                    this_xbrick%children(:)=children(:)
-                else
-                    deallocate(this_xbrick%children,stat=istat)
-                    if(istat/=0) stop"**deallocation error in update_xbrick**"
-                    allocate(this_xbrick%children(size(children)),stat=istat)
-                    if(istat/=0) stop"**reallocation error in update_xbrick**"
-                    this_xbrick%children(:)=children(:)
-                end if
-            else
-                allocate(this_xbrick%children(size(children)),stat=istat)
-                if(istat/=0) stop"**allocation error in update_xbrick**"
-                this_xbrick%children(:)=children(:)
+                this_xbrick%flo_node(:)=flo_node(:)
             end if
         end if
 
