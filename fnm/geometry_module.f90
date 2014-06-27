@@ -9,22 +9,22 @@
       
       
       !---- define geometrical quantities ------
-      type, public :: point
+      type, public :: node
         real(kind=dp) :: x(3)
         !contains
-          !procedure :: prepare => prepare_point
-          !procedure :: build => build_point
-      end type point
+          !procedure :: prepare => prepare_node
+          !procedure :: build => build_node
+      end type node
       
       type, public :: edge
-        integer :: points(2)
+        integer :: nodes(2)
         !contains
           !procedure :: prepare => prepare_edge
           !procedure :: build => build_edge
       end type edge
       
       type, public :: triangle
-        integer :: points(3)
+        integer :: nodes(3)
         integer :: edges(3)  
         !contains
           !procedure :: prepare => prepare_triangle
@@ -32,7 +32,7 @@
       end type triangle
       
       type, public :: quadrilateral
-        integer :: points(4)
+        integer :: nodes(4)
         integer :: edges(4)  
         !contains
           !procedure :: prepare => prepare_quadrilateral
@@ -40,7 +40,7 @@
       end type quadrilateral
       
       type, public :: tetrahedron
-        integer :: points(4)
+        integer :: nodes(4)
         integer :: edges(6)
         integer :: triangles(4)
         !contains
@@ -49,7 +49,7 @@
       end type tetrahedron
       
       type, public :: wedge
-        integer :: points(6)
+        integer :: nodes(6)
         integer :: edges(9)
         integer :: triangles(2)
         integer :: quadrilaterals(3)
@@ -59,7 +59,7 @@
       end type wedge
       
       type, public :: brick
-        integer :: points(8)
+        integer :: nodes(8)
         integer :: edges(12)
         integer :: quadrilaterals(6)
         !contains
@@ -69,7 +69,7 @@
       
 
       interface prepare
-        module procedure prepare_point
+        module procedure prepare_node
         module procedure prepare_edge
         module procedure prepare_triangle
         module procedure prepare_quadrilateral
@@ -86,15 +86,15 @@
       
       
       
-      ! prepare a point with zero coordinates
-      subroutine prepare_point(this_point)
+      ! prepare a node with zero coordinates
+      subroutine prepare_node(this_node)
       
-      	type(point),intent(inout) :: this_point
+      	type(node),intent(inout) :: this_node
       	
-      	this_point%x(:)=zero
-        !this_point=point(zero) ! cannot use implicit constructor here
+      	this_node%x(:)=zero
+        !this_node=node(zero) ! cannot use implicit constructor here
       
-      end subroutine prepare_point
+      end subroutine prepare_node
     
       
       ! prepare an edge
@@ -102,7 +102,7 @@
       
       	type(edge),intent(inout) :: this_edge
       	
-        this_edge%points(:)=0
+        this_edge%nodes(:)=0
       
       end subroutine prepare_edge
 
@@ -112,7 +112,7 @@
       
         type(triangle),intent(inout) :: this_surface
  
-        this_surface%points(:)=0       
+        this_surface%nodes(:)=0       
         this_surface%edges(:)=0
       
       end subroutine prepare_triangle
@@ -123,7 +123,7 @@
       
         type(quadrilateral),intent(inout) :: this_surface
         
-        this_surface%points(:)=0   
+        this_surface%nodes(:)=0   
         this_surface%edges(:)=0
     
       end subroutine prepare_quadrilateral
@@ -134,7 +134,7 @@
       
         type(tetrahedron),intent(inout) :: this_volume
         
-        this_volume%points(:)=0
+        this_volume%nodes(:)=0
         this_volume%edges(:)=0
         this_volume%triangles(:)=0
       
@@ -146,7 +146,7 @@
       
         type(wedge),intent(inout) :: this_volume
         
-        this_volume%points(:)=0       
+        this_volume%nodes(:)=0       
         this_volume%edges(:)=0      
         this_volume%triangles(:)=0 
         this_volume%quadrilaterals(:)=0
@@ -159,7 +159,7 @@
       
         type(brick),intent(inout) :: this_volume
         
-      	this_volume%points(:)=0
+      	this_volume%nodes(:)=0
         this_volume%edges(:)=0
         this_volume%quadrilaterals(:)=0
       

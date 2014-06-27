@@ -6,10 +6,6 @@
       private
 
       integer,parameter :: nnode=4, nedge=4
-
-      type, public :: quadrilateral ! breakable quadrilateral
-        integer :: end_node(nnode)
-      end type quadrilateral
       
 
       type, public :: xquadrilateral ! breakable quadrilateral

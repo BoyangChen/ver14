@@ -7,9 +7,6 @@
 
       integer,parameter :: nnode=8, nedge=12, ntri=0, nquad=6
 
-      type, public :: brick ! breakable brick
-        integer :: end_node(nnode)
-      end type brick
 
       type, public :: xbrick ! breakable brick
         integer :: end_node(nnode) ! cnc to glb node arrays for accessing glb real(vertex) node numbers

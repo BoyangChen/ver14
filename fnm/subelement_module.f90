@@ -11,11 +11,11 @@
         end type
     
         interface empty
-            module procedure empty_sub_element
+            module procedure empty_subelement
         end interface
       
         interface update
-            module procedure update_sub_element
+            module procedure update_subelement
         end interface
         
         public :: empty,update
