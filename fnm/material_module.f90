@@ -1,66 +1,113 @@
+    include 'isotropic_material_module.f90'
+    include 'lamina_material_module.f90'
+    include 'interlayer_material_module.f90'
+    
     module material_module
-    use paramter_module
+    use parameter_module
+    use isotropic_material_module
+    use lamina_material_module
+    use interlayer_material_module
     
     implicit none
-    private
     
-    type,public :: isotropic
-        real(kind=dp) :: E, nu ! elastic moduli
-        real(kind=dp) :: Xt,Xc ! tensile, compressive, and shear strengths
-        real(kind=dp) :: GIc, GIIc, GIIIc ! mode I,II,III fracture toughness
+    type :: material_type ! global material array is on this type
+        character(len=matnamelength):: matname
+        type(isotropic_type),allocatable :: isotropic(:)
+        type(lamina_type),allocatable :: lamina(:)
+        type(interlayer_type),allocatable :: interlayer(:)
     end type
     
-    type,public :: lamina
-        real(kind=dp) :: theta ! fibre angle w.r.t global x direction
-        real(kind=dp) :: E1,E2,G12,G23,nu12,nu23 ! elastic moduli
-        real(kind=dp) :: Xt,Xc,Yt,Yc,Sl,phi0 ! tensile, compressive, and shear strengths from Pinho criterion
-        real(kind=dp) :: GfIc ! translaminar fracture toughness
-        real(kind=dp) :: GmIc, GmIIc ! mode I,II matrix fracture toughness
-        real(kind=dp) :: eta ! mixed-mode law constant
-    end type
-    
-    type,public :: cohesive_crack
-        real(kind=dp) :: Dnn, Dtt, Dll ! penalty stiffness
-        real(kind=dp) :: tau_nc, tau_tc, tau_lc ! strengths, t and l dir. values may be different
-        real(kind=dp) :: Gnc, Gtc, Glc ! toughness values, t and l dir. values may be different
-        real(kind=dp) :: eta ! mixed-mode law component; eta_nt/nl/tl are the same; may be different in future
-    end type
-    
-    type,public :: ply_block
-        integer :: n_plies ! no. of plies in this block
-        real(kind=dp) :: theta ! plyblock angle
-    end type
-    
-    type,public :: laminate
-        type(lamina) :: ud_properties ! unidirectional lamina properties
-        type(ply_block), allocatable :: layup(:)
-    end type
-    
-    
-    
-    interface empty
-        module procedure empty_isotropic
-        module procedure empty_lamina
-        module procedure empty_cohesive_crack
-        module procedure empty_ply_block
-        module procedure empty_laminate
+   interface empty
+        module procedure empty_material
     end interface
       
     interface update
-        module procedure update_isotropic
-        module procedure update_lamina
-        module procedure update_cohesive_crack
-        module procedure update_ply_block
-        module procedure update_laminate
+        module procedure update_material
     end interface
     
-   
-    public :: empty,update
-  
-
 
   
     contains
+    
+    
+    
+      subroutine empty_material(this_material)
+      
+      	type(material_type),intent(inout) :: this_material
+        
+        integer :: istat
+        
+        this_material%matname=''
+      	
+        if(allocated(this_material%isotropic)) then
+            deallocate(this_material%isotropic,stat=istat)
+            if(istat/=0) stop"**deallocation error in empty_material**"
+        end if
+
+        if(allocated(this_material%lamina)) then
+            deallocate(this_material%lamina,stat=istat)
+            if(istat/=0) stop"**deallocation error in empty_material**"
+        end if
+        
+        if(allocated(this_material%interlayer)) then
+            deallocate(this_material%interlayer,stat=istat)
+            if(istat/=0) stop"**deallocation error in empty_material**"
+        end if
+
+      end subroutine empty_material
+ 
+
+
+      subroutine update_material(this_material,matname,isotropic,lamina,interlayer)
+      
+      	type(material_type),intent(inout) :: this_material
+        character(len=*),optional,intent(in):: matname
+        type(isotropic_type),optional,intent(in) :: isotropic
+        type(lamina_type),optional,intent(in) :: lamina
+        type(interlayer_type),optional,intent(in) :: interlayer
+           
+        integer :: istat
+        
+        if(present(matname)) then
+            if(len(matname)<=matnamelength) then
+                this_material%matname=matname
+            else
+                write(msg_file,*) 'material name too long! keep its length within', matnamelength
+                this_material%matname(1:matnamelength)=matname(1:matnamelength)
+            end if
+        end if
+         
+        if(present(isotropic)) then
+            if(allocated(this_material%isotropic)) then
+                this_material%isotropic(1)=isotropic        
+            else
+                allocate(this_material%isotropic(1),stat=istat)
+                if(istat/=0) stop"**allocation error in update_material**"
+                this_material%isotropic(1)=isotropic            
+            end if
+        end if
+        
+        if(present(lamina)) then
+            if(allocated(this_material%lamina)) then
+                this_material%lamina(1)=lamina        
+            else
+                allocate(this_material%lamina(1),stat=istat)
+                if(istat/=0) stop"**allocation error in update_material**"
+                this_material%lamina(1)=lamina            
+            end if
+        end if
+        
+        if(present(interlayer)) then
+            if(allocated(this_material%interlayer)) then
+                this_material%interlayer(1)=interlayer       
+            else
+                allocate(this_material%interlayer(1),stat=istat)
+                if(istat/=0) stop"**allocation error in update_material**"
+                this_material%interlayer(1)=interlayer
+            end if
+        end if
+
+      end subroutine update_material
     
     
     

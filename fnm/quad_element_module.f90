@@ -1,6 +1,5 @@
     module quad_element_module
     use paramter_module
-    use xgeometry_module
     use material_module
     
     implicit none
@@ -17,6 +16,7 @@
     
     type, public :: quad_element 
         integer :: connec(nnd) ! node indices in their global arrays
+        integer :: material ! material index in the global material arrays
         type(quad_intg_point) :: intg_point(nintg) ! x, xi, stress, strain, sdv
         real(kind=dp) :: K_matrix(ndof,ndof), F_vector(ndof) ! k matrix and f vector
         real(kind=dp) :: avg_glb_stress(nst), avg_lcl_stress(nst)

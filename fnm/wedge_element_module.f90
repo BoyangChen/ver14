@@ -1,6 +1,6 @@
     module wedge_element_module
     use paramter_module
-    use xgeometry_module
+    !use xgeometry_module
     use material_module
     
     implicit none
