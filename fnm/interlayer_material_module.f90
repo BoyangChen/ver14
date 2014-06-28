@@ -20,9 +20,12 @@
     
 
     type,public :: interlayer_type
-        type(interlayer_modulus),allocatable :: modulus(:)
-        type(interlayer_strength),allocatable :: strength(:)
-        type(interlayer_toughness),allocatable :: toughness(:)  
+        type(interlayer_modulus) :: modulus
+        type(interlayer_strength) :: strength
+        type(interlayer_toughness) :: toughness
+        logical :: modulus_active=.false.
+        logical :: strength_active=.false.
+        logical :: toughness_active=.false.
     end type
     
 
@@ -49,23 +52,10 @@
       
       	type(interlayer_type),intent(inout) :: this_interlayer
         
-        integer :: istat
+        this_interlayer%modulus_active=.false.
+        this_interlayer%strength_active=.false.
+        this_interlayer%toughness_active=.false.
       	
-        if(allocated(this_interlayer%modulus)) then
-            deallocate(this_interlayer%modulus,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_interlayer**"
-        end if
-
-        if(allocated(this_interlayer%strength)) then
-            deallocate(this_interlayer%strength,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_interlayer**"
-        end if
-        
-        if(allocated(this_interlayer%toughness)) then
-            deallocate(this_interlayer%toughness,stat=istat)
-            if(istat/=0) stop"**deallocation error in empty_interlayer**"
-        end if
-
       end subroutine empty_interlayer
  
 
@@ -76,38 +66,22 @@
         type(interlayer_modulus),optional,intent(in) :: modulus
         type(interlayer_strength),optional,intent(in) :: strength
         type(interlayer_toughness),optional,intent(in) :: toughness
-           
-        integer :: istat
-         
+        
         if(present(modulus)) then
-            if(allocated(this_interlayer%modulus)) then
-                this_interlayer%modulus(1)=modulus        
-            else
-                allocate(this_interlayer%modulus(1),stat=istat)
-                if(istat/=0) stop"**allocation error in update_interlayer**"
-                this_interlayer%modulus(1)=modulus            
-            end if
+                this_interlayer%modulus=modulus  
+                this_interlayer%modulus_active=.true.
         end if
         
         if(present(strength)) then
-            if(allocated(this_interlayer%strength)) then
-                this_interlayer%strength(1)=strength        
-            else
-                allocate(this_interlayer%strength(1),stat=istat)
-                if(istat/=0) stop"**allocation error in update_interlayer**"
-                this_interlayer%strength(1)=strength            
-            end if
+                this_interlayer%strength=strength
+                this_interlayer%strength_active=.true.
         end if
         
         if(present(toughness)) then
-            if(allocated(this_interlayer%toughness)) then
-                this_interlayer%toughness(1)=toughness       
-            else
-                allocate(this_interlayer%toughness(1),stat=istat)
-                if(istat/=0) stop"**allocation error in update_interlayer**"
-                this_interlayer%toughness(1)=toughness
-            end if
+                this_interlayer%toughness=toughness
+                this_interlayer%toughness_active=.true.
         end if
+        
 
       end subroutine update_interlayer   
       

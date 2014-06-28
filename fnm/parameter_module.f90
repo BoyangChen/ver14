@@ -6,7 +6,6 @@
         
         integer, parameter :: msg_file=6 ! I/O file index for message file
         
-        integer, parameter :: matnamelength=10 ! character length of a material name
         
         real(kind=dp), parameter :: zero=0._dp,one=1._dp,two=2._dp, &
       three=3._dp,four=4._dp,five=5._dp,six=6._dp,seven=7._dp, &
