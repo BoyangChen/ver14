@@ -1,12 +1,12 @@
-    include 'isotropic_material_module.f90'
-    include 'lamina_material_module.f90'
-    include 'interlayer_material_module.f90'
+    include 'isotropic_type_module.f90'
+    include 'lamina_type_module.f90'
+    include 'interlayer_type_module.f90'
     
     module material_module
     use parameter_module
-    use isotropic_material_module
-    use lamina_material_module
-    use interlayer_material_module
+    use isotropic_type_module
+    use lamina_type_module
+    use interlayer_type_module
     
     implicit none
     
@@ -19,5 +19,19 @@
         integer :: matkey ! index in the respective array of the associated material type
     end type
 
+    interface empty
+        module procedure empty_material
+    end interface
+    
+    contains
+    
+    subroutine empty_material(mat)
+        type(material),intent(inout):: mat
+        
+        mat%matname=''
+        mat%mattype=''
+        mat%matkey=0
+    
+    end subroutine
     
     end module material_module

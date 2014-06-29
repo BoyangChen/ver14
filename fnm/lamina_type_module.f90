@@ -1,4 +1,4 @@
-    module lamina_material_module
+    module lamina_type_module
     use parameter_module
     
     implicit none
@@ -84,4 +84,4 @@
       end subroutine update_lamina   
       
       
-    end module lamina_material_module
+    end module lamina_type_module

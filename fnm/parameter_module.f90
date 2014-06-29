@@ -14,5 +14,11 @@
       two_third=two/three,one_sixth=one/six, &
       halfcirc=180._dp,pi=3.14159265359_dp,ninety=90._dp &
       ,tolerance=0.1_dp
+      
+        contains
+        
+        subroutine exit_function
+            stop"**exit function reached**"
+        end subroutine 
      
        end module parameter_module

@@ -1,4 +1,4 @@
-    module interlayer_material_module
+    module interlayer_type_module
     use parameter_module
     
     implicit none
@@ -86,4 +86,4 @@
       end subroutine update_interlayer   
       
       
-    end module interlayer_material_module
+    end module interlayer_type_module
