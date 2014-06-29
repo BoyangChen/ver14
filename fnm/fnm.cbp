@@ -31,7 +31,7 @@
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
-		<Unit filename="test_xgeometry.f90">
+		<Unit filename="testxit.f90">
 			<Option weight="0" />
 		</Unit>
 		<Extensions>
