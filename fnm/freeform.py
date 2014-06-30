@@ -1,5 +1,5 @@
-inputf=open('UEL2d-90a.f','r')
-outputf=open('uel2d-90free.f','w')
+inputf=open('toolkit_module.f','r')
+outputf=open('toolkit_module.f90','w')
 
 lines=inputf.readlines()
 for line in lines:

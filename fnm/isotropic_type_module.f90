@@ -5,23 +5,20 @@
     private
 
     type,public :: isotropic_modulus
-        private
-        real(kind=dp) :: E, nu ! elastic moduli
+        real(kind=dp) :: E=zero, nu=zero ! elastic moduli
     end type
     
     type,public :: isotropic_strength
-        private
-        real(kind=dp) :: Xt, Xc ! tensile and compressive strengths
+        real(kind=dp) :: Xt=zero, Xc=zero ! tensile and compressive strengths
     end type
     
     type,public :: isotropic_toughness
-        private
-        real(kind=dp) :: GIc, GIIc, GIIIc ! mode I,II,III fracture toughness
+        real(kind=dp) :: GIc=zero, GIIc=zero, GIIIc=zero ! mode I,II,III fracture toughness
     end type
 
     type,public :: isotropic_type
         private
-        type(isotropic_modulus):: modulus
+        type(isotropic_modulus):: modulus ! value already zeroed
         type(isotropic_strength) :: strength
         type(isotropic_toughness):: toughness 
         logical :: modulus_active=.false.
@@ -38,12 +35,16 @@
         module procedure update_isotropic
     end interface
     
+    interface export
+        module procedure export_isotropic
+    end interface
+    
     interface ddsdde
         module procedure ddsdde_isotropic
     end interface
     
    
-    public :: empty,update
+    public :: empty,update,export,ddsdde
   
 
 
@@ -52,11 +53,15 @@
     
     
     
+    
       subroutine empty_isotropic(this_isotropic)
       
       	type(isotropic_type),intent(out) :: this_isotropic
         
-      	
+      	this_isotropic%modulus=isotropic_modulus(E=zero,nu=zero)
+        this_isotropic%strength=isotropic_strength(Xt=zero,Xc=zero)
+        this_isotropic%toughness=isotropic_toughness(GIc=zero,GIIc=zero,GIIIc=zero)
+        
         this_isotropic%modulus_active=.false.
         this_isotropic%strength_active=.false.
         this_isotropic%toughness_active=.false.
@@ -89,6 +94,29 @@
         end if
 
       end subroutine update_isotropic  
+      
+      
+      
+      subroutine export_isotropic(this_isotropic,modulus,strength,toughness, &
+      & modulus_active,strength_active,toughness_active)
+      
+      	type(isotropic_type),intent(in) :: this_isotropic
+        type(isotropic_modulus),optional,intent(out) :: modulus
+        type(isotropic_strength),optional,intent(out) :: strength
+        type(isotropic_toughness),optional,intent(out) :: toughness
+        logical,optional,intent(out) :: modulus_active,strength_active,toughness_active
+        
+         
+        if(present(modulus)) modulus=this_isotropic%modulus
+        if(present(modulus_active)) modulus_active=this_isotropic%modulus_active
+        
+        if(present(strength)) strength=this_isotropic%strength
+        if(present(strength_active)) strength_active=this_isotropic%strength_active
+               
+        if(present(toughness)) toughness=this_isotropic%toughness
+        if(present(toughness_active)) toughness_active=this_isotropic%toughness_active
+
+      end subroutine export_isotropic 
 
 
 
@@ -131,17 +159,17 @@
         ! calculate the linear elasticity stiffness matrix
         E=this_mat%modulus%E
         nu=this_mat%modulus%nu
-        G=half*E/(one+v) ! shear modulus
+        G=half*E/(one+nu) ! shear modulus
 
         if (nst .eq. 3) then ! 2D problem
-            if (PlainStrain) then
+            if (PlaneStrain) then
                 del=(one+nu)*(one-2*nu)
                 dee(1,1)=(one-nu)*E/del
                 dee(2,2)=dee(1,1)
                 dee(3,3)=G
                 dee(1,2)=nu*E/del
                 dee(2,1)=dee(1,2)   
-            else ! plain stress
+            else ! plane stress
                 del=one-nu**2
                 dee(1,1)=E/del
                 dee(2,2)=dee(1,1)

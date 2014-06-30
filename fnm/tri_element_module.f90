@@ -1,42 +1,24 @@
     module tri_element_module
     use paramter_module
-    use material_module
+    use material_module, only: material,export ! no update or empty allowed
+    use integration_point_module ! integration point type
     use toolkit_module
     use global_lib_module, only: lib_tri, lib_node, lib_mat
     
     implicit none
     private
     
-    integer,parameter :: ndim=2, nst=3, nnode=3, nig=1, ndof=ndim*nnode ! constants for type tri_element
-    
-    
-    
-    
-    type :: tri_ig_point ! private, everything needed for storage/output at ig point
-    
-        real(kind=dp) :: x(ndim) ! physical coordinates
-        real(kind=dp) :: stress(nst) ! stresses for output
-        real(kind=dp) :: strain(nst) ! strains for output
-        
-        ! below are optional terms 
-        
-        real(kind=dp),allocatable :: rsdv(:) ! sdvs for calculation and output
-        integer,allocatable :: isdv(:)
-        logical,allocatable :: lsdv(:)
-        
-    end type :: tri_ig_point
-
-    
+    integer, parameter :: ndim=2, nst=3, nnode=3, nig=1, ndof=ndim*nnode ! constants for type tri_element 
     
     
     type, public :: tri_element 
         private
         
-        integer :: connec(nnode) ! node indices in their global arrays
-        integer :: matkey ! material index in the global material arrays
-        type(tri_ig_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv
-        real(kind=dp) :: K_matrix(ndof,ndof), F_vector(ndof) ! k matrix and f vector
-        logical :: PlaneStrain
+        integer :: connec(nnode)=0 ! node indices in their global arrays
+        integer :: matkey=0 ! material index in the global material arrays
+        type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
+        real(kind=dp) :: K_matrix(ndof,ndof)=zero, F_vector(ndof)=zero ! k matrix and f vector
+        logical :: PlaneStrain=.false.
         
         ! below are optional terms 
         
@@ -53,8 +35,8 @@
         module procedure empty_tri_element
     end interface
     
-    interface update
-        module procedure update_tri_element
+    interface prepare
+        module procedure prepare_tri_element
     end interface
     
     interface integrate
@@ -64,7 +46,7 @@
     
 
 
-    public :: empty,update,integrate
+    public :: empty,prepare,integrate
     
     
     
@@ -83,8 +65,8 @@
         
         elem%connec=0
         elem%matkey=0
-        do i=1:nig
-            call empty_ig(elem%ig_point(i))
+        do i=1,nig
+            call empty(elem%ig_point(i))
         end do
         elem%K_matrix=zero   
         elem%F_vector=zero       
@@ -98,18 +80,27 @@
     
     
     
-    ! this subroutine is used to fill in the connectivity and material lib index of the element
+    ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine update_tri_element(elem,connec,matkey)
+    subroutine prepare_tri_element(elem,connec,matkey)
     
         type(tri_element),intent(inout) :: elem
         integer,intent(in) :: connec(nnode)
         integer,intent(in) :: matkey
         
+        real(kind=dp) :: x(ndim),stress(nst),strain(nst)
+        integer :: i
+        x=zero;stress=zero;strain=zero
+        i=0
+        
         elem%connec=connec
         elem%matkey=matkey
+        
+        do i=1,nig
+            call update(elem%ig_point(i),x=x,stress=stress,strain=strain)
+        end do
     
-    end subroutine update_tri_element
+    end subroutine prepare_tri_element
     
     
     
@@ -246,10 +237,10 @@
             
             
             ! update strains to ig point strain array
-            call update_ig(elem%ig_point(kig),strain=tmpstrain)
+            call update(elem%ig_point(kig),strain=tmpstrain)
             
             ! update stress of this ig point
-            call update_ig(elem%ig_point(kig),stress=tmpstress)
+            call update(elem%ig_point(kig),stress=tmpstress)
             
        	end do !-looped over all int points. ig=nig
         
@@ -280,94 +271,7 @@
     
     
     
-    
-    
-    
-    
-    
-    
-    subroutine empty_ig(ig_point)
-        type(tri_ig_point),intent(out) :: ig_point
-        
-        ig_point%x=zero
-        ig_point%stress=zero
-        ig_point%strain=zero
-        
-        if(allocated(ig_point%rsdv)) then
-            deallocate(ig_point%rsdv)
-        end if
-        
-        if(allocated(ig_point%isdv)) then
-            deallocate(ig_point%isdv)
-        end if
-        
-        if(allocated(ig_point%lsdv)) then
-            deallocate(ig_point%lsdv)
-        end if
-    
-    end subroutine empty_ig
-  
-    
-    subroutine update_ig(ig_point,x,stress,strain,rsdv,isdv,lsdv)
-        type(tri_ig_point),intent(inout) :: ig_point
-        real(kind=dp),optional,intent(in) :: x(:)
-        real(kind=dp),optional,intent(in) :: stress(:),strain(:)
-        real(kind=dp),optional,intent(in) :: rsdv(:)
-        integer,optional,intent(in) :: isdv(:)
-        logical,optional,intent(in) :: lsdv(:)
-        
-        if(present(x)) ig_point%x=x
-        
-        if(present(stress)) ig_point%stress=stress
-        
-        if(present(strain)) ig_point%strain=strain
-        
-        if(present(rsdv)) then        
-            if(allocated(ig_point%rsdv)) then
-                if(size(rsdv)==size(ig_point%rsdv)) then
-                    ig_point%rsdv=rsdv
-                else
-                    deallocate(ig_point%rsdv)
-                    allocate(ig_point%rsdv(size(rsdv)))
-                    ig_point%rsdv=rsdv
-                end if
-            else
-                allocate(ig_point%rsdv(size(rsdv)))
-                ig_point%rsdv=rsdv
-            end if
-        end if    
-        
-        if(present(isdv)) then        
-            if(allocated(ig_point%isdv)) then
-                if(size(isdv)==size(ig_point%isdv)) then
-                    ig_point%isdv=isdv
-                else
-                    deallocate(ig_point%isdv)
-                    allocate(ig_point%isdv(size(isdv)))
-                    ig_point%isdv=isdv
-                end if
-            else
-                allocate(ig_point%isdv(size(isdv)))
-                ig_point%isdv=isdv
-            end if
-        end if 
-        
-        if(present(lsdv)) then        
-            if(allocated(ig_point%lsdv)) then
-                if(size(lsdv)==size(ig_point%lsdv)) then
-                    ig_point%lsdv=lsdv
-                else
-                    deallocate(ig_point%lsdv)
-                    allocate(ig_point%lsdv(size(lsdv)))
-                    ig_point%lsdv=lsdv
-                end if
-            else
-                allocate(ig_point%lsdv(size(lsdv)))
-                ig_point%lsdv=lsdv
-            end if
-        end if 
-    
-    end subroutine update_ig
+
     
  
     subroutine tri_ig(xi,wt)
