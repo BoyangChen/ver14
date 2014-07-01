@@ -129,10 +129,8 @@
         real(kind=dp) :: bee(nst,ndof),beet(ndof,nst) ! b matrix and its transpose
         real(kind=dp) :: dee(nst,nst),deeg(nst,nst) ! d matrix in local & global coord. syst.
         real(kind=dp) :: btd(ndof,nst),btdb(ndof,ndof) ! b'*d & b'*d*b
-        real(kind=dp) :: tmpstrain(nst),tmpstress(nst) ! temporary strain and stress arrays
-        real(kind=dp),allocatable :: tmprsdv(:) ! temporary real sdv arrays
-        integer,allocatable :: tmpisdv(:)
-        logical,allocatable :: tmplsdv(:)
+        real(kind=dp) :: tmpstrain(nst),tmpstress(nst) ! temporary strain and stress arrays        
+        real(kind=dp),allocatable :: xj(:),uj(:)! nodal vars extracted from glb lib_node array
         
         integer :: i,j,kig
         
@@ -151,9 +149,24 @@
         node(:)=lib_node(elem%connec(:))
         
         ! assign values to local arrays from nodal values
-        do i=1,nnode
-            coords(1:ndim,i)=node(i)%x(1:ndim)
-            u((i-1)*ndim+1:i*ndim)=node(i)%u(1:ndim)
+        do j=1,nnode
+        
+            ! export useful values from nodes
+            call export(node(j),x=xj,u=uj)
+            
+            ! assign values to coords matrix and u vector
+            if(allocated(xj)) then
+                coords(:,j)=xj(:)
+            else
+                write(msg_file,*)'WARNING: x not allocated for node:',elem%connec(j)
+            end if
+            
+            if(allocated(uj)) then 
+                u((j-1)*ndim+1:j*ndim)=uj(1:ndim)
+            else
+                write(msg_file,*)'WARNING: u not allocated for node:',elem%connec(j)
+            end if
+            
         end do
         
         ! copy material values from global material array
@@ -176,9 +189,7 @@
             bee=zero; beet=zero; dee=zero; deeg=zero
             btd=zero; btdb=zero
             tmpstrain=zero; tmpstress=zero
-            !~if(allocated(tmprsdv)) tmprsdv=zero
-            !~if(allocated(tmpisdv)) tmpisdv=0
-            !~if(allocated(tmplsdv)) tmplsdv=.false.
+            
         
             call tri_shape(igxi,fn,dn,kig) !-to get shape matrix and derivatives
             jac=matmul(coords,dn) ! get jacobian           
@@ -197,9 +208,6 @@
             ! transfer strain to local coordinates
         	call ktransfer_strain(nst,tmpstrain,theta) !-strain now in local coords
             
-            
-            ! update temp sdvs from elem ig point sdvs
-            !..........Not included at the moment..........
             
             ! get D matrix dee accord. to material properties, and update intg point stresses
             select case(mat%mattype)

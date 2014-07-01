@@ -11,17 +11,26 @@
 
     implicit none
 
-    !type(xnode) :: node1,node2
-    !real(kind=dp) :: x(3)
+    type(xnode) :: node1,node2
+    real(kind=dp) :: x(3),u(3),du(3),v(3),a(3),dof(6),ddof(6)
+    real(kind=dp),allocatable :: xa(:),ua(:),va(:),aa(:),dofa(:),ddofa(:)
 
 
-    !call empty(node1)
-    !call empty(node2)
-    !call update(node1,x=[one,one,one])
-    !node2=node1
-    !call export(node2,x=x)
+    call empty(node1)
+    call empty(node2)
 
-    !print*,x
+    u=zero
+    du=zero
+    v=zero
+    a=one
+    dof=ten
+    ddof=three
+
+    call update(node1,x=[one,one,one],u=u,du=du,v=v,a=a,dof=dof,ddof=ddof)
+    node2=node1
+    call export(node2,x=xa,u=ua,v=va,a=aa,dof=dofa,ddof=ddofa)
+
+    print*,dofa,ddofa
 
 
 !    type(isotropic_type) :: lib_iso(3)
@@ -41,24 +50,24 @@
 !    print*,mstat,sstat,tstat
 
 
-    integer :: ndim=2, nst=3
-    type(integration_point) :: igpnt
-    real(kind=dp),allocatable :: x(:),rsdv(:)
-
-    call update(igpnt,x=[zero,one],rsdv=[one,two])
-    call export(igpnt,x=x,rsdv=rsdv)
-
-    print*,x
-    print*,rsdv
-
-    call empty(igpnt)
-
-    x=zero;rsdv=ten
-
-    call export(igpnt,x=x,rsdv=rsdv)
-
-    print*,x
-    print*,rsdv
+!    integer :: ndim=2, nst=3
+!    type(integration_point) :: igpnt
+!    real(kind=dp),allocatable :: x(:),rsdv(:)
+!
+!    call update(igpnt,x=[zero,one],rsdv=[one,two])
+!    call export(igpnt,x=x,rsdv=rsdv)
+!
+!    print*,x
+!    print*,rsdv
+!
+!    call empty(igpnt)
+!
+!    x=zero;rsdv=ten
+!
+!    call export(igpnt,x=x,rsdv=rsdv)
+!
+!    print*,x
+!    print*,rsdv
 
 
 
