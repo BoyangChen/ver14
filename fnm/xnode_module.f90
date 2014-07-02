@@ -9,6 +9,7 @@
       
         private ! hide components from external operation
         
+        integer :: key=0
         real(kind=dp),allocatable :: x(:) ! coordinates, density
         real(kind=dp),allocatable :: u(:), du(:), v(:), a(:) ! displacements, incremental disp. velocity and acceleration
         real(kind=dp),allocatable :: dof(:), ddof(:) ! additional dof and incremental dof
@@ -23,12 +24,12 @@
         module procedure update_xnode
       end interface
       
-      interface export
-        module procedure export_xnode
+      interface extract
+        module procedure extract_xnode
       end interface
       
 
-      public :: empty,update,export
+      public :: empty,update,extract
 
 
 
@@ -45,6 +46,7 @@
       
       	type(xnode),intent(out) :: this_xnode
       	
+        this_xnode%key=0
         if(allocated(this_xnode%x)) deallocate(this_xnode%x)
         if(allocated(this_xnode%u)) deallocate(this_xnode%u)
         if(allocated(this_xnode%du)) deallocate(this_xnode%du)
@@ -62,12 +64,14 @@
 
 
       ! update a node
-      subroutine update_xnode(this_xnode,x,u,du,v,a,dof,ddof)
+      subroutine update_xnode(this_xnode,key,x,u,du,v,a,dof,ddof)
       
       	type(xnode),intent(inout) :: this_xnode
+        integer,optional,intent(in) :: key
         real(kind=dp),optional,intent(in) :: x(:),u(:),du(:),v(:),a(:)
         real(kind=dp),optional,intent(in) :: dof(:),ddof(:)
         
+        if(present(key)) this_xnode%key=key
         
         if(present(x)) then
             if(allocated(this_xnode%x)) then
@@ -224,11 +228,14 @@
       
       
            ! update a node
-    subroutine export_xnode(this_xnode,x,u,du,v,a,dof,ddof)
+    subroutine extract_xnode(this_xnode,key,x,u,du,v,a,dof,ddof)
       
       	type(xnode),intent(in) :: this_xnode
+        integer,optional,intent(out) :: key
         real(kind=dp),allocatable,optional,intent(out) :: x(:),u(:),du(:),v(:),a(:)
         real(kind=dp),allocatable,optional,intent(out) :: dof(:),ddof(:)
+        
+        if(present(key)) key=this_xnode%key
         
         if(present(x)) then
             if(allocated(this_xnode%x)) then
@@ -280,7 +287,7 @@
         end if
         
 
-    end subroutine export_xnode 
+    end subroutine extract_xnode 
       
       
 

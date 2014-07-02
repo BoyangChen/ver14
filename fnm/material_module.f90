@@ -33,11 +33,11 @@
         module procedure update_material
     end interface
     
-    interface export
-        module procedure export_material
+    interface extract
+        module procedure extract_material
     end interface
     
-    private :: empty_material, update_material, export_material
+    private :: empty_material, update_material, extract_material
     
     
     
@@ -73,8 +73,8 @@
     end subroutine update_material
     
     
-    ! this subroutine is used anywhere to export material information
-    subroutine export_material(mat,matname,mattype,matkey)
+    ! this subroutine is used anywhere to extract material information
+    subroutine extract_material(mat,matname,mattype,matkey)
         type(material),intent(in):: mat
         character(len=matnamelength),optional,intent(out) :: matname 
         character(len=mattypelength),optional,intent(out) :: mattype 
@@ -84,7 +84,7 @@
         if(present(mattype)) mattype=mat%mattype
         if(present(matkey)) matkey=mat%matkey
     
-    end subroutine export_material
+    end subroutine extract_material
     
     
     end module material_module

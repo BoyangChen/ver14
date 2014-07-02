@@ -7,97 +7,152 @@
     
     
 !********************************************************************************************
-!******************** subroutine deemat_global **********************************************
-!**** to transform d matrix from local to global coordinates ********************************
+!                           function glb_dee
+!               to transform d matrix from local to global coordinates 
+!                           (for composite lamina)
 !********************************************************************************************
-      subroutine kdeemat_global(nst,dee,deeg,theta)
-      use modparam
-!
-      include 'aba_param.inc'
-!     
-      dimension dee(nst,nst), deeg(nst,nst)
-!
-      dimension dee2(nst,nst)
-      integer i,j
-!     initialize local array
-      call kinitial(dee2,nst,nst)
-!
+      function glb_dee(dee,theta)
+    
+      real(kind=dp),intent(in)   :: dee(:,:), theta
+      real(kind=dp)              :: glb_dee(shape(dee))
+
+      ! local variables
+      real(kind=dp) :: c, s
+      integer       :: nst
+      
+      c=zero; s=zero
+      nst=0
+
       c=cos(pi*theta/halfcirc)
       s=sin(pi*theta/halfcirc)
-!     d matrix in global coords stored first in local array dee2
-      if (nst .eq. 3) then
-        dee2(1,1) = c*c*c*c*dee(1,1) + two*c*c*s*s*(dee(1,2)
-     &            + two*dee(3,3)) + s*s*s*s*dee(2,2)
-        dee2(1,2) = s*s*c*c*(dee(1,1) + dee(2,2) - four*dee(3,3))
-     &            + (s*s*s*s+c*c*c*c)*dee(1,2)
-        dee2(2,1) = dee2(1,2)
-        dee2(2,2) = s*s*s*s*dee(1,1) + two*c*c*s*s*(dee(1,2)
-     &            + two*dee(3,3)) + c*c*c*c*dee(2,2)
-        dee2(1,3) = s*c*(c*c*(dee(1,1) - dee(1,2) - two*dee(3,3))
-     &            + s*s*(dee(1,2) - dee(2,2) + two*dee(3,3)))
-        dee2(3,1) = dee2(1,3)
-        dee2(2,3) = s*c*(s*s*(dee(1,1) - dee(1,2) - two*dee(3,3))
-     &            + c*c*(dee(1,2) - dee(2,2) + two*dee(3,3)))
-        dee2(3,2) = dee2(2,3)
-        dee2(3,3) = c*c*s*s*(dee(1,1)+dee(2,2)-2*dee(1,2))
-     &			  +(c*c-s*s)**2*dee(3,3)
+      
+      if(shape(dee)(1)/=shape(dee)(2)) then
+        write(msg_file,*)"ERROR: D matrix must be square!"
+        call exit_function
       else
-       write(6,*) 'no. of strains not supported for kdeemat_global!'
-       call xit
+        nst=shape(dee)(1)
       end if
-!     pass values to deeg
-      do i=1,nst
-        do j=1,nst
-            deeg(i,j)=dee2(i,j)
-        end do
-      end do
-!
-      return
-      end subroutine kdeemat_global
+      
+      ! d matrix in global coords stored first in local array glb_dee
+      if (nst == 3) then
+        glb_dee(1,1) = c*c*c*c*dee(1,1) + two*c*c*s*s*(dee(1,2) &
+     &            + two*dee(3,3)) + s*s*s*s*dee(2,2)
+        glb_dee(1,2) = s*s*c*c*(dee(1,1) + dee(2,2) - four*dee(3,3)) &
+     &            + (s*s*s*s+c*c*c*c)*dee(1,2)
+        glb_dee(2,1) = glb_dee(1,2)
+        glb_dee(2,2) = s*s*s*s*dee(1,1) + two*c*c*s*s*(dee(1,2) &
+     &            + two*dee(3,3)) + c*c*c*c*dee(2,2)
+        glb_dee(1,3) = s*c*(c*c*(dee(1,1) - dee(1,2) - two*dee(3,3)) &
+     &            + s*s*(dee(1,2) - dee(2,2) + two*dee(3,3)))
+        glb_dee(3,1) = glb_dee(1,3)
+        glb_dee(2,3) = s*c*(s*s*(dee(1,1) - dee(1,2) - two*dee(3,3)) &
+     &            + c*c*(dee(1,2) - dee(2,2) + two*dee(3,3)))
+        glb_dee(3,2) = glb_dee(2,3)
+        glb_dee(3,3) = c*c*s*s*(dee(1,1)+dee(2,2)-2*dee(1,2)) &
+     &			  +(c*c-s*s)**2*dee(3,3)
+      ELSE IF (NST == 6) THEN
+        glb_dee(1,1) = c*c*c*c*dee(1,1) + two*c*c*s*s*(dee(1,2) &
+     &            + two*dee(4,4)) + s*s*s*s*dee(2,2)
+        glb_dee(1,2) = s*s*c*c*(dee(1,1) + dee(2,2) - four*dee(4,4)) &
+     &            + (s*s*s*s+c*c*c*c)*dee(1,2)
+        glb_dee(2,1) = glb_dee(1,2)
+        glb_dee(2,2) = s*s*s*s*dee(1,1) + two*c*c*s*s*(dee(1,2) &
+     &            + two*dee(4,4)) + c*c*c*c*dee(2,2)
+        glb_dee(1,3) = c*c*dee(1,3) + s*s*dee(2,3)
+        glb_dee(3,1) = glb_dee(1,3)
+        glb_dee(1,4) = s*c*(c*c*(dee(1,1) - dee(1,2) - two*dee(4,4)) &
+     &            + s*s*(dee(1,2) - dee(2,2) + two*dee(4,4)))
+        glb_dee(4,1) = glb_dee(1,4)
+        glb_dee(2,3) = s*s*dee(1,3) + c*c*dee(2,3)
+        glb_dee(3,2) = glb_dee(2,3)
+        glb_dee(2,4) = s*c*(s*s*(dee(1,1) - dee(1,2) - two*dee(4,4)) &
+     &            + c*c*(dee(1,2) - dee(2,2) + two*dee(4,4)))
+        glb_dee(4,2) = glb_dee(2,4)
+        glb_dee(3,3) = dee(3,3)
+        glb_dee(3,4) = c*s*(dee(1,3) - dee(2,3))
+        glb_dee(4,3) = glb_dee(3,4)
+        glb_dee(5,5) = c*c*dee(5,5) + s*s*dee(6,6)
+        glb_dee(5,6) = c*s*(dee(6,6) - dee(5,5))
+        glb_dee(6,5) = glb_dee(5,6)
+        glb_dee(6,6) = s*s*dee(5,5) + c*c*dee(6,6)
+        glb_dee(4,4) = s*s*c*c*(dee(1,1) - two*dee(1,2) + dee(2,2)) &
+     &            + (s*s - c*c)*(s*s - c*c)*dee(4,4)
+      
+      else
+       write(msg_file,*) 'no. of strains not supported for glb_dee function!'
+       call exit_function
+      end if
+
+      end function glb_dee
 !********************************************************************************************
 !********************************************************************************************
 
 
 
 !********************************************************************************************
-!********************* subroutine kdeterminant **********************************************
+!********************* function determinant **********************************************
 !********* returns the determinant of a jacobian matrix	*************************************
 !********************************************************************************************
-      subroutine kdeterminant(ajacob,detj,ndim)
+      function determinant(ajacobi)
 !
-      include 'aba_param.inc'
-!
-      dimension ajacob(ndim,ndim)
+      real(kind=dp),intent(in) ::   ajacobi(:,:)
+      real(kind=dp)            ::   determinant
+      
+      integer :: ndim
+      
+      ndim=0
+      
+      if(shape(ajacobi)(1)/=shape(ajacobi)(2)) then
+        write(msg_file,*)"ERROR: jacobian matrix must be square!"
+        call exit_function
+      else
+        ndim=shape(ajacobi)(1)
+      end if
 !
       if (ndim .eq. 2) then
-        detj= ajacob(1,1)*ajacob(2,2) - ajacob(1,2)*ajacob(2,1)
+        detj= ajacobi(1,1)*ajacobi(2,2) - ajacobi(1,2)*ajacobi(2,1)
+      else if(ndim .eq. 3) then
+        DetJ= Ajacobi(1,1)*(Ajacobi(2,2)*Ajacobi(3,3)-Ajacobi(3,2)*Ajacobi(2,3))
+        DetJ= DetJ- Ajacobi(1,2)*(Ajacobi(2,1)*Ajacobi(3,3)-Ajacobi(3,1)*Ajacobi(2,3))
+        DetJ= DetJ+ Ajacobi(1,3)*(Ajacobi(2,1)*Ajacobi(3,2)-Ajacobi(3,1)*Ajacobi(2,2))
       else
-        write(6,*) 'dimension not supported for kdeterminant!'
-        call xit
+        write(msg_file,*) "ERROR:dimension not supported for determinant function!"
+        call exit_function
       end if
 !
       return
-      end subroutine kdeterminant
+      end function determinant
 !********************************************************************************************
 !********************************************************************************************
 
 
 
 !********************************************************************************************    
-!********************* subroutine kbeemat ***************************************************
+!********************* function beemat ***************************************************
 !******* strain-displacement matrix for infinitesimal deformation ***************************
 !********************************************************************************************
+! convention of order: eps1, eps2, eps3, gamma12, gamma13, gamma23
 !
-      subroutine kbeemat(bee,gn,nnode,nst,ndofel)
-      use modparam
-!
-      include 'aba_param.inc'
-!
-      dimension gn(nnode,*),bee(nst,ndofel)
-!
-      integer i,j,k,l,m
-!
-      if (nst .eq. 3) then
+      function beemat(gn)
+
+      !dimension gn(nnode,ndim),bee(nst,ndof)
+      real(kind=dp),intent(in)  :: gn(:,:)
+      real(kind=dp) :: beemat(size(gn(1,:))*(size(gn(1,:))+1)/2, size(gn(1,:))*size(gn(:,1)))
+
+      ! local variables  
+      real(kind=dp) :: x, y, z
+      integer :: nnode, ndim, nst, ndof
+      integer :: k,l,m,n
+      
+      x=zero; y=zero; z=zero
+      nnode=0; ndim=0; nst=0; ndof=0
+      k=0; l=0; m=0; n=0
+      
+      nnode=size(gn(:,1))
+      ndim=size(gn(1,:))
+      nst=ndim*(ndim+1)/2
+
+      if (nst == 3) then
         do m=1,nnode
           k= 2*m
           l=k-1
@@ -108,11 +163,29 @@
           bee(2,k)= y
           bee(3,l)= y
         end do
+      else if (nst == 6) then
+        do m=1,nnode
+          n= 3*m
+          k=n-1
+          l=k-1
+          x=gn(1,m)
+          y=gn(2,m)
+          z=gn(3,m)
+          bee(1,l)=x
+          bee(4,k)=x
+          bee(5,n)=x
+          bee(2,k)=y
+          bee(4,l)=y
+          bee(6,n)=y
+          bee(3,n)=z
+          bee(5,l)=z
+          bee(6,k)=z
+        end do
       else
-       write(6,*) 'no. of strains not supported for kbeemat!'
-       call xit        
+       write(msg_file,*) 'no. of strains not supported for kbeemat!'
+       call exit_function  
       end if
-!
+
       return
       end subroutine kbeemat
 !********************************************************************************************

@@ -35,8 +35,8 @@
         module procedure update_isotropic
     end interface
     
-    interface export
-        module procedure export_isotropic
+    interface extract
+        module procedure extract_isotropic
     end interface
     
     interface ddsdde
@@ -44,7 +44,7 @@
     end interface
     
    
-    public :: empty,update,export,ddsdde
+    public :: empty,update,extract,ddsdde
   
 
 
@@ -97,7 +97,7 @@
       
       
       
-      subroutine export_isotropic(this_isotropic,modulus,strength,toughness, &
+      subroutine extract_isotropic(this_isotropic,modulus,strength,toughness, &
       & modulus_active,strength_active,toughness_active)
       
       	type(isotropic_type),intent(in) :: this_isotropic
@@ -116,7 +116,7 @@
         if(present(toughness)) toughness=this_isotropic%toughness
         if(present(toughness_active)) toughness_active=this_isotropic%toughness_active
 
-      end subroutine export_isotropic 
+      end subroutine extract_isotropic 
 
 
 
@@ -124,7 +124,7 @@
 !************************ subroutine ddsdde ************************************************
 !***** returns the tangent stiffness matrix of the material ******************************
 !********************************************************************************************
-      subroutine ddsdde_isotropic(this_mat,dee,PlaneStrain,strain,stress,rsdv,isdv,lsdv)
+      subroutine ddsdde_isotropic(this_mat,dee,strain,stress,PlaneStrain,rsdv,isdv,lsdv)
 
         type(isotropic_type),intent(in) :: this_mat
         real(kind=dp),intent(out) :: dee(:,:)

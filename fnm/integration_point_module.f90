@@ -13,6 +13,7 @@
         !~real(kind=dp) :: strain(nst)=zero ! strains for output
         
         real(kind=dp),allocatable :: x(:) ! physical coordinates
+        real(kind=dp),allocatable :: u(:) ! displacement
         real(kind=dp),allocatable :: stress(:) ! stresses for output
         real(kind=dp),allocatable :: strain(:) ! strains for output
         
@@ -34,12 +35,12 @@
         module procedure update_ig
     end interface
       
-    interface export
-        module procedure export_ig
+    interface extract
+        module procedure extract_ig
     end interface
       
 
-    public :: empty,update,export
+    public :: empty,update,extract
     
     
     
@@ -49,6 +50,7 @@
         type(integration_point),intent(out) :: ig_point
         
         if(allocated(ig_point%x)) deallocate(ig_point%x)
+        if(allocated(ig_point%u)) deallocate(ig_point%u)
         if(allocated(ig_point%stress)) deallocate(ig_point%stress)
         if(allocated(ig_point%strain)) deallocate(ig_point%strain)
         if(allocated(ig_point%rsdv)) deallocate(ig_point%rsdv)
@@ -81,9 +83,9 @@
     !~end subroutine empty_ig
   
     
-    subroutine update_ig(ig_point,x,stress,strain,rsdv,isdv,lsdv)
+    subroutine update_ig(ig_point,x,u,stress,strain,rsdv,isdv,lsdv)
         type(integration_point),intent(inout) :: ig_point
-        real(kind=dp),optional,intent(in) :: x(:)
+        real(kind=dp),optional,intent(in) :: x(:),u(:)
         real(kind=dp),optional,intent(in) :: stress(:),strain(:)
         real(kind=dp),optional,intent(in) :: rsdv(:)
         integer,optional,intent(in) :: isdv(:)
@@ -110,7 +112,22 @@
                 allocate(ig_point%x(size(x)))
                 ig_point%x=x
             end if
-        end if    
+        end if 
+
+        if(present(u)) then        
+            if(allocated(ig_point%u)) then
+                if(size(u)==size(ig_point%u)) then
+                    ig_point%u=u
+                else
+                    deallocate(ig_point%u)
+                    allocate(ig_point%u(size(u)))
+                    ig_point%u=u
+                end if
+            else
+                allocate(ig_point%u(size(u)))
+                ig_point%u=u
+            end if
+        end if
         
         if(present(stress)) then        
             if(allocated(ig_point%stress)) then
@@ -140,11 +157,7 @@
                 allocate(ig_point%strain(size(strain)))
                 ig_point%strain=strain
             end if
-        end if
-        
-        
-        
-        
+        end if        
         
         if(present(rsdv)) then        
             if(allocated(ig_point%rsdv)) then
@@ -196,9 +209,9 @@
     
     
     
-    subroutine export_ig(ig_point,x,stress,strain,rsdv,isdv,lsdv)
+    subroutine extract_ig(ig_point,x,u,stress,strain,rsdv,isdv,lsdv)
         type(integration_point),intent(in) :: ig_point
-        real(kind=dp),allocatable,optional,intent(out) :: x(:)
+        real(kind=dp),allocatable,optional,intent(out) :: x(:),u(:)
         real(kind=dp),allocatable,optional,intent(out) :: stress(:),strain(:)
         real(kind=dp),allocatable,optional,intent(out) :: rsdv(:)
         integer,allocatable,optional,intent(out) :: isdv(:)
@@ -210,7 +223,14 @@
                 allocate(x(size(ig_point%x)))
                 x=ig_point%x
             end if
-        end if    
+        end if
+        
+        if(present(u)) then        
+            if(allocated(ig_point%u)) then
+                allocate(u(size(ig_point%u)))
+                u=ig_point%u
+            end if
+        end if
         
         if(present(stress)) then        
             if(allocated(ig_point%stress)) then
@@ -248,7 +268,7 @@
             end if
         end if 
     
-    end subroutine export_ig
+    end subroutine extract_ig
     
     
     end module integration_point_module
