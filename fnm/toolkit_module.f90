@@ -14,23 +14,27 @@
       function glb_dee(dee,theta)
     
       real(kind=dp),intent(in)   :: dee(:,:), theta
-      real(kind=dp)              :: glb_dee(shape(dee))
+      real(kind=dp)              :: glb_dee(size(dee(:,1)),size(dee(1,:)))
 
       ! local variables
       real(kind=dp) :: c, s
-      integer       :: nst
+      integer       :: nst, nrow, ncol
       
+      glb_dee=zero
       c=zero; s=zero
-      nst=0
+      nst=0; nrow=0; ncol=0
 
       c=cos(pi*theta/halfcirc)
       s=sin(pi*theta/halfcirc)
       
-      if(shape(dee)(1)/=shape(dee)(2)) then
-        write(msg_file,*)"ERROR: D matrix must be square!"
+      nrow=size(dee(:,1))
+      ncol=size(dee(1,:))
+      
+      if(nrow/=ncol) then
+        write(msg_file,*)"error: d matrix must be square!"
         call exit_function
       else
-        nst=shape(dee)(1)
+        nst=nrow
       end if
       
       ! d matrix in global coords stored first in local array glb_dee
@@ -50,7 +54,7 @@
         glb_dee(3,2) = glb_dee(2,3)
         glb_dee(3,3) = c*c*s*s*(dee(1,1)+dee(2,2)-2*dee(1,2)) &
      &			  +(c*c-s*s)**2*dee(3,3)
-      ELSE IF (NST == 6) THEN
+      else if (nst == 6) then
         glb_dee(1,1) = c*c*c*c*dee(1,1) + two*c*c*s*s*(dee(1,2) &
      &            + two*dee(4,4)) + s*s*s*s*dee(2,2)
         glb_dee(1,2) = s*s*c*c*(dee(1,1) + dee(2,2) - four*dee(4,4)) &
@@ -79,7 +83,7 @@
      &            + (s*s - c*c)*(s*s - c*c)*dee(4,4)
       
       else
-       write(msg_file,*) 'no. of strains not supported for glb_dee function!'
+       write(msg_file,*) 'error: no. of strains not supported for glb_dee function!'
        call exit_function
       end if
 
@@ -93,30 +97,33 @@
 !********************* function determinant **********************************************
 !********* returns the determinant of a jacobian matrix	*************************************
 !********************************************************************************************
-      function determinant(ajacobi)
+      function determinant(jacob)
 !
-      real(kind=dp),intent(in) ::   ajacobi(:,:)
+      real(kind=dp),intent(in) ::   jacob(:,:)
       real(kind=dp)            ::   determinant
       
-      integer :: ndim
+      integer :: ndim, nshape(2)
       
-      ndim=0
+      determinant=zero
+      ndim=0; nshape=0
       
-      if(shape(ajacobi)(1)/=shape(ajacobi)(2)) then
-        write(msg_file,*)"ERROR: jacobian matrix must be square!"
+      nshape=shape(jacob)
+      
+      if(nshape(1)/=nshape(2)) then
+        write(msg_file,*)"error: jacobian matrix must be square!"
         call exit_function
       else
-        ndim=shape(ajacobi)(1)
+        ndim=nshape(1)
       end if
 !
       if (ndim .eq. 2) then
-        detj= ajacobi(1,1)*ajacobi(2,2) - ajacobi(1,2)*ajacobi(2,1)
+        determinant= jacob(1,1)*jacob(2,2) - jacob(1,2)*jacob(2,1)
       else if(ndim .eq. 3) then
-        DetJ= Ajacobi(1,1)*(Ajacobi(2,2)*Ajacobi(3,3)-Ajacobi(3,2)*Ajacobi(2,3))
-        DetJ= DetJ- Ajacobi(1,2)*(Ajacobi(2,1)*Ajacobi(3,3)-Ajacobi(3,1)*Ajacobi(2,3))
-        DetJ= DetJ+ Ajacobi(1,3)*(Ajacobi(2,1)*Ajacobi(3,2)-Ajacobi(3,1)*Ajacobi(2,2))
+        determinant= jacob(1,1)*(jacob(2,2)*jacob(3,3)-jacob(3,2)*jacob(2,3))
+        determinant= determinant- jacob(1,2)*(jacob(2,1)*jacob(3,3)-jacob(3,1)*jacob(2,3))
+        determinant= determinant+ jacob(1,3)*(jacob(2,1)*jacob(3,2)-jacob(3,1)*jacob(2,2))
       else
-        write(msg_file,*) "ERROR:dimension not supported for determinant function!"
+        write(msg_file,*) "error:dimension not supported for determinant function!"
         call exit_function
       end if
 !
@@ -135,7 +142,6 @@
 !
       function beemat(gn)
 
-      !dimension gn(nnode,ndim),bee(nst,ndof)
       real(kind=dp),intent(in)  :: gn(:,:)
       real(kind=dp) :: beemat(size(gn(1,:))*(size(gn(1,:))+1)/2, size(gn(1,:))*size(gn(:,1)))
 
@@ -144,6 +150,7 @@
       integer :: nnode, ndim, nst, ndof
       integer :: k,l,m,n
       
+      beemat=zero
       x=zero; y=zero; z=zero
       nnode=0; ndim=0; nst=0; ndof=0
       k=0; l=0; m=0; n=0
@@ -158,10 +165,10 @@
           l=k-1
           x=gn(m,1)
           y=gn(m,2)
-          bee(1,l)= x
-          bee(3,k)= x
-          bee(2,k)= y
-          bee(3,l)= y
+          beemat(1,l)= x
+          beemat(3,k)= x
+          beemat(2,k)= y
+          beemat(3,l)= y
         end do
       else if (nst == 6) then
         do m=1,nnode
@@ -171,15 +178,15 @@
           x=gn(1,m)
           y=gn(2,m)
           z=gn(3,m)
-          bee(1,l)=x
-          bee(4,k)=x
-          bee(5,n)=x
-          bee(2,k)=y
-          bee(4,l)=y
-          bee(6,n)=y
-          bee(3,n)=z
-          bee(5,l)=z
-          bee(6,k)=z
+          beemat(1,l)=x
+          beemat(4,k)=x
+          beemat(5,n)=x
+          beemat(2,k)=y
+          beemat(4,l)=y
+          beemat(6,n)=y
+          beemat(3,n)=z
+          beemat(5,l)=z
+          beemat(6,k)=z
         end do
       else
        write(msg_file,*) 'no. of strains not supported for kbeemat!'
@@ -187,7 +194,7 @@
       end if
 
       return
-      end subroutine kbeemat
+      end function beemat
 !********************************************************************************************
 !********************************************************************************************
 !
@@ -197,48 +204,62 @@
 !********************* subroutine kjac_inv **************************************************
 !************** inverts a jacobian matrix onto itself ***************************************
 !********************************************************************************************
-      subroutine kjac_inv(ajacob,detj,ndim)
-      use modparam
+      function inverse(jacob,detj)
 !
-      include 'aba_param.inc'
-!
-      dimension ajacob(ndim,ndim)
-!
-      dimension ajac(ndim,ndim)
-      integer i,j
-!
-!	  initialize local matrices and vectors
-      call kinitial(ajac,ndim,ndim)
-!
-      do i=1,ndim
-        do j=1,ndim
-          ajac(i,j)=ajacob(i,j)
-        end do
-      end do
-!
-      if(ndim .eq. 2) then
-        ajacob(1,1)=ajac(2,2)
-        ajacob(2,1)=-ajac(2,1)
-        ajacob(1,2)=-ajac(1,2)
-        ajacob(2,2)=ajac(1,1)
+      real(kind=dp),intent(in)          :: jacob(:,:)
+      real(kind=dp),optional,intent(in) :: detj  
+      real(kind=dp)                     :: inverse(size(jacob(:,1)),size(jacob(1,:)))
+
+      real(kind=dp) :: det
+      integer :: ndim, nshape(2)
+      
+      inverse=zero
+      det=zero
+      ndim=0; nshape=0
+      
+      nshape=shape(jacob)
+      
+      if(nshape(1)/=nshape(2)) then
+        write(msg_file,*)"error: jacobian matrix must be square!"
+        call exit_function
       else
-       write(6,*) 'dimension not supported for kjac_inv!'
-       call xit
+        ndim=nshape(1)
+      end if  
+
+      if(ndim == 2) then
+        inverse(1,1)=jacob(2,2)
+        inverse(2,1)=-jacob(2,1)
+        inverse(1,2)=-jacob(1,2)
+        inverse(2,2)=jacob(1,1)
+      else if(ndim == 3) then
+        inverse(1,1)=jacob(2,2)*jacob(3,3)-jacob(3,2)*jacob(2,3)
+        inverse(2,1)=jacob(3,1)*jacob(2,3)-jacob(2,1)*jacob(3,3)
+        inverse(3,1)=jacob(2,1)*jacob(3,2)-jacob(3,1)*jacob(2,2)
+        inverse(1,2)=jacob(3,2)*jacob(1,3)-jacob(1,2)*jacob(3,3)
+        inverse(2,2)=jacob(1,1)*jacob(3,3)-jacob(3,1)*jacob(1,3)
+        inverse(3,2)=jacob(3,1)*jacob(1,2)-jacob(1,1)*jacob(3,2)
+        inverse(1,3)=jacob(1,2)*jacob(2,3)-jacob(2,2)*jacob(1,3)
+        inverse(2,3)=jacob(2,1)*jacob(1,3)-jacob(1,1)*jacob(2,3)
+        inverse(3,3)=jacob(1,1)*jacob(2,2)-jacob(2,1)*jacob(1,2)
+      else
+       write(msg_file,*) "error: dimension not yet supported for inverse!"
+       call exit_function
       end if
 !
-      if(detj .gt. zero) then
-        do i=1,ndim
-            do j=1,ndim
-                ajacob(i,j)=ajacob(i,j)/detj
-            end do
-        end do
+      if(present(detj)) then
+        det=detj
       else
-       write(6,*) 'zero or negative detj in kjac_inv!'
-       call xit
+        det=determinant(jacob)
       end if
-!
-      return
-      end subroutine kjac_inv
+      
+      if(det .gt. tiny(one)) then
+        inverse=inverse/det
+      else
+        write(msg_file,*) "error: zero or negative detj in inverse!"
+        call exit_function
+      end if
+
+      end function inverse
 !********************************************************************************************
 !********************************************************************************************
 
@@ -246,26 +267,27 @@
 
 !********************************************************************************************
 !******************* subroutine ktransfer_strain ********************************************
-!********** transfer strains from global to material coordinate systems *********************
+!********** transfer strains from global to local coordinate systems *********************
+!                   (for composite lamina)
 !********************************************************************************************
-      subroutine ktransfer_strain(nst,strain,theta)
-      use modparam
-!
-      include 'aba_param.inc'
-!
-      dimension strain(nst)
-!
-      dimension strn(nst),t(nst,nst)
-      integer i,j	  
-!
-!	  initialize local matrices and vectors
-      call kinitial(strn,nst,1)
-      call kinitial(t,nst,nst)
-!
+      function lcl_strain(strain,theta)
+
+      real(kind=dp),intent(in)  :: strain(:), theta
+      real(kind=dp)             :: lcl_strain(size(strain))
+
+      real(kind=dp) :: c, s, t(size(strain),size(strain))
+      integer :: nst
+      
+      lcl_strain=zero
+      c=zero; s=zero; t=zero
+      nst=0
+      
+      nst=size(strain)
+
       c=cos(pi*theta/halfcirc)
       s=sin(pi*theta/halfcirc)
 !
-      if (nst .eq. 3) then
+      if (nst == 3) then
         t(1,1)=c*c
         t(1,2)=s*s
         t(1,3)=c*s
@@ -275,51 +297,56 @@
         t(3,1)=-two*c*s
         t(3,2)=two*c*s
         t(3,3)=c*c-s*s
+      else if (nst == 6) then
+        t(1,1)=c*c
+        t(1,2)=s*s
+        t(1,4)=c*s
+        t(2,1)=s*s
+        t(2,2)=c*c
+        t(2,4)=-c*s
+        t(3,3)=one
+        t(4,1)=-two*c*s
+        t(4,2)=two*c*s
+        t(4,4)=c*c-s*s
+        t(5,5)=c
+        t(5,6)=-s
+        t(6,5)=s
+        t(6,6)=c
       else
-       write(6,*) 'no. of strains not supported for ktransfer_strain!'
-       call xit
+       write(msg_file,*) 'no. of strains not supported for lcl_strain!'
+       call exit_function
       end if
-      call kmatrix_mul(t,strain,strn,nst,nst,1)
-!
-      do i=1,nst
-        strain(i) = strn(i)
-      end do
-!
-      return
-      end subroutine ktransfer_strain
+      
+      lcl_strain=matmul(t,strain)
+
+      end function lcl_strain
 !********************************************************************************************
 !********************************************************************************************
 
 
 
 !********************************************************************************************
-!******************* subroutine kunitv ******************************************************
+!******************* subroutine normalize ***************************************************
 !********** normalize vector and return its magnitude  **************************************
 !********************************************************************************************
-       subroutine kunitv(a,amag,ndim)
-       use modparam
-!
-       include 'aba_param.inc'
-!       
-       dimension a(ndim)
-       integer i
-!
+    subroutine normalize(a,amag)
+       
+        real(kind=dp), intent(inout) :: a(:)
+        real(kind=dp), intent(out)   :: amag
+       
         amag=zero
-        do i=1,ndim
-         amag=amag+a(i)*a(i)
-        end do
-        amag=dsqrt(amag)
-        if(amag .ne. zero) then
-         do i=1,ndim
-            a(i)=a(i)/amag
-         end do
+       
+        amag=sqrt(dot_product(a,a))
+        
+        if(amag .gt. tiny(one)) then
+            a=a/amag
         else
-         write(6,*) 'zero vector for kunitv!'
-!        do nothing
+            write(msg_file,*) 'warning:zero vector for kunitv!'
+!           do nothing
         end if
-!
+
        return
-       end subroutine kunitv
+    end subroutine normalize
 !********************************************************************************************
 !********************************************************************************************
     
