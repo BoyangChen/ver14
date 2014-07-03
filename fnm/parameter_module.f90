@@ -8,6 +8,7 @@
         
         integer, parameter :: matnamelength=20 ! character length of a user-input material name
         integer, parameter :: mattypelength=20 ! character length of a system material type name
+        integer, parameter :: dirlength=256 ! character length of a directory name
         
         
         real(kind=dp), parameter :: zero=0._dp,one=1._dp,two=2._dp, &

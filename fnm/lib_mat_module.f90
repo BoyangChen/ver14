@@ -15,31 +15,36 @@
     implicit none
     save
     
-    type(material)          :: lib_mat(1)
-    type(isotropic_type)    :: lib_iso(1)
-    type(lamina_type)       :: lib_lamina(1)
+    type(material), allocatable          :: lib_mat(:)
+    type(isotropic_type), allocatable    :: lib_iso(:)
+    type(lamina_type), allocatable       :: lib_lamina(:)
     
     contains
     
     subroutine initialize_lib_mat()
         
-        integer :: i=0
+        integer :: i=0, nmat=0, niso=0, nlamina=0
         character(len=matnamelength) :: mname
         character(len=mattypelength) :: mtype
         
         mname='test1'
         mtype='isotropic'
+        nmat=1
+        niso=1
+        
+        allocate(lib_mat(nmat))
+        allocate(lib_iso(niso))
     
-        do i=1, size(lib_mat)
+        do i=1, nmat
             call empty(lib_mat(i))
         end do
         
-        do i=1, size(lib_iso)
+        do i=1, niso
             call empty(lib_iso(i))
         end do
         
         call update(lib_mat(1),matname=mname,mattype=mtype,matkey=1)
-        call update(lib_iso(1), isotropic_modulus(E=100.0_dp, nu=0.3_dp))
+        call update(lib_iso(1), isotropic_modulus(E=100.0_dp, nu=zero))
     
     
     end subroutine initialize_lib_mat

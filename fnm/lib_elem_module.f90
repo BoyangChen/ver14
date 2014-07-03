@@ -6,8 +6,7 @@
     !   preprocessing programme             !
     !***************************************!
  
-    include 'lib_node_module.f90'
-    include 'lib_mat_module.f90'
+
     include 'integration_point_module.f90'
     include 'toolkit_module.f90'
     include 'tri_element_module.f90'
