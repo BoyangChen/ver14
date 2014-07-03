@@ -1,9 +1,6 @@
     module tri_element_module
-    use paramter_module
-    use material_module, only: material,extract ! no update or empty allowed
-    use integration_point_module ! integration point type
-    use toolkit_module
-    use global_lib_module, only: lib_tri, lib_node, lib_mat
+    use parameter_module
+    use integration_point_module        ! integration point type
     
     implicit none
     private
@@ -17,8 +14,9 @@
         integer :: key=0 ! glb index of this element
         integer :: connec(nnode)=0 ! node indices in their global arrays
         integer :: matkey=0 ! material index in the global material arrays
+        real(kind=dp) :: theta=zero ! material (local) orientation for composite lamina
         type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
-        real(kind=dp) :: K_matrix(ndof,ndof)=zero, F_vector(ndof)=zero ! k matrix and f vector
+        !~real(kind=dp) :: K_matrix(ndof,ndof)=zero, F_vector(ndof)=zero ! k matrix and f vector
         logical :: plstrain=.false.
         
         ! below are optional terms 
@@ -71,15 +69,16 @@
         elem%key=0
         elem%connec=0
         elem%matkey=0
+        elem%theta=zero
         do i=1,nig
             call empty(elem%ig_point(i))
         end do
-        elem%K_matrix=zero   
-        elem%F_vector=zero       
+        !~elem%K_matrix=zero   
+        !~elem%F_vector=zero       
         elem%plstrain=.false. ! default value      
-        if(allocated(elem%avg_rsdv)) deallocate(elem%avg_rsdv)       
-        if(allocated(elem%avg_isdv)) deallocate(elem%avg_isdv)
-        if(allocated(elem%avg_lsdv)) deallocate(elem%avg_lsdv)
+        if(allocated(elem%rsdv)) deallocate(elem%rsdv)       
+        if(allocated(elem%isdv)) deallocate(elem%isdv)
+        if(allocated(elem%lsdv)) deallocate(elem%lsdv)
     
     end subroutine empty_tri_element
     
@@ -88,20 +87,22 @@
     
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_tri_element(elem,key,connec,matkey)
+    subroutine prepare_tri_element(elem,key,connec,matkey,theta)
     
-        type(tri_element),intent(inout) :: elem
-        integer,intent(in) :: connec(nnode)
-        integer,intent(in) :: key,matkey
+        type(tri_element),      intent(inout)   :: elem
+        integer,                intent(in)      :: connec(nnode)
+        integer,                intent(in)      :: key,matkey
+        real(kind=dp),optional, intent(in)      :: theta
         
-        real(kind=dp) :: x(ndim),stress(nst),strain(nst)
-        integer :: i
-        x=zero;stress=zero;strain=zero
+        real(kind=dp)   :: x(ndim),stress(nst),strain(nst)
+        integer         :: i
+        x=zero; stress=zero; strain=zero
         i=0
         
         elem%key=key
         elem%connec=connec
         elem%matkey=matkey
+        if(present(theta)) elem%theta=theta
         
         do i=1,nig
             call update(elem%ig_point(i),x=x,stress=stress,strain=strain)
@@ -112,15 +113,16 @@
     
     
     
-    subroutine extract_tri_element(elem,key,connec,matkey,ig_point,K_matrix,F_vector,plstrain,rsdv,isdv,lsdv)
+    subroutine extract_tri_element(elem,key,connec,matkey,theta,ig_point,plstrain,rsdv,isdv,lsdv)
     
         type(tri_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: key, matkey
+        real(kind=dp),                        optional, intent(out) :: theta
         logical,                              optional, intent(out) :: plstrain
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
-        real(kind=dp),           allocatable, optional, intent(out) :: K_matrix(:,:), F_vector(:)
+        !~real(kind=dp),           allocatable, optional, intent(out) :: K_matrix(:,:), F_vector(:)
         real(kind=dp),           allocatable, optional, intent(out) :: rsdv(:)
         integer,                 allocatable, optional, intent(out) :: isdv(:)
         logical,                 allocatable, optional, intent(out) :: lsdv(:)
@@ -128,6 +130,8 @@
         if(present(key)) key=elem%key
         
         if(present(matkey)) matkey=elem%matkey
+        
+        if(present(theta)) theta=elem%theta
         
         if(present(plstrain)) plstrain=elem%plstrain
         
@@ -141,15 +145,15 @@
             ig_point=elem%ig_point
         end if
         
-        if(present(K_matrix)) then
-            allocate(K_matrix(ndof,ndof))
-            K_matrix=elem%K_matrix
-        end if
-        
-        if(present(F_vector)) then
-            allocate(F_vector(ndof))
-            F_vector=elem%F_vector
-        end if
+        !~if(present(K_matrix)) then
+        !~    allocate(K_matrix(ndof,ndof))
+        !~    K_matrix=elem%K_matrix
+        !~end if
+        !~
+        !~if(present(F_vector)) then
+        !~    allocate(F_vector(ndof))
+        !~    F_vector=elem%F_vector
+        !~end if
         
         if(present(rsdv)) then        
             if(allocated(elem%rsdv)) then
@@ -182,20 +186,27 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_tri_element(elem)
+    subroutine integrate_tri_element(elem,K_matrix,F_vector)
+    use toolkit_module                  ! global tools for element integration
+    use lib_mat_module                  ! global material library
+    use lib_node_module                 ! global node library
     
-        type(tri_element),intent(inout) :: elem 
+        type(tri_element),intent(inout)         :: elem 
+        real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
         
         ! the rest are all local variables
         
         ! variables to be extracted from global arrays
         type(xnode) :: node(nnode) ! x, u, du, v, extra dof ddof etc
         type(material) :: mat ! matname, mattype and matkey to glb mattype array
+        character(len=matnamelength) :: matname
+        character(len=mattypelength) :: mattype
+        integer :: matkey
         
         ! variables defined locally
-        real(kind=dp)   :: K_matrix(ndof,ndof), F_vector(ndof)
         real(kind=dp)   :: igxi(ndim,nig),igwt(nig) ! ig point natural coords and weights
         real(kind=dp)   :: coords(ndim,nnode) ! coordinates of the element nodes
+        real(kind=dp)   :: theta ! orientation of element local coordinates
         real(kind=dp)   :: u(ndof) ! nodal disp. vector
         logical         :: plstrain ! true for plane strain stiffness
         logical         :: failure ! true for failure analysis
@@ -204,20 +215,23 @@
         real(kind=dp)   :: bee(nst,ndof),beet(ndof,nst) ! b matrix and its transpose
         real(kind=dp)   :: dee(nst,nst) ! d matrix
         real(kind=dp)   :: btd(ndof,nst),btdb(ndof,ndof) ! b'*d & b'*d*b
-        real(kind=dp)   :: tmpx(ndim),tmpstrain(nst),tmpstress(nst) ! temp. x, strain & stress arrays for intg pnts      
+        real(kind=dp)   :: tmpx(ndim),tmpu(ndim),tmpstrain(nst),tmpstress(nst) ! temp. x, strain & stress arrays for intg pnts      
         real(kind=dp),allocatable :: xj(:),uj(:)! nodal vars extracted from glb lib_node array
         
         integer :: i,j,kig
         
         ! initialize variables
+        allocate(K_matrix(ndof,ndof),F_vector(ndof))
+        K_matrix=zero; F_vector=zero
+        
         i=0; j=0; kig=0
         do i=1,nnode
             call empty(node(i))
         end do
         call empty(mat)
-        K_matrix=zero; F_vector=zero
+        
         igxi=zero; igwt=zero
-        coords=zero; u=zero
+        coords=zero; theta=zero; u=zero
         plstrain=.false.; failure=.false.
         
         ! copy nodes from global node array 
@@ -244,11 +258,15 @@
             
         end do
         
-        ! copy material values from global material array
-        mat=lib_mat(elm%matkey)
+        ! extract material values from global material array
+        mat=lib_mat(elem%matkey)
+        call extract(mat,matname,mattype,matkey)
         
-        ! copy plain strain variable from element
+        ! extract plain strain variable from element
         plstrain=elem%plstrain
+        
+        ! extract orientation from element
+        theta=elem%theta
         
         ! update ig point xi and weight
         call tri_ig(igxi,igwt)
@@ -263,7 +281,7 @@
             jac=zero; gn=zero; detj=zero
             bee=zero; beet=zero; dee=zero
             btd=zero; btdb=zero
-            tmpx=zero; tmpstrain=zero; tmpstress=zero
+            tmpx=zero; tmpu=zero; tmpstrain=zero; tmpstress=zero
             
             !- get shape matrix and derivatives
             call tri_shape(igxi(:,kig),fn,dn) 
@@ -297,32 +315,33 @@
             tmpstrain=matmul(bee,u)
             
             ! transfer strain to local coordinates
-            tmpstrain=lcl_strain(tmpstrain,theta)
+            if(theta/=zero) tmpstrain=lcl_strain(tmpstrain,theta)
             
             
             ! get D matrix dee accord. to material properties, and update intg point stresses
-            select case(mat%mattype)
-                case('isotropic')
+            select case (mattype)
+                case ('isotropic')
                     
                     ! check if failure analysis is needed (check if strength parameters are present)
-                    call extract(lib_isotropic(mat%matkey),strength_active=failure)
+                    call extract(lib_iso(matkey),strength_active=failure)
                     
                     if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
                     & tri_element type isotropic material; only linear elastic stiffness matrix is integrated."
                     
                     ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_isotropic(mat%matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
+                    call ddsdde(lib_iso(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
                     
-                case('lamina')
-                
-                    ! check if failure analysis is needed (check if strength parameters are present)
-                    call extract(lib_lamina(mat%matkey),strength_active=failure)
-                    
-                    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
-                    & tri_element type lamina material; only linear elastic stiffness matrix is integrated."
-                
-                    ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_lamina(mat%matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
+                !~case ('lamina')
+                !~
+                !~    ! check if failure analysis is needed (check if strength parameters are present)
+                !~    call extract(lib_lamina(matkey),strength_active=failure)
+                !~    
+                !~    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
+                !~    & tri_element type lamina material; only linear elastic stiffness matrix is integrated."
+                !~    
+                !~
+                !~    ! calculate D matrix, update tmpstress
+                !~    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
                     
                 case default
                     write(msg_file,*) 'material type not supported for tri element!'
@@ -330,7 +349,7 @@
             end select
             
             ! get D matrix in global coordinates deeg
-            dee=glb_dee(dee,theta)
+            if(theta/=zero) dee=glb_dee(dee,theta)
             
             ! calculate B' D B
             beet=transpose(bee)
@@ -361,9 +380,9 @@
         
         F_vector=matmul(K_matrix,u) 
         
-        ! update element K matrix and F vector
-        elem%K_matrix=K_matrix
-        elem%F_vector=F_vector
+        !~! update element K matrix and F vector
+        !~elem%K_matrix=K_matrix
+        !~elem%F_vector=F_vector
         
     
     end subroutine integrate_tri_element
@@ -408,7 +427,7 @@
       end if
 
       return
-    end subroutine tri_intg
+    end subroutine tri_ig
     
     
     
