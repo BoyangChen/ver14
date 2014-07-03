@@ -140,7 +140,7 @@
         integer :: nst
         
         ! initialize variables
-        dee=zero
+        dee=zero; stress=zero
         E=zero; nu=zero; G=zero; del=zero
         nst=0 
         
@@ -193,6 +193,8 @@
             write(msg_file,*) 'no. of strains not supported for kdeemat!'
             call exit_function
         end if
+        
+        stress=matmul(dee,strain)
         
         
 
