@@ -175,9 +175,9 @@
           n= 3*m
           k=n-1
           l=k-1
-          x=gn(1,m)
-          y=gn(2,m)
-          z=gn(3,m)
+          x=gn(m,1)
+          y=gn(m,2)
+          z=gn(m,3)
           beemat(1,l)=x
           beemat(4,k)=x
           beemat(5,n)=x

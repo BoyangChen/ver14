@@ -22,7 +22,7 @@
         end type
 
 
-        integer, parameter :: ndim=2 ! dimension of problem
+        integer, parameter :: ndim=3 ! dimension of problem
 
         ! K, F and connectivity of each element, extracted from glb lib
         real(kind=dp),allocatable :: Ki(:,:), Fi(:), strsi(:), strni(:)
@@ -38,7 +38,8 @@
         ! output directory name
         character(len=dirlength)  :: outdir
 
-        integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem,ntri,nndset
+        integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
+        integer :: ntri,nquad,nwedge,nndset
 
         ! initialize variables
         outdir=''
@@ -46,7 +47,7 @@
         jl=0; ml=0; nl=0
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
-        nelem=0; ntri=0;nndset=0
+        nelem=0; ntri=0; nquad=0; nwedge=0; nndset=0
 
         call initialize_lib_node
         call initialize_lib_elem
@@ -69,13 +70,13 @@
         nndset=2
         allocate(ndset(nndset))
 
-        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
-        ndset(2)=nodeset(setname='top',setnode=[3,4])
+        ndset(1)=nodeset(setname='bottom',setnode=[1,2,7,8])
+        ndset(2)=nodeset(setname='top',setnode=[3,4,9,10])
 
         ! input here some test disp. loading
         ! uniform tension in y dir on top surf, u_y=0.1
         do i=1,size(ndset(2)%setnode)
-            call update(lib_node(ndset(2)%setnode(i)),u=[0.1_dp,zero])
+            call update(lib_node(ndset(2)%setnode(i)),u=[zero,zero,0.1_dp])
         end do
 
 
@@ -97,6 +98,20 @@
 !                call extract(lib_tri(i),ig_point=igpt)
 !                call extract(igpt(1),stress=strsi,strain=strni)
 !                print*,strni,strsi
+            end do
+        end if
+
+        if(allocated(lib_quad)) then
+            nquad=size(lib_quad)
+            do i=1,nquad
+                call integrate(lib_quad(i),Ki,Fi)
+            end do
+        end if
+
+        if(allocated(lib_wedge)) then
+            nwedge=size(lib_wedge)
+            do i=1,nwedge
+                call integrate(lib_wedge(i),Ki,Fi)
             end do
         end if
 
