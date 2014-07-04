@@ -23,15 +23,19 @@
     implicit none
     save
     
-    type(tri_element) :: lib_tri(2)
+    type(tri_element),allocatable :: lib_tri(:)
     
     contains
     
     subroutine initialize_lib_elem
     
-        integer :: i=0
+        integer :: i=0, ntri=0
+        
+        ntri=2
     
-        do i=1, size(lib_tri)
+        allocate(lib_tri(ntri))
+    
+        do i=1, ntri
             call empty(lib_tri(i))
         end do
         
