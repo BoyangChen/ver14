@@ -6,7 +6,7 @@
     !   preprocessing programme             !
     !***************************************!
     
-    include 'xnode_module.f90'
+    include 'elements/xnode_module.f90'
     
     module lib_node_module
     use parameter_module

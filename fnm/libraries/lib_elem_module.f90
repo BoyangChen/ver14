@@ -7,12 +7,12 @@
     !***************************************!
  
 
-    include 'integration_point_module.f90'
-    include 'toolkit_module.f90'
-    include 'tri_element_module.f90'
-    include 'quad_element_module.f90'
-    include 'wedge_element_module.f90'
-    !include 'brick_element_module.f90'
+    include 'elements/integration_point_module.f90'
+    include 'elements/toolkit_module.f90'
+    include 'elements/tri_element_module.f90'
+    include 'elements/quad_element_module.f90'
+    include 'elements/wedge_element_module.f90'
+    include 'elements/brick_element_module.f90'
     ! ... and other future element modules ...
    
     module lib_elem_module
@@ -20,6 +20,7 @@
     use tri_element_module
     use quad_element_module
     use wedge_element_module
+    use brick_element_module
     ! ... and other future element modules ...
     
     implicit none
@@ -28,20 +29,23 @@
     type(tri_element),allocatable   :: lib_tri(:)
     type(quad_element),allocatable  :: lib_quad(:)
     type(wedge_element),allocatable :: lib_wedge(:)
+    type(brick_element),allocatable :: lib_brick(:)
     
     contains
     
     subroutine initialize_lib_elem
     
-        integer :: i=0, ntri=0, nquad=0, nwedge=0
+        integer :: i=0, ntri=0, nquad=0, nwedge=0, nbrick=0
         
         !~ntri=2
         !~nquad=1
         nwedge=2
+        nbrick=1
     
-        !~allocate(lib_tri(ntri))
-        !~allocate(lib_quad(nquad))
-        allocate(lib_wedge(nwedge))
+        !~if(.not.allocated(lib_tri)) allocate(lib_tri(ntri))
+        !~if(.not.allocated(lib_quad)) allocate(lib_quad(nquad))
+        if(.not.allocated(lib_wedge)) allocate(lib_wedge(nwedge))
+        if(.not.allocated(lib_brick)) allocate(lib_brick(nbrick))
         
     !~
     !~    do i=1, ntri
@@ -54,14 +58,19 @@
           do i=1, nwedge
             call empty(lib_wedge(i))
           end do
+          do i=1, nbrick
+            call empty(lib_brick(i))
+          end do
     
     !~    
     !~    call prepare(lib_tri(1),key=1,connec=[1,2,3],matkey=1)
     !~    call prepare(lib_tri(2),key=2,connec=[2,4,3],matkey=1)
     !~    call prepare(lib_quad(1),key=3,connec=[3,4,6,5],matkey=1)
     
-        call prepare(lib_wedge(1),key=1,connec=[1,2,3,7,8,9],matkey=1)
-        call prepare(lib_wedge(2),key=2,connec=[2,4,3,8,10,9],matkey=1)
+        call prepare(lib_wedge(1),key=1,connec=[1,2,3,7,8,9],matkey=2)
+        call prepare(lib_wedge(2),key=2,connec=[2,4,3,8,10,9],matkey=2)
+        
+        call prepare(lib_brick(1),key=1,connec=[3,4,6,5,9,10,12,11],matkey=2,theta=90._dp)
     
     end subroutine initialize_lib_elem
       

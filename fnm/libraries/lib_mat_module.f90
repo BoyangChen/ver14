@@ -6,10 +6,17 @@
     !   preprocessing programme             !
     !***************************************!
  
-    include 'material_module.f90'
+ 
+    include 'materials/isotropic_type_module.f90'
+    include 'materials/lamina_type_module.f90'
+    include 'materials/interlayer_type_module.f90'
+    include 'materials/material_module.f90'
    
     module lib_mat_module
     use parameter_module
+    use isotropic_type_module
+    use lamina_type_module
+    use interlayer_type_module
     use material_module
     
     implicit none
@@ -24,16 +31,20 @@
     subroutine initialize_lib_mat()
         
         integer :: i=0, nmat=0, niso=0, nlamina=0
-        character(len=matnamelength) :: mname
-        character(len=mattypelength) :: mtype
+        character(len=matnamelength) :: mname1, mname2
+        character(len=mattypelength) :: mtype1, mtype2
         
-        mname='test1'
-        mtype='isotropic'
-        nmat=1
+        mname1='test1'
+        mtype1='isotropic'
+        mname2='test2'
+        mtype2='lamina'
+        nmat=2
         niso=1
+        nlamina=1
         
         allocate(lib_mat(nmat))
         allocate(lib_iso(niso))
+        allocate(lib_lamina(nlamina))
     
         do i=1, nmat
             call empty(lib_mat(i))
@@ -43,8 +54,16 @@
             call empty(lib_iso(i))
         end do
         
-        call update(lib_mat(1),matname=mname,mattype=mtype,matkey=1)
+        do i=1, nlamina
+            call empty(lib_lamina(i))
+        end do
+        
+        call update(lib_mat(1),matname=mname1,mattype=mtype1,matkey=1)
+        call update(lib_mat(2),matname=mname2,mattype=mtype2,matkey=1)
+        
         call update(lib_iso(1), isotropic_modulus(E=100.0_dp, nu=zero))
+        
+        call update(lib_lamina(1), lamina_modulus(1000.0_dp,100.0_dp,40.0_dp,50.0_dp,zero,zero))
     
     
     end subroutine initialize_lib_mat

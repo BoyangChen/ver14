@@ -1,12 +1,6 @@
-    include 'isotropic_type_module.f90'
-    include 'lamina_type_module.f90'
-    include 'interlayer_type_module.f90'
-    
+ 
     module material_module
     use parameter_module
-    use isotropic_type_module
-    use lamina_type_module
-    use interlayer_type_module
     
     implicit none
   

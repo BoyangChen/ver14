@@ -1,14 +1,14 @@
-    module tri_element_module
+    module wedge_element_module
     use parameter_module
     use integration_point_module        ! integration point type
     
     implicit none
     private
     
-    integer, parameter :: ndim=2, nst=3, nnode=3, nig=1, ndof=ndim*nnode ! constants for type tri_element 
+    integer, parameter :: ndim=3, nst=6, nnode=6, nig=2, ndof=ndim*nnode ! constants for type wedge_element 
     
     
-    type, public :: tri_element 
+    type, public :: wedge_element 
         private
         
         integer :: key=0 ! glb index of this element
@@ -31,19 +31,19 @@
     
     
     interface empty
-        module procedure empty_tri_element
+        module procedure empty_wedge_element
     end interface
     
     interface prepare
-        module procedure prepare_tri_element
+        module procedure prepare_wedge_element
     end interface
     
     interface integrate
-        module procedure integrate_tri_element
+        module procedure integrate_wedge_element
     end interface
     
     interface extract
-        module procedure extract_tri_element
+        module procedure extract_wedge_element
     end interface
     
     
@@ -59,9 +59,9 @@
     
     ! this subroutine is used to format the element for use
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine empty_tri_element(elem)
+    subroutine empty_wedge_element(elem)
     
-        type(tri_element),intent(out) ::elem
+        type(wedge_element),intent(out) ::elem
         
         integer :: i
         i=0
@@ -80,16 +80,16 @@
         if(allocated(elem%isdv)) deallocate(elem%isdv)
         if(allocated(elem%lsdv)) deallocate(elem%lsdv)
     
-    end subroutine empty_tri_element
+    end subroutine empty_wedge_element
     
     
     
     
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_tri_element(elem,key,connec,matkey,theta)
+    subroutine prepare_wedge_element(elem,key,connec,matkey,theta)
     
-        type(tri_element),      intent(inout)   :: elem
+        type(wedge_element),    intent(inout)   :: elem
         integer,                intent(in)      :: connec(nnode)
         integer,                intent(in)      :: key,matkey
         real(kind=dp),optional, intent(in)      :: theta
@@ -108,14 +108,14 @@
             call update(elem%ig_point(i),x=x,stress=stress,strain=strain)
         end do
     
-    end subroutine prepare_tri_element
+    end subroutine prepare_wedge_element
     
     
     
     
-    subroutine extract_tri_element(elem,key,connec,matkey,theta,ig_point,plstrain,rsdv,isdv,lsdv)
+    subroutine extract_wedge_element(elem,key,connec,matkey,theta,ig_point,plstrain,rsdv,isdv,lsdv)
     
-        type(tri_element), intent(in) :: elem
+        type(wedge_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: key, matkey
         real(kind=dp),                        optional, intent(out) :: theta
@@ -177,7 +177,7 @@
         end if
     
     
-    end subroutine extract_tri_element
+    end subroutine extract_wedge_element
 
 
     
@@ -186,12 +186,12 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_tri_element(elem,K_matrix,F_vector)
+    subroutine integrate_wedge_element(elem,K_matrix,F_vector)
     use toolkit_module                  ! global tools for element integration
     use lib_mat_module                  ! global material library
     use lib_node_module                 ! global node library
     
-        type(tri_element),intent(inout)         :: elem 
+        type(wedge_element),intent(inout)         :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
         
         ! the rest are all local variables
@@ -269,7 +269,7 @@
         theta=elem%theta
         
         ! update ig point xi and weight
-        call tri_ig(igxi,igwt)
+        call init_ig(igxi,igwt)
           
         
         
@@ -284,7 +284,7 @@
             tmpx=zero; tmpu=zero; tmpstrain=zero; tmpstress=zero
             
             !- get shape matrix and derivatives
-            call tri_shape(igxi(:,kig),fn,dn) 
+            call init_shape(igxi(:,kig),fn,dn) 
             
             !- calculate integration point physical coordinates (initial)
             tmpx=matmul(coords,fn)
@@ -326,22 +326,22 @@
                     call extract(lib_iso(matkey),strength_active=failure)
                     
                     if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
-                    & tri_element type isotropic material; only linear elastic stiffness matrix is integrated."
+                    & wedge_element type isotropic material; only linear elastic stiffness matrix is integrated."
                     
                     ! calculate D matrix, update tmpstress
                     call ddsdde(lib_iso(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
                     
-                !~case ('lamina')
-                !~
-                !~    ! check if failure analysis is needed (check if strength parameters are present)
-                !~    call extract(lib_lamina(matkey),strength_active=failure)
-                !~    
-                !~    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
-                !~    & tri_element type lamina material; only linear elastic stiffness matrix is integrated."
-                !~    
-                !~
-                !~    ! calculate D matrix, update tmpstress
-                !~    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
+                case ('lamina')
+                
+                    ! check if failure analysis is needed (check if strength parameters are present)
+                    call extract(lib_lamina(matkey),strength_active=failure)
+                    
+                    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
+                    & wedge_element type lamina material; only linear elastic stiffness matrix is integrated."
+                    
+                
+                    ! calculate D matrix, update tmpstress
+                    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
                     
                 case default
                     write(msg_file,*) 'material type not supported for tri element!'
@@ -385,7 +385,7 @@
         !~elem%F_vector=F_vector
         
     
-    end subroutine integrate_tri_element
+    end subroutine integrate_wedge_element
     
     
     
@@ -408,59 +408,71 @@
 
     
  
-    subroutine tri_ig(xi,wt)
+    subroutine init_ig(xi,wt)
 
       real(kind=dp),intent(inout) :: xi(ndim,nig),wt(nig)
 	
-      if (ndim .eq. 2) then
-        if (nig .eq. 1) then
+        if (nig .eq. 2) then
             xi(1,1)= one_third
             xi(2,1)= one_third
-            wt(1) = half
+            xi(3,1)= -root3
+            xi(1,2)= one_third
+            xi(2,2)= one_third
+            xi(3,2)= root3
+            wt = half
         else
-            write(msg_file,*) 'no. of integration points incorrect for tri3_ig!'
-            call xit
+            write(msg_file,*) 'no. of integration points incorrect for wedge_ig!'
+            call exit_function
         end if
-      else
-        write(msg_file,*) 'dimension incorrect for tri3_ig!'
-        call xit
-      end if
 
-      return
-    end subroutine tri_ig
+    end subroutine init_ig
     
     
     
-    subroutine tri_shape(igxi,f,df)
+    subroutine init_shape(igxi,f,df)
       
         real(kind=dp),intent(inout) :: f(nnode),df(nnode,ndim)
         real(kind=dp),intent(in) :: igxi(ndim)
         
-        real(kind=dp) :: xi,eta ! local variables
+        real(kind=dp) :: xi,eta,zeta ! local variables
 
-        if (ndim .eq. 2) then
-            xi=igxi(1)
-            eta=igxi(2)
-            if (nnode .eq. 3) then
-                f(1)=one-xi-eta
-                f(2)=xi
-                f(3)=eta
-                df(1,1)=-one
-                df(2,1)=one
-                df(3,1)=zero
-                df(1,2)=-one
-                df(2,2)=zero
-                df(3,2)=one
-            else
-                write(msg_file,*) 'no. of nodes incorrect for tri_shape!'
-                call xit
-            end if
-        else
-            write(msg_file,*) 'dimension incorrect for tri_shape!'
-            call xit
-        end if
-       return
-    end subroutine tri_shape
+        xi=igxi(1)
+        eta=igxi(2)
+        zeta=igxi(3)
+        
+        f(1)=half*(one-xi-eta)*(one-zeta)
+        f(2)=half*xi*(one-zeta)
+        f(3)=half*eta*(one-zeta)
+        f(4)=half*(one-xi-eta)*(one+zeta)
+        f(5)=half*xi*(one+zeta)
+        f(6)=half*eta*(one+zeta)
+        
+        
+        df(1,3) = -half*(one-xi-eta)
+        df(2,3) = -half*xi
+        df(3,3) = -half*eta
+        df(4,3) =  half*(one-xi-eta)
+        df(5,3) =  half*xi
+        df(6,3) =  half*eta
+        
+        
+        df(1,1) = -half*(one-zeta)
+        df(2,1) =  half*(one-zeta)
+        df(3,1) =  zero
+        df(4,1) = -half*(one+zeta)
+        df(5,1) =  half*(one+zeta)
+        df(6,1) =  zero
+        
+        df(1,2) = -half*(one-zeta)
+        df(2,2) =  zero
+        df(3,2) =  half*(one-zeta)
+        df(4,2) = -half*(one+zeta)
+        df(5,2) =  zero
+        df(6,2) =  half*(one+zeta)
+        
+        
+
+    end subroutine init_shape
     
     
-    end module tri_element_module
+    end module wedge_element_module

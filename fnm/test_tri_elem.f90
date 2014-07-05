@@ -1,14 +1,13 @@
     include 'parameter_module.f90'
-    include 'lib_node_module.f90'
-    include 'lib_mat_module.f90'
-    include 'lib_elem_module.f90'
-    include 'output_module.f90'
+    include 'libraries/lib_node_module.f90'
+    include 'libraries/lib_mat_module.f90'
+    include 'libraries/lib_elem_module.f90'
+    include 'outputs/output_module.f90'
 
     program test_tri
         use parameter_module
         use lib_mat_module
         use lib_node_module
-        use integration_point_module
         use lib_elem_module
         use output_module
 
@@ -27,7 +26,6 @@
         ! K, F and connectivity of each element, extracted from glb lib
         real(kind=dp),allocatable :: Ki(:,:), Fi(:), strsi(:), strni(:)
         integer, allocatable :: conneci(:)
-        type(integration_point),allocatable :: igpt(:)
 
         ! K, F and U of the global system, assembled from glb lib
         real(kind=dp),allocatable :: K(:,:),U(:),F(:)
@@ -39,7 +37,7 @@
         character(len=dirlength)  :: outdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nndset
+        integer :: ntri,nquad,nwedge,nbrick,nndset
 
         ! initialize variables
         outdir=''
@@ -47,7 +45,7 @@
         jl=0; ml=0; nl=0
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
-        nelem=0; ntri=0; nquad=0; nwedge=0; nndset=0
+        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0; nndset=0
 
         call initialize_lib_node
         call initialize_lib_elem
@@ -85,19 +83,6 @@
             ntri=size(lib_tri)
             do i=1,ntri
                 call integrate(lib_tri(i),Ki,Fi)
-!                call extract(lib_tri(i),connec=conneci)
-!                do jr=1,3 ! 3 nodes
-!                    mr=jr*ndim
-!                    nr=conneci(jr)*ndim
-!                    do jl=1,3
-!                        ml=jl*ndim
-!                        nl=conneci(jl)*ndim
-!                        K(nl-1:nl,nr-1:nr)=K(nl-1:nl,nr-1:nr)+Ki(ml-1:ml,mr-1:mr)
-!                    end do
-!                end do
-!                call extract(lib_tri(i),ig_point=igpt)
-!                call extract(igpt(1),stress=strsi,strain=strni)
-!                print*,strni,strsi
             end do
         end if
 
@@ -112,6 +97,13 @@
             nwedge=size(lib_wedge)
             do i=1,nwedge
                 call integrate(lib_wedge(i),Ki,Fi)
+            end do
+        end if
+
+        if(allocated(lib_brick)) then
+            nbrick=size(lib_brick)
+            do i=1,nbrick
+                call integrate(lib_brick(i),Ki,Fi)
             end do
         end if
 

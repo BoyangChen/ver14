@@ -331,17 +331,17 @@
                     ! calculate D matrix, update tmpstress
                     call ddsdde(lib_iso(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
                     
-                !~case ('lamina')
-                !~
-                !~    ! check if failure analysis is needed (check if strength parameters are present)
-                !~    call extract(lib_lamina(matkey),strength_active=failure)
-                !~    
-                !~    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
-                !~    & quad_element type lamina material; only linear elastic stiffness matrix is integrated."
-                !~    
-                !~
-                !~    ! calculate D matrix, update tmpstress
-                !~    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
+                case ('lamina')
+                
+                    ! check if failure analysis is needed (check if strength parameters are present)
+                    call extract(lib_lamina(matkey),strength_active=failure)
+                    
+                    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
+                    & quad_element type lamina material; only linear elastic stiffness matrix is integrated."
+                    
+                
+                    ! calculate D matrix, update tmpstress
+                    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
                     
                 case default
                     write(msg_file,*) 'material type not supported for tri element!'
@@ -428,7 +428,7 @@
             wt = one
         else
             write(msg_file,*) 'no. of integration points incorrect for quad_ig!'
-            call xit
+            call exit_function
         end if
 
     end subroutine init_ig

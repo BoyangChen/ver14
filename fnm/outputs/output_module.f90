@@ -52,7 +52,7 @@
         !~call getcwd(outdir)
         
         ! create the output file name
-        outfile=trim(outdir)//'/'//trim(outnum)//'.vtk'
+        outfile=trim(outdir)//'/outputs/'//trim(outnum)//'.vtk'
         outfile=trim(outfile)
         
         ! open the outfile
@@ -87,7 +87,7 @@
         if(allocated(lib_quad)) nquad=size(lib_quad)
         !~if(allocated(lib_tetra)) ntetra=size(lib_tetra)
         if(allocated(lib_wedge)) nwedge=size(lib_wedge)
-        !~if(allocated(lib_brick)) nbrick=size(lib_brick)
+        if(allocated(lib_brick)) nbrick=size(lib_brick)
         ! .... and other elem types ....
         
         ! total no. of elems
@@ -134,14 +134,14 @@
             end do
         end if
         !~
-        !~if(nbrick > 0) then
-        !~    do i=1,nbrick ! write each element's connec individually
-        !~        call extract(lib_brick(i),connec=connec) ! extract connec from lib_tri
-        !~        ! print connec in vtk; note that in vtk node no. starts from 0
-        !~        connec=connec-1
-        !~        write(u,*) 8,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6),connec(7),connec(8)
-        !~    end do
-        !~end if
+        if(nbrick > 0) then
+            do i=1,nbrick ! write each element's connec individually
+                call extract(lib_brick(i),connec=connec) ! extract connec from lib_tri
+                ! print connec in vtk; note that in vtk node no. starts from 0
+                connec=connec-1
+                write(u,*) 8,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6),connec(7),connec(8)
+            end do
+        end if
         
         write(u,'(a)')''
         
@@ -267,6 +267,31 @@
             end do 
         end if
         
+        if (nbrick > 0) then
+            do i=1,nbrick
+                sigtsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_brick(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),stress=sig)                   
+                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                    sigtsr(3,2)=sigtsr(3,2)+sig(6)   
+                end do 
+                ! average stress in the element
+                sigtsr=sigtsr/size(igpnt)  
+                do l=1,3
+                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                end do
+                write(u,'(a)')'' ! separate from next element                
+            end do 
+        end if
+        
         !~if (nquad > 0 ) then
         !~! fill in the same ....
         !~end if
@@ -321,6 +346,31 @@
             do i=1,nwedge
                 epstsr=zero ! empty sig & eps tensor for reuse
                 call extract(lib_wedge(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),strain=eps)                   
+                    epstsr(1,1)=epstsr(1,1)+eps(1)
+                    epstsr(2,2)=epstsr(2,2)+eps(2)
+                    epstsr(3,3)=epstsr(3,3)+eps(3)
+                    epstsr(1,2)=epstsr(1,2)+eps(4)
+                    epstsr(1,3)=epstsr(1,3)+eps(5)
+                    epstsr(2,3)=epstsr(2,3)+eps(6)
+                    epstsr(2,1)=epstsr(2,1)+eps(4)
+                    epstsr(3,1)=epstsr(3,1)+eps(5)
+                    epstsr(3,2)=epstsr(3,2)+eps(6)   
+                end do 
+                ! average stress in the element
+                epstsr=epstsr/size(igpnt)  
+                do l=1,3
+                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                end do
+                write(u,'(a)')'' ! separate from next element                
+            end do 
+        end if
+        
+        if (nbrick > 0) then
+            do i=1,nbrick
+                epstsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_brick(i),ig_point=igpnt)
                 do j=1,size(igpnt)
                     call extract(igpnt(j),strain=eps)                   
                     epstsr(1,1)=epstsr(1,1)+eps(1)
