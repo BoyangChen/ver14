@@ -9,14 +9,14 @@
  
     include 'materials/isotropic_type_module.f90'
     include 'materials/lamina_type_module.f90'
-    include 'materials/interlayer_type_module.f90'
+    include 'materials/interface_type_module.f90'
     include 'materials/material_module.f90'
    
     module lib_mat_module
     use parameter_module
     use isotropic_type_module
     use lamina_type_module
-    use interlayer_type_module
+    use interface_type_module
     use material_module
     
     implicit none
