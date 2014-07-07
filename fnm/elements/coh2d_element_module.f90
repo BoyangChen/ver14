@@ -163,101 +163,109 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_coh2d_element(elem,K_matrix,F_vector,isgauss)
+    subroutine integrate_coh2d_element(elem,K_matrix,F_vector,gauss)
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
         use lib_node_module                 ! global node library
-        use global_clock_module             ! global analysis progress (kstep, kinc, time, dtime)
+        use glb_clock_module                ! global analysis progress (kstep, kinc, time, dtime)
     
         type(coh2d_element), intent(inout)      :: elem 
         real(kind=dp), allocatable, intent(out) :: K_matrix(:,:), F_vector(:)
-        logical, optional, intent(in)           :: isgauss
-
+        logical, optional, intent(in)           :: gauss
+ 
+        !-----------------------------------------!
+        ! local variables, extracted from glb libs
+        !-----------------------------------------!
         
-        ! - the rest are all local variables
+        ! - element nodes extracted from global node library
+        type(xnode)     :: node(nnode)                  ! x, u, du, v, extra dof ddof etc
         
-        ! - variables to be extracted from global arrays
-        type(xnode)                     :: node(nnode)  ! x, u, du, v, extra dof ddof etc
-        type(material)                  :: mat          ! matname, mattype and matkey to glb mattype array
+        ! - element material extracted from global material library
+        type(material)  :: mat                          ! matname, mattype and matkey to glb mattype array
         
-        ! - variables derived from element nodes
+        ! - variables extracted from global clock module
+        integer         :: curr_step, curr_inc          ! current step and increment no. of the analysis
+        
+        
+        
+        !-----------------------------------------!
+        ! - the rest are all pure local variables
+        !-----------------------------------------!
+        
+        ! - variables extracted from element nodes
         real(kind=dp),allocatable :: xj(:),uj(:)        ! nodal vars extracted from glb lib_node array
         real(kind=dp)   :: coords(ndim,nnode)           ! coordinates of the element nodes, formed from xj of each node
         real(kind=dp)   :: u(ndof)                      ! element nodal disp. vector, formed from uj of each node
         
         ! - variables extracted from element material
-        character(len=matnamelength)    :: matname
-        character(len=mattypelength)    :: mattype
-        integer                         :: matkey
+        character(len=matnamelength)    :: matname      ! name of the material assigned to this element
+        character(len=mattypelength)    :: mattype      ! type of the material
+        integer                         :: matkey       ! index of the material in the material library of its type 
         
-        ! - variables to be extracted from element intg points
-        integer, allocatable            :: ig_isdv(:)
-        real(kind=dp), allocatable      :: ig_rsdv(:)
-        
-        ! - variables extracted from global clock module
-        integer         :: curr_step, curr_inc          ! current step and increment no. of the analysis
-        
-        ! - variables derived from element isdv
+        ! - variables extracted from element isdv
         integer         :: nstep, ninc                  ! step and increment no. of the last iteration, stored in the element
-        logical         :: last_converged
+        logical         :: last_converged               ! true if last iteration has converged: a new increment/step has started
         
-        ! - variables derived from ig point isdv and rsdv
-        integer         :: ig_fstat                     ! failure status of the ig point
-        real(kind=dp)   :: ig_u0,ig_uf,ig_dm,ig_dmeq    ! vars to define cohesive law, estimated damage and equilibrium damage
+        ! - variables extracted from intg point sdvs
+        integer,        allocatable     :: ig_isdv(:)   ! integration point integer sdv
+        real(kind=dp),  allocatable     :: ig_rsdv(:)   ! integration point real sdv
+        integer                         :: ig_fstat     ! failure status of the ig point
+        real(kind=dp)    :: ig_u0,ig_uf,ig_dm,ig_dmeq   ! coh. law vars, estimated damage and equilibrium damage
         
         
         
         ! - variables defined locally
         
         real(kind=dp)   :: igxi(ndim-1,nig),igwt(nig)   ! ig point natural coords and weights
-        real(kind=dp)   :: tmpx(ndim), tmpu(ndim)       ! temp. x and u arrays for intg points
+        real(kind=dp)   :: tmpx(ndim), tmpu(ndim)       ! temporary arrays to hold x and u values for intg points
                
         real(kind=dp)   :: fn(nnode)                    ! shape functions
         real(kind=dp)   :: Nmatrix(ndim,ndof)           ! obtained from fn, to compute disp. jump acrss intfc: {u}_jump = [N]*{u}
         real(kind=dp)   :: normal(ndim),tangent(ndim)   ! normal and tangent vectors of the interface, obtained from coords
         real(kind=dp)   :: det                          ! determinant of jacobian (=length of element/2); 2 is length of ref. elem
-        real(kind=dp)   :: Qmatrix(ndim,ndim)           ! rotation matrix from global to local coordinates, from normal & tangent
+        real(kind=dp)   :: Qmatrix(ndim,ndim)           ! rotation matrix from global to local coordinates (from normal & tangent)
         real(kind=dp)   :: ujump(ndim),delta(ndim)      ! {delta}=[Q]*{u}_jump, {delta} is the jump vector in lcl coords.
         real(kind=dp)   :: Dee(ndim,ndim)               ! material stiffness matrix [D]
         real(kind=dp)   :: Tau(ndim)                    ! {Tau}=[D]*{delta}, traction on the interface
         
         real(kind=dp)   :: QN(ndim,ndof),DQN(ndim,ndof)         ! [Q]*[N], [D]*[Q]*[N]
         real(kind=dp)   :: NtQt(ndof,ndim),NtQtDQN(ndof,ndof)   ! [N']*[Q'], [N']*[Q']*[D]*[Q]*[N] 
-        real(kind=dp)   :: NtQtTau(ndof),tract2(ndim)           ! [N']*[Q']*{Tau}
-        integer         :: i,j,kig, kntr,n
+        real(kind=dp)   :: NtQtTau(ndof)                        ! [N']*[Q']*{Tau}
+        integer         :: i,j,kig
       
         
         
         
         !------------------------------------------------!
-        !           initialize variables 
+        !           initialize all variables 
         !------------------------------------------------!
         
-        allocate(K_matrix(ndof,ndof),F_vector(ndof))
+        ! intent(out) variables, automatically deallocated when passed in
+        allocate(K_matrix(ndof,ndof),F_vector(ndof)); K_matrix=zero; F_vector=zero 
         
-        K_matrix=zero; F_vector=zero
-        
+        ! integer counters
         i=0; j=0; kig=0
         
+        ! local variables, extracted from glb libs
         do i=1,nnode
             call empty(node(i))
-        end do
-        
+        end do 
         call empty(mat)
+        curr_step=0; curr_inc=0
         
-        coords=zero; u=zero
-        
-        matname=''; mattype=''; matkey=0
-        
-        curr_step=0; curr_inc=0; nstep=0; ninc=0; last_converged=.false.
-        
+        ! pure local variables
+        coords=zero; u=zero 
+        matname=''; mattype=''; matkey=0 
+        nstep=0; ninc=0; last_converged=.false.
+        ig_fstat=0; ig_u0=zero; ig_uf=zero; ig_dm=zero; ig_dmeq=zero
         igxi=zero; igwt=zero
-        
-        tangent=zero; normal=zero; det=zero; Qmatrix=zero
-        
-        
-        
-        
+        tmpx=zero; tmpu=zero
+        fn=zero; Nmatrix=zero
+        tangent=zero; normal=zero 
+        det=zero; Qmatrix=zero
+        ujump=zero; delta=zero
+        Dee=zero; Tau=zero
+        QN=zero; DQN=zero; NtQt=zero; NtQtDQN=zero; NtQtTau=zero
         
         
         
@@ -272,8 +280,6 @@
         
         ! - extract material values from global material array
         mat=lib_mat(elem%matkey)
-        
-        
         
         
         
@@ -321,8 +327,13 @@
             ninc         = elem%isdv(2)
         end if
         
-        if(nstep.ne.curr_step .or. ninc.ne.curr_inc) last_converged=.true.
-        
+        ! check if last iteration has converged, and if so, update logical var. 
+        ! and store new step & iteration values
+        if(nstep.ne.curr_step .or. ninc.ne.curr_inc) then
+            last_converged=.true.
+            elem%isdv(1) = curr_step    
+            elem%isdv(2) = curr_inc
+        end if
         
         
         
@@ -350,7 +361,6 @@
             Qmatrix(1,j)=normal(j)
             Qmatrix(2,j)=tangent(j)
         end do
-
         
         
         
@@ -362,8 +372,8 @@
         !------------------------------------------------!
         
         ! - calculate ig point xi and weight
-        if(present(isgauss)) call init_ig(igxi,igwt,isgauss)
-        else                 call init_ig(igxi,igwt)
+        if(present(gauss).and.gauss)  call init_ig(igxi,igwt,gauss)
+        else                          call init_ig(igxi,igwt)
         end if
          
         !-calculate strain,stress,stiffness,sdv etc. at each int point
@@ -393,25 +403,15 @@
             ! calculate separation delta in local coords: delta=Qmatrix*ujump
             delta=matmul(Qmatrix,ujump)
             
-            ! - extract sdvs from integration points
+            ! - extract sdvs from integration points; ig_isdv&rsdv automatically deallocated when passed in
             call extract(elem%ig_point(kig),isdv=ig_isdv,rsdv=ig_rsdv)
             
             ! - update damage variables local arrays
-            if(allocated(ig_isdv)) then
-                ig_fstat=ig_isdv(1)
-            else
-                allocate(ig_isdv(1)); ig_isdv=0
-                ig_fstat=ig_isdv(1)
-            end if
-            if(allocated(ig_rsdv)) then
-                ig_dm=ig_rsdv(1); ig_dmeq=ig_rsdv(2); ig_u0=ig_rsdv(3); ig_uf=ig_rsdv(4)
-            else
-                allocate(ig_rsdv(4)); ig_rsdv=zero
-                ig_dm=ig_rsdv(1); ig_dmeq=ig_rsdv(2); ig_u0=ig_rsdv(3); ig_uf=ig_rsdv(4)
-            end if
+            if(.not.allocated(ig_isdv)) allocate(ig_isdv(1)); ig_isdv=0 ! 1st iteration
+            ig_fstat=ig_isdv(1)
             
-            !~if(.not.allocated(ig_isdv)) allocate(ig_isdv(1)); ig_isdv=0
-            !~if(.not.allocated(ig_rsdv)) allocate(ig_rsdv(4)); ig_rsdv=zero
+            if(.not.allocated(ig_rsdv)) allocate(ig_rsdv(4)); ig_rsdv=zero ! 1st iteration
+            ig_dm=ig_rsdv(1); ig_dmeq=ig_rsdv(2); ig_u0=ig_rsdv(3); ig_uf=ig_rsdv(4)
             
             ! update equilibrium damage variable
             if(last_converged) ig_dmeq=ig_dm
@@ -435,24 +435,19 @@
             !  add this ig point contributions to K and F
             !------------------------------------------------!
           
-            QN=matmul(Qmatrix,Nmatrix)
-            NtQt=transpose(QN)
-            DQN=matmul(Dee,QN)
-            NtQtDQN=matmul(NtQt,DQN)
+            QN      =   matmul(Qmatrix, Nmatrix)
+            NtQt    =   transpose(QN)
+            DQN     =   matmul(Dee, QN)
+            NtQtDQN =   matmul(NtQt, DQN)
+            NtQtTau =   matmul(NtQt, Tau)
 		
-            do j=1,ndof
-                do k=1,ndof
-                    K_matrix(j,k) = K_matrix(j,k)+NtQtDQN(j,k)*det*igwt(kig)
+            do j=1, ndof
+                do k=1, ndof
+                    K_matrix(j,k) = K_matrix(j,k) + NtQtDQN(j,k) * det * igwt(kig)
                 end do
+                F_vector(j) = F_vector(j) + NtQtTau(j) * igwt(kig) * det
             end do
-
-            NtQtTau=matmul(NtQt,Tau)
-		
-            do j=1,ndof
-                F_vector(j)=F_vector(j)+NtQtTau(j)*igwt(kig)*det
-            end do
-            
-            
+               
             
             
             !------------------------------------------------!
@@ -460,12 +455,12 @@
             !------------------------------------------------!
 
             !- calculate integration point physical coordinates (initial)
-            tmpx=matmul(coords,fn)
+            tmpx    =   matmul(coords,fn)
             
             !- calculate integration point displacement
-            do j=1,ndim
-                do i=1,nnode
-                    tmpu(j)=tmpu(j)+fn(i)*u((i-1)*ndim+j)
+            do j=1, ndim
+                do i=1, nnode
+                    tmpu(j) = tmpu(j) + fn(i) * u((i-1)*ndim+j)
                 end do
             end do
 
@@ -473,7 +468,7 @@
             ig_isdv(1)=ig_fstat
             ig_rsdv(1)=ig_dm; ig_rsdv(2)=ig_dmeq; ig_rsdv(3)=ig_u0; ig_rsdv(4)=ig_uf
             
-            ! update ig point arrays
+            ! update element ig point arrays
             call update(elem%ig_point(kig),x=tmpx,u=tmpu, &
             & strain=delta,stress=Tau,isdv=ig_isdv,rsdv=ig_rsdv)
             
@@ -504,17 +499,17 @@
 
     
  
-    subroutine init_ig(xi,wt,isgauss)
+    subroutine init_ig(xi,wt,gauss)
 
       real(kind=dp), intent(inout)  :: xi(ndim-1,nig), wt(nig)
-      logical, optional, intent(in) :: isgauss
+      logical, optional, intent(in) :: gauss
       
       real(kind=dp) :: cn=zero
 	
         cn=one !-newton cotes
     
-        if(present(isgauss)) then
-            if(isgauss) cn=0.5773502691896260_dp !-gauss
+        if(present(gauss)) then
+            if(gauss) cn=0.5773502691896260_dp !-gauss
         end if
     
         if (nig .eq. 2) then          
