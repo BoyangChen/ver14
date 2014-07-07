@@ -163,14 +163,15 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_coh2d_element(elem,K_matrix,F_vector)
+    subroutine integrate_coh2d_element(elem,K_matrix,F_vector,isgauss)
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
         use lib_node_module                 ! global node library
-        use check_progress_module           ! step and increment no. of the analysis, jstep and jinc
+        use global_clock_module             ! global analysis progress (kstep, kinc, time, dtime)
     
-        type(coh2d_element),intent(inout)       :: elem 
-        real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
+        type(coh2d_element), intent(inout)      :: elem 
+        real(kind=dp), allocatable, intent(out) :: K_matrix(:,:), F_vector(:)
+        logical, optional, intent(in)           :: isgauss
 
         
         ! - the rest are all local variables
@@ -178,21 +179,35 @@
         ! - variables to be extracted from global arrays
         type(xnode)                     :: node(nnode)  ! x, u, du, v, extra dof ddof etc
         type(material)                  :: mat          ! matname, mattype and matkey to glb mattype array
+        
+        ! - variables derived from element nodes
+        real(kind=dp),allocatable :: xj(:),uj(:)        ! nodal vars extracted from glb lib_node array
+        real(kind=dp)   :: coords(ndim,nnode)           ! coordinates of the element nodes, formed from xj of each node
+        real(kind=dp)   :: u(ndof)                      ! element nodal disp. vector, formed from uj of each node
+        
+        ! - variables extracted from element material
         character(len=matnamelength)    :: matname
         character(len=mattypelength)    :: mattype
         integer                         :: matkey
         
         ! - variables to be extracted from element intg points
-        integer, allocatable        :: isdv(:)
-        real(kind=dp), allocatable  :: rsdv(:)
-        ! - variables derived from isdv and rsdv
-        integer         :: fstat
-        real(kind=dp)   :: u0_eff,uf_eff,dm,dmeq
+        integer, allocatable            :: ig_isdv(:)
+        real(kind=dp), allocatable      :: ig_rsdv(:)
+        
+        ! - variables extracted from global clock module
+        integer         :: curr_step, curr_inc          ! current step and increment no. of the analysis
+        
+        ! - variables derived from element isdv
+        integer         :: nstep, ninc                  ! step and increment no. of the last iteration, stored in the element
+        logical         :: last_converged
+        
+        ! - variables derived from ig point isdv and rsdv
+        integer         :: ig_fstat                     ! failure status of the ig point
+        real(kind=dp)   :: ig_u0,ig_uf,ig_dm,ig_dmeq    ! vars to define cohesive law, estimated damage and equilibrium damage
+        
+        
         
         ! - variables defined locally
-        real(kind=dp),allocatable :: xj(:),uj(:)        ! nodal vars extracted from glb lib_node array
-        real(kind=dp)   :: coords(ndim,nnode)           ! coordinates of the element nodes, formed from xj of each node
-        real(kind=dp)   :: u(ndof)                      ! element nodal disp. vector, formed from uj of each node
         
         real(kind=dp)   :: igxi(ndim-1,nig),igwt(nig)   ! ig point natural coords and weights
         real(kind=dp)   :: tmpx(ndim), tmpu(ndim)       ! temp. x and u arrays for intg points
@@ -219,16 +234,28 @@
         !------------------------------------------------!
         
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
+        
         K_matrix=zero; F_vector=zero
         
         i=0; j=0; kig=0
+        
         do i=1,nnode
             call empty(node(i))
         end do
+        
         call empty(mat)
         
-        igxi=zero; igwt=zero
         coords=zero; u=zero
+        
+        matname=''; mattype=''; matkey=0
+        
+        curr_step=0; curr_inc=0; nstep=0; ninc=0; last_converged=.false.
+        
+        igxi=zero; igwt=zero
+        
+        tangent=zero; normal=zero; det=zero; Qmatrix=zero
+        
+        
         
         
         
@@ -256,7 +283,7 @@
         !   assign values to material, coords and u 
         !------------------------------------------------!      
         
-        ! - extract values from nodes and assign to local arrays 
+        ! - extract x and u values from nodes and assign to local arrays 
         do j=1,nnode
             ! extract x and u values from nodes
             call extract(node(j),x=xj,u=uj)     
@@ -274,10 +301,27 @@
             end if    
         end do
         
+        
         ! - extract values from mat (material type) and assign to local vars (matname, mattype & matkey)
         call extract(mat,matname,mattype,matkey) 
         
         
+        ! - extract curr_step and curr_inc values from global clock
+        call extract(glb_clock,kstep=curr_step,kinc=curr_inc)
+        
+        ! - extract isdv values from element and assign to nstep and ninc
+        if(allocated(elem%isdv)) then
+            nstep   =   elem%isdv(1)
+            ninc    =   elem%isdv(2)
+        else ! first iteration
+            allocate(elem%isdv(2))
+            elem%isdv(1) = curr_step    
+            elem%isdv(2) = curr_inc
+            nstep        = elem%isdv(1)
+            ninc         = elem%isdv(2)
+        end if
+        
+        if(nstep.ne.curr_step .or. ninc.ne.curr_inc) last_converged=.true.
         
         
         
@@ -318,15 +362,19 @@
         !------------------------------------------------!
         
         ! - calculate ig point xi and weight
-        call init_ig(igxi,igwt)
+        if(present(isgauss)) call init_ig(igxi,igwt,isgauss)
+        else                 call init_ig(igxi,igwt)
+        end if
          
         !-calculate strain,stress,stiffness,sdv etc. at each int point
       	do kig=1,nig 
         
             ! - empty relevant arrays for reuse
-            fn=zero; dn=zero
-            tmpx=zero; tmpu=zero; delta=zero; Tau=zero
-            fstat=0; dm=zero; dmeq=zero; u0_eff=zero; uf_eff=zero
+            fn=zero; Nmatrix=zero
+            ujump=zero; delta=zero; dee=zero; Tau=zero
+            ig_fstat=0; ig_dm=zero; ig_dmeq=zero; ig_u0=zero; ig_uf=zero
+            QN=zero; NtQt=zero; DQN=zero; NtQtDQN=zero; NtQtTau=zero
+            tmpx=zero; tmpu=zero
             
             !- get shape function matrix
             call init_shape(igxi(:,kig),fn) 
@@ -346,37 +394,42 @@
             delta=matmul(Qmatrix,ujump)
             
             ! - extract sdvs from integration points
-            call extract(elem%ig_point(kig),isdv=isdv,rsdv=rsdv)
+            call extract(elem%ig_point(kig),isdv=ig_isdv,rsdv=ig_rsdv)
             
             ! - update damage variables local arrays
-            if(allocated(isdv)) then
-                fstat=isdv(1)
+            if(allocated(ig_isdv)) then
+                ig_fstat=ig_isdv(1)
             else
-                allocate(isdv(1)); isdv=0
-                fstat=isdv(1)
+                allocate(ig_isdv(1)); ig_isdv=0
+                ig_fstat=ig_isdv(1)
             end if
-            if(allocated(rsdv)) then
-                dm=rsdv(1); dmeq=rsdv(2); u0_eff=rsdv(3); uf_eff=rsdv(4)
+            if(allocated(ig_rsdv)) then
+                ig_dm=ig_rsdv(1); ig_dmeq=ig_rsdv(2); ig_u0=ig_rsdv(3); ig_uf=ig_rsdv(4)
             else
-                allocate(rsdv(4)); rsdv=zero
-                dm=rsdv(1); dmeq=rsdv(2); u0_eff=rsdv(3); uf_eff=rsdv(4)
+                allocate(ig_rsdv(4)); ig_rsdv=zero
+                ig_dm=ig_rsdv(1); ig_dmeq=ig_rsdv(2); ig_u0=ig_rsdv(3); ig_uf=ig_rsdv(4)
             end if
             
+            !~if(.not.allocated(ig_isdv)) allocate(ig_isdv(1)); ig_isdv=0
+            !~if(.not.allocated(ig_rsdv)) allocate(ig_rsdv(4)); ig_rsdv=zero
             
-            ! get D matrix dee accord. to material properties, and update intg point stresses
+            ! update equilibrium damage variable
+            if(last_converged) ig_dmeq=ig_dm
+            
+            ! get D matrix dee accord. to material properties, and update intg point variables
             select case (mattype)
                 case ('interface')
                     
                     ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_interface(matkey),Dee,strain=delta,stress=Tau,fstat,dm,dmeq,u0_eff,uf_eff) 
+                    call ddsdde(lib_interface(matkey),Dee,strain=delta,stress=Tau, &
+                    & fstat=ig_fstat, dm=ig_dm, dmeq=ig_dmeq, u0=ig_u0, uf=ig_uf) 
                     
                 case default
                     write(msg_file,*) 'material type not supported for tri element!'
                     call exit_function
             end select
             
-
-
+            
 
             !------------------------------------------------!
             !  add this ig point contributions to K and F
@@ -409,24 +462,21 @@
             !- calculate integration point physical coordinates (initial)
             tmpx=matmul(coords,fn)
             
-            ! update x to ig point x array
-            call update(elem%ig_point(kig),x=tmpx)
-            
             !- calculate integration point displacement
             do j=1,ndim
                 do i=1,nnode
                     tmpu(j)=tmpu(j)+fn(i)*u((i-1)*ndim+j)
                 end do
             end do
+
+            ! update local ig sdv arrays
+            ig_isdv(1)=ig_fstat
+            ig_rsdv(1)=ig_dm; ig_rsdv(2)=ig_dmeq; ig_rsdv(3)=ig_u0; ig_rsdv(4)=ig_uf
             
-            ! update u to ig point u array
-            call update(elem%ig_point(kig),u=tmpu)
+            ! update ig point arrays
+            call update(elem%ig_point(kig),x=tmpx,u=tmpu, &
+            & strain=delta,stress=Tau,isdv=ig_isdv,rsdv=ig_rsdv)
             
-            ! update separation to ig point strain array
-            call update(elem%ig_point(kig),strain=delta)
-            
-            ! update traction to ig point stress array
-            call update(elem%ig_point(kig),stress=Tau)
             
        	end do !-looped over all int points. ig=nig
           
