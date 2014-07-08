@@ -16,14 +16,11 @@
         integer :: matkey=0 ! material index in the global material arrays
         real(kind=dp) :: theta=zero ! material (local) orientation for composite lamina
         type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
-        !~real(kind=dp) :: K_matrix(ndof,ndof)=zero, F_vector(ndof)=zero ! k matrix and f vector
         logical :: plstrain=.false.
         
         ! below are optional terms 
         
-        real(kind=dp),allocatable :: rsdv(:)
-        integer,allocatable :: isdv(:)
-        logical,allocatable :: lsdv(:)
+        type(sdv_array), allocatable :: sdv(:)
         
     end type
     
@@ -72,13 +69,9 @@
         elem%theta=zero
         do i=1,nig
             call empty(elem%ig_point(i))
-        end do
-        !~elem%K_matrix=zero   
-        !~elem%F_vector=zero       
+        end do       
         elem%plstrain=.false. ! default value      
-        if(allocated(elem%rsdv)) deallocate(elem%rsdv)       
-        if(allocated(elem%isdv)) deallocate(elem%isdv)
-        if(allocated(elem%lsdv)) deallocate(elem%lsdv)
+        if(allocated(elem%sdv)) deallocate(elem%sdv) 
     
     end subroutine empty_quad_element
     
@@ -94,9 +87,9 @@
         integer,                intent(in)      :: key,matkey
         real(kind=dp),optional, intent(in)      :: theta
         
-        real(kind=dp)   :: x(ndim),stress(nst),strain(nst)
+        real(kind=dp)   :: x(ndim),u(ndim),stress(nst),strain(nst)
         integer         :: i
-        x=zero; stress=zero; strain=zero
+        x=zero; u=zero; stress=zero; strain=zero
         i=0
         
         elem%key=key
@@ -105,7 +98,7 @@
         if(present(theta)) elem%theta=theta
         
         do i=1,nig
-            call update(elem%ig_point(i),x=x,stress=stress,strain=strain)
+            call update(elem%ig_point(i),x=x,u=u,stress=stress,strain=strain)
         end do
     
     end subroutine prepare_quad_element
@@ -113,7 +106,7 @@
     
     
     
-    subroutine extract_quad_element(elem,key,connec,matkey,theta,ig_point,plstrain,rsdv,isdv,lsdv)
+    subroutine extract_quad_element(elem,key,connec,matkey,theta,ig_point,plstrain,sdv)
     
         type(quad_element), intent(in) :: elem
         
@@ -122,10 +115,7 @@
         logical,                              optional, intent(out) :: plstrain
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
-        !~real(kind=dp),           allocatable, optional, intent(out) :: K_matrix(:,:), F_vector(:)
-        real(kind=dp),           allocatable, optional, intent(out) :: rsdv(:)
-        integer,                 allocatable, optional, intent(out) :: isdv(:)
-        logical,                 allocatable, optional, intent(out) :: lsdv(:)
+        type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
         
         if(present(key)) key=elem%key
         
@@ -145,34 +135,10 @@
             ig_point=elem%ig_point
         end if
         
-        !~if(present(K_matrix)) then
-        !~    allocate(K_matrix(ndof,ndof))
-        !~    K_matrix=elem%K_matrix
-        !~end if
-        !~
-        !~if(present(F_vector)) then
-        !~    allocate(F_vector(ndof))
-        !~    F_vector=elem%F_vector
-        !~end if
-        
-        if(present(rsdv)) then        
-            if(allocated(elem%rsdv)) then
-                allocate(rsdv(size(elem%rsdv)))
-                rsdv=elem%rsdv
-            end if
-        end if    
-        
-        if(present(isdv)) then        
-            if(allocated(elem%isdv)) then
-                allocate(isdv(size(elem%isdv)))
-                isdv=elem%isdv
-            end if
-        end if 
-        
-        if(present(lsdv)) then        
-            if(allocated(elem%lsdv)) then
-                allocate(lsdv(size(elem%lsdv)))
-                lsdv=elem%lsdv
+        if(present(sdv)) then        
+            if(allocated(elem%sdv)) then
+                allocate(sdv(size(elem%sdv)))
+                sdv=elem%sdv
             end if
         end if
     
@@ -364,25 +330,13 @@
         	end do	
             
             
-            ! update x to ig point x array
-            call update(elem%ig_point(kig),x=tmpx)
-            
-            ! update u to ig point u array
-            call update(elem%ig_point(kig),u=tmpu)
-            
-            ! update strains to ig point strain array
-            call update(elem%ig_point(kig),strain=tmpstrain)
-            
-            ! update stress of this ig point
-            call update(elem%ig_point(kig),stress=tmpstress)
+            ! update ig point arrays
+            call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=tmpstrain,stress=tmpstress)
             
        	end do !-looped over all int points. ig=nig
         
         F_vector=matmul(K_matrix,u) 
         
-        !~! update element K matrix and F vector
-        !~elem%K_matrix=K_matrix
-        !~elem%F_vector=F_vector
         
     
     end subroutine integrate_quad_element

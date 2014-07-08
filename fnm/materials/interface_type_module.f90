@@ -86,4 +86,70 @@
       end subroutine update_interface   
       
       
+!********************************************************************************************
+!************************ subroutine ddsdde ************************************************
+!***** returns the tangent stiffness matrix of the material ******************************
+!********************************************************************************************
+      subroutine ddsdde_interface(this_mat,dee,strain,stress,sdv)
+
+        type(interface_type),       intent(in)  :: this_mat
+        real(kind=dp),  optional,   intent(in)  :: strain(:)
+        real(kind=dp),              intent(out) :: dee(:,:)
+        real(kind=dp),  optional,   intent(out) :: stress(:)
+        
+        type(sdv_array), optional,  intent(inout) :: sdv
+
+        
+        ! local variables
+        real(kind=dp) :: Dnn0, Dtt0, Dll0, Dnn, Dtt, Dll
+        real(kind=dp) :: tau_nc, tau_tc, tau_lc
+        real(kind=dp) :: Gnc, Gtc, Glc, eta
+        integer :: nst
+        
+        ! initialize variables
+        dee=zero; if(present(stress)) stress=zero ! intent(out) vars
+        Dnn0=zero; Dtt0=zero; Dll0=zero
+        Dnn=zero;  Dtt=zero;  Dll=zero
+        tau_nc=zero; tau_tc=zero; tau_lc=zero
+        Gnc=zero; Gtc=zero; Glc=zero; eta=zero
+        nst=0
+        
+        ! find no. of strains
+        nst=size(dee(:,1))
+        
+        if(.not.this_mat%modulus_active) then
+            write(msg_file,*) 'interface material modulus undefined!'
+            call exit_function
+        end if
+        
+        ! extract the original linear elasticity stiffness
+        Dnn0=this_mat%modulus%Dnn
+        Dtt0=this_mat%modulus%Dtt
+        Dll0=this_mat%modulus%Dll
+        
+        ! calculate damage
+        if(this_mat%strength_active)
+        
+        if(this_mat%toughness_active)
+
+        if (nst .eq. 2) then ! 2D problem
+            dee(1,1)=Dnn
+            dee(2,2)=Dtt
+        else if (nst .eq. 3) then ! 3D problem
+            dee(1,1)=Dnn
+            dee(2,2)=Dtt
+            dee(3,3)=Dll
+        else
+            write(msg_file,*) 'no. of strains not supported for interface ddsdde!'
+            call exit_function
+        end if
+        
+        stress=matmul(dee,strain)
+        
+        
+
+      return
+      end subroutine ddsdde_interface 
+      
+      
     end module interface_type_module

@@ -124,25 +124,32 @@
 !************************ subroutine ddsdde ************************************************
 !***** returns the tangent stiffness matrix of the material ******************************
 !********************************************************************************************
-      subroutine ddsdde_isotropic(this_mat,dee,strain,stress,PlaneStrain,rsdv,isdv,lsdv)
+      subroutine ddsdde_isotropic(this_mat,dee,strain,stress,PlaneStrain,sdv)
 
-        type(isotropic_type),intent(in) :: this_mat
-        real(kind=dp),intent(out) :: dee(:,:)
-        real(kind=dp),optional,intent(out) :: stress(:)
-        real(kind=dp),optional,intent(in) :: strain(:)
-        real(kind=dp),allocatable,optional,intent(inout) :: rsdv(:)
-        integer,allocatable,optional,intent(inout) :: isdv(:)
-        logical,allocatable,optional,intent(inout) :: lsdv(:)
-        logical,optional,intent(in) :: PlaneStrain
+        type(isotropic_type),   intent(in)  :: this_mat
+        real(kind=dp),          intent(out) :: dee(:,:)
+        real(kind=dp),optional, intent(out) :: stress(:)
+        real(kind=dp),optional, intent(in)  :: strain(:)
+        logical,      optional, intent(in)  :: PlaneStrain
         
+        type(sdv_array), optional, intent(inout) :: sdv
+        
+                
         ! local variables
         real(kind=dp) :: E,nu,G,del
         integer :: nst
         
-        ! initialize variables
-        dee=zero; stress=zero
+        !----------------------------------!
+        !   initialize variables
+        !----------------------------------!
+        
+        ! initialize intent(out) variables 
+        dee=zero 
+        if(present(stress)) stress=zero
+        
+        ! initialize local variables
         E=zero; nu=zero; G=zero; del=zero
-        nst=0 
+        nst=0
         
         ! find no. of strains
         nst=size(dee(:,1))
@@ -162,7 +169,7 @@
         G=half*E/(one+nu) ! shear modulus
 
         if (nst .eq. 3) then ! 2D problem
-            if (PlaneStrain) then
+            if (present(PlaneStrain).and.PlaneStrain) then
                 del=(one+nu)*(one-2*nu)
                 dee(1,1)=(one-nu)*E/del
                 dee(2,2)=dee(1,1)
@@ -194,7 +201,7 @@
             call exit_function
         end if
         
-        stress=matmul(dee,strain)
+        if(present(strain).and.present(stress)) stress=matmul(dee,strain)
         
         
 

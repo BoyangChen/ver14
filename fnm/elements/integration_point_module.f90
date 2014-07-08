@@ -19,9 +19,11 @@
         
         ! below are optional terms 
         
-        real(kind=dp),allocatable :: rsdv(:) ! sdvs for calculation and output
-        integer,allocatable :: isdv(:)
-        logical,allocatable :: lsdv(:)
+        type(sdv_array), allocatable :: sdv(:) ! allocatable sets of sdv real, integer & logical arrays
+        
+        !~real(kind=dp),allocatable :: rsdv(:) ! sdvs for calculation and output
+        !~integer,allocatable :: isdv(:)
+        !~logical,allocatable :: lsdv(:)
         
     end type
     
@@ -53,9 +55,10 @@
         if(allocated(ig_point%u)) deallocate(ig_point%u)
         if(allocated(ig_point%stress)) deallocate(ig_point%stress)
         if(allocated(ig_point%strain)) deallocate(ig_point%strain)
-        if(allocated(ig_point%rsdv)) deallocate(ig_point%rsdv)
-        if(allocated(ig_point%isdv)) deallocate(ig_point%isdv)
-        if(allocated(ig_point%lsdv)) deallocate(ig_point%lsdv)
+        if(allocated(ig_point%sdv)) deallocate(ig_point%sdv)
+        !~if(allocated(ig_point%rsdv)) deallocate(ig_point%rsdv)
+        !~if(allocated(ig_point%isdv)) deallocate(ig_point%isdv)
+        !~if(allocated(ig_point%lsdv)) deallocate(ig_point%lsdv)
     
     end subroutine empty_ig
     
@@ -83,13 +86,14 @@
     !~end subroutine empty_ig
   
     
-    subroutine update_ig(ig_point,x,u,stress,strain,rsdv,isdv,lsdv)
+    subroutine update_ig(ig_point,x,u,stress,strain,sdv)
         type(integration_point),intent(inout) :: ig_point
-        real(kind=dp),optional,intent(in) :: x(:),u(:)
-        real(kind=dp),optional,intent(in) :: stress(:),strain(:)
-        real(kind=dp),optional,intent(in) :: rsdv(:)
-        integer,optional,intent(in) :: isdv(:)
-        logical,optional,intent(in) :: lsdv(:)
+        real(kind=dp),optional,intent(in)   :: x(:),u(:)
+        real(kind=dp),optional,intent(in)   :: stress(:),strain(:)
+        type(sdv_array),optional,intent(in) :: sdv(:)
+        !~real(kind=dp),optional,intent(in) :: rsdv(:)
+        !~integer,optional,intent(in) :: isdv(:)
+        !~logical,optional,intent(in) :: lsdv(:)
         
         !~if(present(x)) ig_point%x=x
         !~
@@ -157,65 +161,83 @@
                 allocate(ig_point%strain(size(strain)))
                 ig_point%strain=strain
             end if
-        end if        
-        
-        if(present(rsdv)) then        
-            if(allocated(ig_point%rsdv)) then
-                if(size(rsdv)==size(ig_point%rsdv)) then
-                    ig_point%rsdv=rsdv
-                else
-                    deallocate(ig_point%rsdv)
-                    allocate(ig_point%rsdv(size(rsdv)))
-                    ig_point%rsdv=rsdv
-                end if
-            else
-                allocate(ig_point%rsdv(size(rsdv)))
-                ig_point%rsdv=rsdv
-            end if
         end if    
-        
-        if(present(isdv)) then        
-            if(allocated(ig_point%isdv)) then
-                if(size(isdv)==size(ig_point%isdv)) then
-                    ig_point%isdv=isdv
+
+        if(present(sdv)) then        
+            if(allocated(ig_point%sdv)) then
+                if(size(sdv)==size(ig_point%sdv)) then
+                    ig_point%sdv=sdv
                 else
-                    deallocate(ig_point%isdv)
-                    allocate(ig_point%isdv(size(isdv)))
-                    ig_point%isdv=isdv
+                    deallocate(ig_point%sdv)
+                    allocate(ig_point%sdv(size(sdv)))
+                    ig_point%sdv=sdv
                 end if
             else
-                allocate(ig_point%isdv(size(isdv)))
-                ig_point%isdv=isdv
+                allocate(ig_point%sdv(size(sdv)))
+                ig_point%sdv=sdv
             end if
-        end if 
+        end if
+
+    
         
-        if(present(lsdv)) then        
-            if(allocated(ig_point%lsdv)) then
-                if(size(lsdv)==size(ig_point%lsdv)) then
-                    ig_point%lsdv=lsdv
-                else
-                    deallocate(ig_point%lsdv)
-                    allocate(ig_point%lsdv(size(lsdv)))
-                    ig_point%lsdv=lsdv
-                end if
-            else
-                allocate(ig_point%lsdv(size(lsdv)))
-                ig_point%lsdv=lsdv
-            end if
-        end if 
+        !~if(present(rsdv)) then        
+        !~    if(allocated(ig_point%rsdv)) then
+        !~        if(size(rsdv)==size(ig_point%rsdv)) then
+        !~            ig_point%rsdv=rsdv
+        !~        else
+        !~            deallocate(ig_point%rsdv)
+        !~            allocate(ig_point%rsdv(size(rsdv)))
+        !~            ig_point%rsdv=rsdv
+        !~        end if
+        !~    else
+        !~        allocate(ig_point%rsdv(size(rsdv)))
+        !~        ig_point%rsdv=rsdv
+        !~    end if
+        !~end if    
+        !~
+        !~if(present(isdv)) then        
+        !~    if(allocated(ig_point%isdv)) then
+        !~        if(size(isdv)==size(ig_point%isdv)) then
+        !~            ig_point%isdv=isdv
+        !~        else
+        !~            deallocate(ig_point%isdv)
+        !~            allocate(ig_point%isdv(size(isdv)))
+        !~            ig_point%isdv=isdv
+        !~        end if
+        !~    else
+        !~        allocate(ig_point%isdv(size(isdv)))
+        !~        ig_point%isdv=isdv
+        !~    end if
+        !~end if 
+        !~
+        !~if(present(lsdv)) then        
+        !~    if(allocated(ig_point%lsdv)) then
+        !~        if(size(lsdv)==size(ig_point%lsdv)) then
+        !~            ig_point%lsdv=lsdv
+        !~        else
+        !~            deallocate(ig_point%lsdv)
+        !~            allocate(ig_point%lsdv(size(lsdv)))
+        !~            ig_point%lsdv=lsdv
+        !~        end if
+        !~    else
+        !~        allocate(ig_point%lsdv(size(lsdv)))
+        !~        ig_point%lsdv=lsdv
+        !~    end if
+        !~end if 
     
     end subroutine update_ig
     
     
     
     
-    subroutine extract_ig(ig_point,x,u,stress,strain,rsdv,isdv,lsdv)
+    subroutine extract_ig(ig_point,x,u,stress,strain,sdv)
         type(integration_point),intent(in) :: ig_point
-        real(kind=dp),allocatable,optional,intent(out) :: x(:),u(:)
-        real(kind=dp),allocatable,optional,intent(out) :: stress(:),strain(:)
-        real(kind=dp),allocatable,optional,intent(out) :: rsdv(:)
-        integer,allocatable,optional,intent(out) :: isdv(:)
-        logical,allocatable,optional,intent(out) :: lsdv(:)
+        real(kind=dp),allocatable,optional,intent(out)   :: x(:),u(:)
+        real(kind=dp),allocatable,optional,intent(out)   :: stress(:),strain(:)
+        type(sdv_array),allocatable,optional,intent(out) :: sdv(:)
+        !~real(kind=dp),allocatable,optional,intent(out) :: rsdv(:)
+        !~integer,allocatable,optional,intent(out) :: isdv(:)
+        !~logical,allocatable,optional,intent(out) :: lsdv(:)
          
         
         if(present(x)) then        
@@ -246,27 +268,35 @@
             end if
         end if
                 
+        if(present(sdv)) then        
+            if(allocated(ig_point%sdv)) then
+                allocate(sdv(size(ig_point%sdv)))
+                sdv=ig_point%sdv
+            end if
+        end if
                 
-        if(present(rsdv)) then        
-            if(allocated(ig_point%rsdv)) then
-                allocate(rsdv(size(ig_point%rsdv)))
-                rsdv=ig_point%rsdv
-            end if
-        end if    
-        
-        if(present(isdv)) then        
-            if(allocated(ig_point%isdv)) then
-                allocate(isdv(size(ig_point%isdv)))
-                isdv=ig_point%isdv
-            end if
-        end if 
-        
-        if(present(lsdv)) then        
-            if(allocated(ig_point%lsdv)) then
-                allocate(lsdv(size(ig_point%lsdv)))
-                lsdv=ig_point%lsdv
-            end if
-        end if 
+                
+                
+        !~if(present(rsdv)) then        
+        !~    if(allocated(ig_point%rsdv)) then
+        !~        allocate(rsdv(size(ig_point%rsdv)))
+        !~        rsdv=ig_point%rsdv
+        !~    end if
+        !~end if    
+        !~
+        !~if(present(isdv)) then        
+        !~    if(allocated(ig_point%isdv)) then
+        !~        allocate(isdv(size(ig_point%isdv)))
+        !~        isdv=ig_point%isdv
+        !~    end if
+        !~end if 
+        !~
+        !~if(present(lsdv)) then        
+        !~    if(allocated(ig_point%lsdv)) then
+        !~        allocate(lsdv(size(ig_point%lsdv)))
+        !~        lsdv=ig_point%lsdv
+        !~    end if
+        !~end if 
     
     end subroutine extract_ig
     

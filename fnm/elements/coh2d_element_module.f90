@@ -19,9 +19,7 @@
         
         ! below are optional terms 
         
-        real(kind=dp),allocatable :: rsdv(:)
-        integer,allocatable :: isdv(:)
-        logical,allocatable :: lsdv(:)
+        type(sdv_array), allocatable :: sdv(:)
         
     end type
     
@@ -72,9 +70,7 @@
             call empty(elem%ig_point(i))
         end do
           
-        if(allocated(elem%rsdv)) deallocate(elem%rsdv)       
-        if(allocated(elem%isdv)) deallocate(elem%isdv)
-        if(allocated(elem%lsdv)) deallocate(elem%lsdv)
+        if(allocated(elem%sdv)) deallocate(elem%sdv)
     
     end subroutine empty_coh2d_element
     
@@ -85,13 +81,13 @@
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
     subroutine prepare_coh2d_element(elem,key,connec,matkey)
     
-        type(coh2d_element),     intent(inout)   :: elem
+        type(coh2d_element),    intent(inout)   :: elem
         integer,                intent(in)      :: connec(nnode)
         integer,                intent(in)      :: key,matkey
         
-        real(kind=dp)   :: x(ndim),stress(nst),strain(nst)
+        real(kind=dp)   :: x(ndim),u(ndim),stress(nst),strain(nst)
         integer         :: i
-        x=zero; stress=zero; strain=zero
+        x=zero; u=zero; stress=zero; strain=zero
         i=0
         
         elem%key=key
@@ -99,7 +95,7 @@
         elem%matkey=matkey
         
         do i=1,nig
-            call update(elem%ig_point(i),x=x,stress=stress,strain=strain)
+            call update(elem%ig_point(i),x=x,u=u,stress=stress,strain=strain)
         end do
     
     end subroutine prepare_coh2d_element
@@ -107,16 +103,14 @@
     
     
     
-    subroutine extract_coh2d_element(elem,key,connec,matkey,ig_point,rsdv,isdv,lsdv)
+    subroutine extract_coh2d_element(elem,key,connec,matkey,ig_point,sdv)
     
         type(coh2d_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: key, matkey
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
-        real(kind=dp),           allocatable, optional, intent(out) :: rsdv(:)
-        integer,                 allocatable, optional, intent(out) :: isdv(:)
-        logical,                 allocatable, optional, intent(out) :: lsdv(:)
+        type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
         
         if(present(key)) key=elem%key
         
@@ -132,28 +126,13 @@
             ig_point=elem%ig_point
         end if
         
-        if(present(rsdv)) then        
-            if(allocated(elem%rsdv)) then
-                allocate(rsdv(size(elem%rsdv)))
-                rsdv=elem%rsdv
-            end if
-        end if    
-        
-        if(present(isdv)) then        
-            if(allocated(elem%isdv)) then
-                allocate(isdv(size(elem%isdv)))
-                isdv=elem%isdv
-            end if
-        end if 
-        
-        if(present(lsdv)) then        
-            if(allocated(elem%lsdv)) then
-                allocate(lsdv(size(elem%lsdv)))
-                lsdv=elem%lsdv
+        if(present(sdv)) then        
+            if(allocated(elem%sdv)) then
+                allocate(sdv(size(elem%sdv)))
+                sdv=elem%sdv
             end if
         end if
-    
-    
+         
     end subroutine extract_coh2d_element
 
 
@@ -167,7 +146,7 @@
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
         use lib_node_module                 ! global node library
-        use glb_clock_module                ! global analysis progress (kstep, kinc, time, dtime)
+        use glb_clock_module                ! global analysis progress (curr. step, inc, time, dtime)
     
         type(coh2d_element), intent(inout)      :: elem 
         real(kind=dp), allocatable, intent(out) :: K_matrix(:,:), F_vector(:)
@@ -181,11 +160,7 @@
         type(xnode)     :: node(nnode)                  ! x, u, du, v, extra dof ddof etc
         
         ! - element material extracted from global material library
-        type(material)  :: mat                          ! matname, mattype and matkey to glb mattype array
-        
-        ! - variables extracted from global clock module
-        integer         :: curr_step, curr_inc          ! current step and increment no. of the analysis
-        
+        type(material)  :: mat                          ! matname, mattype and matkey to glb mattype array        
         
         
         !-----------------------------------------!
@@ -207,11 +182,7 @@
         logical         :: last_converged               ! true if last iteration has converged: a new increment/step has started
         
         ! - variables extracted from intg point sdvs
-        integer,        allocatable     :: ig_isdv(:)   ! integration point integer sdv
-        real(kind=dp),  allocatable     :: ig_rsdv(:)   ! integration point real sdv
-        integer                         :: ig_fstat     ! failure status of the ig point
-        real(kind=dp)    :: ig_u0,ig_uf,ig_dm,ig_dmeq   ! coh. law vars, estimated damage and equilibrium damage
-        
+        type(sdv_array),  allocatable   :: ig_sdv(:)
         
         
         ! - variables defined locally
@@ -251,13 +222,11 @@
             call empty(node(i))
         end do 
         call empty(mat)
-        curr_step=0; curr_inc=0
         
         ! pure local variables
         coords=zero; u=zero 
         matname=''; mattype=''; matkey=0 
         nstep=0; ninc=0; last_converged=.false.
-        ig_fstat=0; ig_u0=zero; ig_uf=zero; ig_dm=zero; ig_dmeq=zero
         igxi=zero; igwt=zero
         tmpx=zero; tmpu=zero
         fn=zero; Nmatrix=zero
@@ -312,27 +281,23 @@
         call extract(mat,matname,mattype,matkey) 
         
         
-        ! - extract curr_step and curr_inc values from global clock
-        call extract(glb_clock,kstep=curr_step,kinc=curr_inc)
-        
         ! - extract isdv values from element and assign to nstep and ninc
-        if(allocated(elem%isdv)) then
-            nstep   =   elem%isdv(1)
-            ninc    =   elem%isdv(2)
-        else ! first iteration
-            allocate(elem%isdv(2))
-            elem%isdv(1) = curr_step    
-            elem%isdv(2) = curr_inc
-            nstep        = elem%isdv(1)
-            ninc         = elem%isdv(2)
+        if(.not.allocated(elem%sdv)) then   ! 1st iteration
+            allocate(elem%sdv(1))
+            allocate(elem%sdv(1)%i(2))      ! allocate integer sdv array
+            elem%sdv(1)%i(1) = curr_step    ! store current step & increment in the integer sdv array
+            elem%sdv(1)%i(2) = curr_inc
         end if
+        nstep        = elem%sdv(1)%i(1)     ! extract the step & increment no. of the last iteration
+        ninc         = elem%sdv(1)%i(2)
+        
         
         ! check if last iteration has converged, and if so, update logical var. 
         ! and store new step & iteration values
         if(nstep.ne.curr_step .or. ninc.ne.curr_inc) then
             last_converged=.true.
-            elem%isdv(1) = curr_step    
-            elem%isdv(2) = curr_inc
+            elem%sdv(1)%i(1) = curr_step    ! update the current step & increment no.
+            elem%sdv(1)%i(2) = curr_inc
         end if
         
         
@@ -382,7 +347,6 @@
             ! - empty relevant arrays for reuse
             fn=zero; Nmatrix=zero
             ujump=zero; delta=zero; dee=zero; Tau=zero
-            ig_fstat=0; ig_dm=zero; ig_dmeq=zero; ig_u0=zero; ig_uf=zero
             QN=zero; NtQt=zero; DQN=zero; NtQtDQN=zero; NtQtTau=zero
             tmpx=zero; tmpu=zero
             
@@ -403,29 +367,30 @@
             ! calculate separation delta in local coords: delta=Qmatrix*ujump
             delta=matmul(Qmatrix,ujump)
             
-            ! - extract sdvs from integration points; ig_isdv&rsdv automatically deallocated when passed in
-            call extract(elem%ig_point(kig),isdv=ig_isdv,rsdv=ig_rsdv)
+            ! - extract sdvs from integration points; ig_sdv automatically deallocated when passed in
+            call extract(elem%ig_point(kig),sdv=ig_sdv)
             
-            ! - update damage variables local arrays
-            if(.not.allocated(ig_isdv)) allocate(ig_isdv(1)); ig_isdv=0 ! 1st iteration
-            ig_fstat=ig_isdv(1)
+            ! allocate ig_sdv arrays for 1st iteration of analysis
+            if(.not.allocated(ig_sdv)) then
+            ! allocate 2 sets of sdv arrays, 1 for converged sdvs and 1 for iterating sdvs
+                allocate(ig_sdv(2))
+            end if
             
-            if(.not.allocated(ig_rsdv)) allocate(ig_rsdv(4)); ig_rsdv=zero ! 1st iteration
-            ig_dm=ig_rsdv(1); ig_dmeq=ig_rsdv(2); ig_u0=ig_rsdv(3); ig_uf=ig_rsdv(4)
-            
-            ! update equilibrium damage variable
-            if(last_converged) ig_dmeq=ig_dm
+            ! update converged sdvs (sdv1) with iterating sdvs (sdv2) when last iteration has converged
+            ! and revalue iterating sdvs (sdv2) to the last converged sdvs (sdv1) if otherwise
+            if(last_converged) ig_sdv(1)=ig_sdv(2)
+            else               ig_sdv(2)=ig_sdv(1)
+            end if
             
             ! get D matrix dee accord. to material properties, and update intg point variables
             select case (mattype)
                 case ('interface')
                     
-                    ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_interface(matkey),Dee,strain=delta,stress=Tau, &
-                    & fstat=ig_fstat, dm=ig_dm, dmeq=ig_dmeq, u0=ig_u0, uf=ig_uf) 
+                    ! calculate D matrix, update stress, and iterating sdv
+                    call ddsdde(lib_interface(matkey), Dee, strain=delta, stress=Tau, sdv=ig_sdv(2)) 
                     
                 case default
-                    write(msg_file,*) 'material type not supported for tri element!'
+                    write(msg_file,*) 'material type not supported for cohesive element!'
                     call exit_function
             end select
             
@@ -463,14 +428,9 @@
                     tmpu(j) = tmpu(j) + fn(i) * u((i-1)*ndim+j)
                 end do
             end do
-
-            ! update local ig sdv arrays
-            ig_isdv(1)=ig_fstat
-            ig_rsdv(1)=ig_dm; ig_rsdv(2)=ig_dmeq; ig_rsdv(3)=ig_u0; ig_rsdv(4)=ig_uf
             
             ! update element ig point arrays
-            call update(elem%ig_point(kig),x=tmpx,u=tmpu, &
-            & strain=delta,stress=Tau,isdv=ig_isdv,rsdv=ig_rsdv)
+            call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=delta,stress=Tau,sdv=ig_sdv)
             
             
        	end do !-looped over all int points. ig=nig
@@ -508,9 +468,7 @@
 	
         cn=one !-newton cotes
     
-        if(present(gauss)) then
-            if(gauss) cn=0.5773502691896260_dp !-gauss
-        end if
+        if(present(gauss).and.gauss) cn=0.5773502691896260_dp !-gauss ig point
     
         if (nig .eq. 2) then          
             xi(1,1)=-cn

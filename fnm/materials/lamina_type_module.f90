@@ -125,23 +125,25 @@
 !************************ subroutine ddsdde ************************************************
 !***** returns the tangent stiffness matrix of the material ******************************
 !********************************************************************************************
-      subroutine ddsdde_lamina(this_mat,dee,strain,stress,PlaneStrain,rsdv,isdv,lsdv)
+      subroutine ddsdde_lamina(this_mat,dee,strain,stress,PlaneStrain,sdv)
 
         type(lamina_type),                        intent(in)    :: this_mat
         real(kind=dp),                            intent(out)   :: dee(:,:)
         real(kind=dp),                  optional, intent(out)   :: stress(:)
         real(kind=dp),                  optional, intent(in)    :: strain(:)
-        real(kind=dp),  allocatable,    optional, intent(inout) :: rsdv(:)
-        integer,        allocatable,    optional, intent(inout) :: isdv(:)
-        logical,        allocatable,    optional, intent(inout) :: lsdv(:)
         logical,                        optional, intent(in)    :: PlaneStrain
+        
+        type(sdv_array),                optional, intent(inout) :: sdv
+        
+        
         
         ! local variables
         real(kind=dp) :: E1,E2,E3,G12,G13,G23,nu12,nu13,nu23,nu21,nu31,nu32,del
         integer       :: nst
         
-        ! initialize variables
-        dee=zero; stress=zero
+        ! initialize intent(out) variables
+        dee=zero; if(present(stress)) stress=zero
+        ! initialize local variables
         E1=zero; E2=zero; E3=zero
         G12=zero; G13=zero; G23=zero 
         nu12=zero; nu13=zero; nu23=zero
@@ -174,7 +176,7 @@
         del= one-nu12*nu21-nu13*nu31-nu23*nu32-two*nu21*nu32*nu13
         
         if (nst .eq. 3) then ! 2D problem
-          if(PlaneStrain) then
+          if (present(PlaneStrain).and.PlaneStrain) then
             dee(1,1)= E1*(one-nu23*nu32)/del
             dee(1,2)= E1*(nu21+nu23*nu31)/del
             dee(2,2)= E2*(one-nu13*nu31)/del
@@ -207,7 +209,7 @@
         end if
 
         
-        stress=matmul(dee,strain)
+        if(present(strain).and.present(stress)) stress=matmul(dee,strain)
         
         
 

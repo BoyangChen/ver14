@@ -20,6 +20,14 @@
       halfcirc=180._dp,pi=3.14159265359_dp,ninety=90._dp            &
       ,tolerance=0.1_dp
       
+      
+        ! derived data type sdv_array, just to group 3 types of arrays together
+        type :: sdv_array   
+            real(kind=dp),  allocatable :: r(:)
+            integer,        allocatable :: i(:)
+            logical,        allocatable :: l(:)
+        end type
+      
         contains
         
         subroutine exit_function
