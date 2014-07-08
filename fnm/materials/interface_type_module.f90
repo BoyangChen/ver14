@@ -127,10 +127,20 @@
         Dtt0=this_mat%modulus%Dtt
         Dll0=this_mat%modulus%Dll
         
-        ! calculate damage
-        if(this_mat%strength_active)
+        ! extract strength parameters
+        if(this_mat%strength_active) then
+            tau_nc=this_mat%strength%tau_nc
+            tau_tc=this_mat%strength%tau_tc
+            tau_lc=this_mat%strength%tau_lc
+        end if
         
-        if(this_mat%toughness_active)
+        ! extract toughness parameters
+        if(this_mat%toughness_active) then
+            Gnc=this_mat%toughness%Gnc
+            Gtc=this_mat%toughness%Gtc
+            Glc=this_mat%toughness%Glc
+            eta=this_mat%toughness%eta
+        end if
 
         if (nst .eq. 2) then ! 2D problem
             dee(1,1)=Dnn
