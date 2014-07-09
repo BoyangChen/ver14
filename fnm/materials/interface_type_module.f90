@@ -3,6 +3,10 @@
     
     implicit none
     private
+    
+    
+    ! parameters
+    integer, parameter :: failed=10, onset=5, intact=0
 
 
     type,public :: interface_modulus
@@ -105,6 +109,7 @@
         real(kind=dp) :: dmax                   ! local replica of dfail
         integer :: nst
         
+        
         ! initialize variables
         dee=zero; if(present(stress)) stress=zero ! intent(out) vars
         Dnn0=zero; Dtt0=zero; Dll0=zero
@@ -178,15 +183,16 @@
             if(.not.allocated(sdv%i)) allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
             fstat=sdv%i(1)
             ! check and update fstat
-            if(fstat/=10) then
+            if(fstat/=failed) then
                 ! calculate stress based on jump
                 ! dee is defined based on intact stiffness
                 sigma=matmul(dee,jump)               
                 ! go through failure criterion and update fstat
                 call FailureCriterion(sigma,this_mat%strength,fstat)
             end if          
-            ! update D matrix accord. to fstat
-            if(fstat==10) dee=dee*(one-dmax)           
+            ! update D matrix accord. to fstat and crack open/close status
+            if(fstat==failed) dee=dee*(one-dmax)
+            if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! update stress
             if(present(stress)) stress=matmul(dee,jump)
             ! update sdv
@@ -217,6 +223,9 @@
       
       
       
+      
+      
+      
       subroutine CohesiveLaw(sdv,Dee,sigma,strength,toughness,jump,dmax)
       
         type(sdv_array),        intent(inout)   :: sdv
@@ -226,21 +235,39 @@
         real(dp),                 intent(in)    :: jump(:), dmax
       
         ! local variables
-        ! fstat, u0, uf, dm, findex, nst, gn, gs, gmc, ...
+        real(dp) :: Dnn0, fstat, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
+        & Gn, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
+        integer  :: nst
+
+        ! initialize local variables
+        Dnn0=zero; fstat=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
+        Glc=zero;  Gsc=zero;  eta=zero; findex=zero;  Gn=zero;  Gs=zero; bk=zero
+        Gmc=zero; u_eff=zero; T_eff=zero; T0=zero; dm2=zero
+        nst=0
         
+        ! extract Dnn0 and nst
+        Dnn0=dee(1,1)
+        nst=size(dee(:,1))
         
         ! extract current values of failure status variable
         if(.not.allocated(sdv%i)) allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
         fstat=sdv%i(1)
         
-        if(fstat==10)    ! already failed
+        
+        ! --------------------------------------------------------- !
+        ! if already failed, calculate directly Dee and Sigma and exit
+        ! --------------------------------------------------------- !
+        if(fstat==failed)    ! already failed
             ! calculate penalty stiffness
             dee=dee*(one-dmax)
+            if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! calculate stress
             sigma=matmul(dee,jump)
             ! exit program
             return
         end if
+        
+        
         
         ! --------------------------------------------------------- !
         ! the following assumes linear cohesive law
@@ -274,17 +301,17 @@
         ! check and update fstat and damage variables
         
         ! still intact
-        if(fstat==0) then
+        if(fstat==intact) then
             ! calculate stress based on jump
             ! dee is defined based on intact stiffness
             sigma=matmul(dee,jump)
             
             ! go through failure criterion and update fstat
-            call FailureCriterion(sigma,this_mat%strength,fstat,findex)
+            call FailureCriterion(sigma,strength,fstat,findex)
             
             ! failure onset
-            if(fstat==5)
-            ! calculate u0, uf and go to next loop
+            if(fstat==onset)
+            ! calculate u0, uf and go to next control
             
                 ! normal and shear strain energy density
                 Gn=half*max(zero,sigma(1))*max(zero,jump(1))
@@ -301,21 +328,29 @@
                 end if
                 T_eff=two*(Gn+Gs)/u_eff
                 
-                ! effective jump and traction at failure onset
+                ! effective jump and traction at failure onset, taking into acc. of overshoot
                 u0=u_eff/sqrt(findex)
                 T0=T_eff/sqrt(findex)
                 
                 ! mixed mode fracture toughness (BK formula)
-                Gsc=sqrt(Gtc**2+Glc**2) 
-                Gmc=Gnc+(Gsc-Gnc)*bk**eta
+                Gsc=sqrt(Gtc**2+Glc**2) ! a quadratic avg of the two shear toughness
+                Gmc=Gnc+(Gsc-Gnc)*(bk**eta)
                 
                 ! effective jump at final failure
                 uf=two*Gmc/T0
+                
+            else if(fstat==failed)
+            ! this is the case where strength is close to zero
+                dm=dmax
+                
+            else ! fstat==intact
+            ! fstat remains intact; dm, u0 and uf remain zero as initialized
+                continue
             end if
         end if
         
         ! failure started
-        if(fstat==5) then
+        if(fstat==onset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
@@ -335,7 +370,7 @@
             ! check dm and update fstat
             if (dm>=dmax) then
                 dm=dmax
-                fstat==10
+                fstat==failed
             end if
         end if
      
@@ -343,6 +378,7 @@
         
         ! update D matrix
         dee=dee*(one-dm)
+        if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
         
         ! update stress
         sigma=matmul(dee,jump)
@@ -358,11 +394,49 @@
       
       subroutine FailureCriterion(sigma,strength,fstat,findex)
       
-!~        ! extract strength parameters
-!~
-!~        tau_nc=this_mat%strength%tau_nc
-!~        tau_tc=this_mat%strength%tau_tc
-!~        tau_lc=this_mat%strength%tau_lc
+        real(dp),                   intent(in) :: sigma(:)
+        type(interface_strength),   intent(in) :: strength
+        real(dp),                  intent(out) :: fstat, findex
+      
+        ! local variables
+        real(dp)    :: tau_nc, tau_tc, tau_lc
+        
+        ! initialize variables
+        fstat=zero; findex=zero                 ! intent (out)
+        tau_nc=zero; tau_tc=zero; tau_lc=zero   ! local
+      
+        ! extract strength parameters
+
+        tau_nc=strength%tau_nc
+        tau_tc=strength%tau_tc
+        tau_lc=strength%tau_lc
+        
+        ! --------------------------------------------------------- !
+        ! the following assumes quadratic stress criterion
+        ! other criteria can also be used in the future
+        ! just need to put in a selection criterion and algorithm
+        ! --------------------------------------------------------- ! 
+        ! e.g.: select case (strength%FC)
+        !           case(0)
+        !               quad. stress
+        !           case(1)
+        !               max. stress
+        !           ...
+        
+        if(min(tau_nc,tau_tc,tau_lc) > tiny(one)) then
+            if(nst==3) then 
+            findex=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
+            else
+            findex=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
+            end if
+            
+            if(findex>=one) fstat=onset
+        else
+            ! strength close to zero == already failed
+            fstat=failed
+        end if
+        
+        
       
       end subroutine FailureCriterion
       
