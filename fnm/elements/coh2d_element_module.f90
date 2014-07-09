@@ -387,7 +387,7 @@
                 case ('interface')
                     
                     ! calculate D matrix, update stress, and iterating sdv
-                    call ddsdde(lib_interface(matkey), Dee, strain=delta, stress=Tau, sdv=ig_sdv(2)) 
+                    call ddsdde(lib_interface(matkey), Dee, strain=delta, stress=Tau, sdv=ig_sdv(2), dfail) 
                     
                 case default
                     write(msg_file,*) 'material type not supported for cohesive element!'
