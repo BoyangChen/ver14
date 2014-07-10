@@ -45,7 +45,7 @@
 
 
         ! initialize variables
-        
+
         outdir=''
         i=0
         jl=0; ml=0; nl=0
@@ -57,11 +57,11 @@
         call initialize_lib_node
         call initialize_lib_elem
         call initialize_lib_mat
-        
-        
+
+
         ! update global clock
         call update_glb_clock(kstep=1,kinc=1)
-        
+
 
         ! Apply boundary test loading
         nndset=2
@@ -75,11 +75,11 @@
         do i=1,size(ndset(2)%setnode)
             call update(lib_node(ndset(2)%setnode(i)),u=[zero,0.1_dp])
         end do
-        
-        
 
-     
-        
+
+
+
+
 
 
         ! integration and assembly
@@ -110,7 +110,7 @@
                 call integrate(lib_brick(i),Ki,Fi)
             end do
         end if
-        
+
         if(allocated(lib_coh2d)) then
             ncoh2d=size(lib_coh2d)
             do i=1,ncoh2d

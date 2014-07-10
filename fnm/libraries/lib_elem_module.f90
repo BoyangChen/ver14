@@ -58,7 +58,7 @@
             call empty(lib_coh2d(i))
         end do
         
-        call prepare(lib_coh2d(1),key=1,connec=[1,2,4,3],matkey=1)
+        call prepare(lib_coh2d(1),key=1,connec=[1,2,4,3],matkey=3)
         
         
         

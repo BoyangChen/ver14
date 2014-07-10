@@ -189,6 +189,12 @@
                 write(u,'(i2)') 12 ! 12 for brick
             end do 
         end if
+        
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                write(u,'(i2)') 9 ! 9 for quad
+            end do 
+        end if
      
         write(u,'(a)')''
 
@@ -302,9 +308,40 @@
             end do 
         end if
         
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                sigtsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh2d(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),stress=sig)  
+                    !epstsr(1,1)
+                    sigtsr(2,2)=sigtsr(2,2)+sig(1)
+                    sigtsr(1,2)=sigtsr(1,2)+sig(2)
+                    sigtsr(2,1)=sigtsr(2,1)+sig(2)                           
+                end do 
+                ! average strain in the element
+                sigtsr=sigtsr/size(igpnt)
+                do l=1,3
+                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                end do
+                write(u,'(a)')'' ! separate from next element               
+            end do 
+        end if
+        
         !~if (nquad > 0 ) then
         !~! fill in the same ....
         !~end if
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         
         
@@ -410,10 +447,10 @@
                 call extract(lib_coh2d(i),ig_point=igpnt)
                 do j=1,size(igpnt)
                     call extract(igpnt(j),strain=eps)  
-                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                    epstsr(1,2)=epstsr(1,2)+eps(3)
-                    epstsr(2,1)=epstsr(2,1)+eps(3)                           
+                    !epstsr(1,1)
+                    epstsr(2,2)=epstsr(2,2)+eps(1)
+                    epstsr(1,2)=epstsr(1,2)+eps(2)
+                    epstsr(2,1)=epstsr(2,1)+eps(2)                           
                 end do 
                 ! average strain in the element
                 epstsr=epstsr/size(igpnt)

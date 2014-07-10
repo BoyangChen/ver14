@@ -31,21 +31,25 @@
     
     subroutine initialize_lib_mat()
         
-        integer :: i=0, nmat=0, niso=0, nlamina=0
-        character(len=matnamelength) :: mname1, mname2
-        character(len=mattypelength) :: mtype1, mtype2
+        integer :: i=0, nmat=0, niso=0, nlamina=0, ninterface=0
+        character(len=matnamelength) :: mname1, mname2, mname3
+        character(len=mattypelength) :: mtype1, mtype2, mtype3
         
         mname1='test1'
         mtype1='isotropic'
         mname2='test2'
         mtype2='lamina'
-        nmat=2
+        mname3='test3'
+        mtype3='interface'
+        nmat=3
         niso=1
         nlamina=1
+        ninterface=1
         
         allocate(lib_mat(nmat))
         allocate(lib_iso(niso))
         allocate(lib_lamina(nlamina))
+        allocate(lib_interface(ninterface))
     
         do i=1, nmat
             call empty(lib_mat(i))
@@ -59,13 +63,20 @@
             call empty(lib_lamina(i))
         end do
         
+        do i=1, ninterface
+            call empty(lib_interface(i))
+        end do
+        
         call update(lib_mat(1),matname=mname1,mattype=mtype1,matkey=1)
         call update(lib_mat(2),matname=mname2,mattype=mtype2,matkey=1)
+        call update(lib_mat(3),matname=mname3,mattype=mtype3,matkey=1)
         
         call update(lib_iso(1), isotropic_modulus(E=100.0_dp, nu=zero))
         
         call update(lib_lamina(1), lamina_modulus(1000.0_dp,100.0_dp,40.0_dp,50.0_dp,zero,zero))
     
+        call update(lib_interface(1), interface_modulus(100.0_dp,100.0_dp,100.0_dp), &
+        & interface_strength(5.0_dp,11.0_dp,11.0_dp))
     
     end subroutine initialize_lib_mat
     

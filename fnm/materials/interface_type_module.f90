@@ -443,9 +443,9 @@
         
         if(min(tau_nc,tau_tc,tau_lc) > tiny(one)) then
             if(nst==3) then 
-            findex2=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
+            findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
             else
-            findex2=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
+            findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
             end if
             
             if(findex2>=one) fstat=onset
