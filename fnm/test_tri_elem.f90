@@ -1,4 +1,5 @@
     include 'parameter_module.f90'
+    include 'libraries/glb_clock_module.f90'
     include 'libraries/lib_node_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
@@ -6,6 +7,7 @@
 
     program test_tri
         use parameter_module
+        use glb_clock_module
         use lib_mat_module
         use lib_node_module
         use lib_elem_module

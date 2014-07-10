@@ -160,7 +160,10 @@
         type(xnode)     :: node(nnode)                  ! x, u, du, v, extra dof ddof etc
         
         ! - element material extracted from global material library
-        type(material)  :: mat                          ! matname, mattype and matkey to glb mattype array        
+        type(material)  :: mat                          ! matname, mattype and matkey to glb mattype array   
+
+        ! - glb clock step and increment no. extracted from glb clock module
+        integer         :: curr_step, curr_inc
         
         
         !-----------------------------------------!
@@ -222,6 +225,7 @@
             call empty(node(i))
         end do 
         call empty(mat)
+        curr_step=0; curr_inc=0
         
         ! pure local variables
         coords=zero; u=zero 
@@ -249,6 +253,9 @@
         
         ! - extract material values from global material array
         mat=lib_mat(elem%matkey)
+        
+        ! - extract curr step and inc values from glb clock module
+        call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
         
         
         

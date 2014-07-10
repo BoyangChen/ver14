@@ -9,10 +9,66 @@
     use parameter_module
     
     implicit none
+    private
     save
 
     integer       :: curr_step, curr_inc
     real(kind=dp) :: curr_time, curr_dtime    
+    
+    
+    public :: extract_glb_clock, update_glb_clock, initialize_glb_clock
+    
+    
+    
+    
+    contains
+    
+    
+    
+    
+    subroutine initialize_glb_clock()
+    
+        curr_step=0
+        curr_inc=0
+        curr_time=zero
+        curr_dtime=zero
+    
+    end subroutine
+    
+    
+    
+    
+    subroutine extract_glb_clock(kstep,kinc,time,dtime)
+        integer, optional, intent(out) :: kstep, kinc
+        real(dp),optional, intent(out) :: time, dtime
+        
+        if(present(kstep)) kstep=curr_step
+        
+        if(present(kinc)) kinc=curr_inc
+        
+        if(present(time)) time=curr_time
+        
+        if(present(dtime)) dtime=curr_dtime
+    
+    end subroutine
+    
+    
+    
+    subroutine update_glb_clock(kstep,kinc,time,dtime)
+        integer, optional, intent(in) :: kstep, kinc
+        real(dp),optional, intent(in) :: time, dtime
+        
+        if(present(kstep)) curr_step=kstep
+        
+        if(present(kinc)) curr_inc=kinc
+        
+        if(present(time)) curr_time=time
+        
+        if(present(dtime)) curr_dtime=dtime
+    
+    end subroutine
+    
+    
     
     
     !~private
