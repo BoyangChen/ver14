@@ -76,7 +76,7 @@
         call update(lib_lamina(1), lamina_modulus(1000.0_dp,100.0_dp,40.0_dp,50.0_dp,zero,zero))
     
         call update(lib_interface(1), interface_modulus(100.0_dp,100.0_dp,100.0_dp), &
-        & interface_strength(5.0_dp,11.0_dp,11.0_dp))
+        & interface_strength(5.0_dp,10.0_dp,10.0_dp), interface_toughness(0.25_dp,one,one,eta=two))
     
     end subroutine initialize_lib_mat
     

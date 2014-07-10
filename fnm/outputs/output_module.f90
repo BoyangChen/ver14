@@ -486,7 +486,68 @@
         write(u,'(a)')''
 
         
+        ! write element damage variable
+        write(u,'(a)')'SCALARS dm float'
         
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                fstat=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh2d(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    fstat=fstat+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fstat=fstat/size(igpnt)
+                write(u,*) fstat
+                !write(u,'(a)')'' ! separate from next element               
+            end do 
+        end if
+        write(u,'(a)')''
+
+
+        ! write element damage variable
+        write(u,'(a)')'SCALARS u0 float'
+        
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                fstat=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh2d(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    fstat=fstat+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fstat=fstat/size(igpnt)
+                write(u,*) fstat
+                !write(u,'(a)')'' ! separate from next element               
+            end do 
+        end if
+        write(u,'(a)')''
+
+
+        ! write element damage variable
+        write(u,'(a)')'SCALARS uf float'
+        
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                fstat=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh2d(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    fstat=fstat+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fstat=fstat/size(igpnt)
+                write(u,*) fstat
+                !write(u,'(a)')'' ! separate from next element               
+            end do 
+        end if
+        write(u,'(a)')''
+
+
+
+
         
         
         !~if (nquad > 0 ) then

@@ -186,10 +186,12 @@
         ! toughness parameters are not active, do only strength failure criterion
         if(.not.this_mat%toughness_active) then
             ! extract current values of failure status variable
-            if(.not.allocated(sdv%i)) allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
+            if(.not.allocated(sdv%i)) then 
+                allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
+            end if
             fstat=sdv%i(1)
             ! check and update fstat
-            if(fstat/=failed) then
+            if(fstat/=onset) then
                 ! calculate stress based on jump
                 ! dee is defined based on intact stiffness
                 sigma=matmul(dee,jump)               
@@ -197,7 +199,7 @@
                 call FailureCriterion(sigma,this_mat%strength,fstat)
             end if          
             ! update D matrix accord. to fstat and crack open/close status
-            if(fstat==failed) dee=dee*(one-dmax)
+            if(fstat==onset) dee=dee*(one-dmax)
             if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! update stress
             if(present(stress)) stress=matmul(dee,jump)
@@ -242,12 +244,13 @@
       
         ! local variables
         real(dp) :: Dnn0, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
-        & Gn, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
+        & Gn, Gt, Gl, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
         integer  :: nst, fstat
 
         ! initialize local variables
         Dnn0=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
-        Glc=zero;  Gsc=zero;  eta=zero; findex=zero;  Gn=zero;  Gs=zero; bk=zero
+        Glc=zero;  Gsc=zero;  eta=zero; findex=zero
+        Gn=zero;  Gt=zero; Gl=zero; Gs=zero; bk=zero
         Gmc=zero; u_eff=zero; T_eff=zero; T0=zero; dm2=zero
         nst=0; fstat=0
         
@@ -256,7 +259,9 @@
         nst=size(dee(:,1))
         
         ! extract current values of failure status variable
-        if(.not.allocated(sdv%i)) allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
+        if(.not.allocated(sdv%i)) then
+            allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
+        end if
         fstat=sdv%i(1)
         
         
@@ -322,9 +327,13 @@
                 ! normal and shear strain energy density
                 Gn=half*max(zero,sigma(1))*max(zero,jump(1))
                 if(nst==2)  then
-                    Gs=half*sigma(2)*jump(2)
+                    Gt=half*sigma(2)*jump(2)
+                    Gs=Gt
                 else        
-                    Gs=half*(sigma(2)*jump(2)+sigma(3)*jump(3))
+                    !Gs=half*(sigma(2)*jump(2)+sigma(3)*jump(3))
+                    Gt=half*sigma(2)*jump(2)
+                    Gl=half*sigma(3)*jump(3)
+                    Gs=Gt+Gl
                 end if
                 
                 ! BK ratio
@@ -343,7 +352,8 @@
                 T0=T_eff/sqrt(findex)
                 
                 ! mixed mode fracture toughness (BK formula)
-                Gsc=sqrt(Gtc**2+Glc**2) ! a quadratic avg of the two shear toughness
+                !Gsc=sqrt(Gtc**2+Glc**2) ! a quadratic avg of the two shear toughness
+                Gsc=Gtc*(Gt/Gs)+Glc*(Gl/Gs)
                 Gmc=Gnc+(Gsc-Gnc)*(bk**eta)
                 
                 ! effective jump at final failure

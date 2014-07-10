@@ -39,19 +39,26 @@
         character(len=dirlength)  :: outdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,nndset
+        integer :: ntri,nquad,nwedge,nbrick,ncoh2d
+        integer :: kinc, ninc, nndset
+        real(dp):: ux, uy, vx, vy
 
 
 
 
-        ! initialize variables
+        ! initialize local variables
 
         outdir=''
         i=0
         jl=0; ml=0; nl=0
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
-        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0; ncoh2d=0; nndset=0
+        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0; ncoh2d=0
+        nndset=0; kinc=0; ninc=0
+        ux=zero; uy=zero; vx=zero; vy=zero
+
+
+        ! initialize global clock and libraries
 
         call initialize_glb_clock
         call initialize_lib_node
@@ -59,68 +66,84 @@
         call initialize_lib_mat
 
 
-        ! update global clock
-        call update_glb_clock(kstep=1,kinc=1)
+        ! initialize node sets
 
-
-        ! Apply boundary test loading
         nndset=2
         allocate(ndset(nndset))
 
         ndset(1)=nodeset(setname='bottom',setnode=[1,2])
         ndset(2)=nodeset(setname='top',setnode=[3,4])
 
-        ! input here some test disp. loading
-        ! uniform tension in y dir on top surf, u_y=0.1
-        do i=1,size(ndset(2)%setnode)
-            call update(lib_node(ndset(2)%setnode(i)),u=[0.11_dp,zero])
-        end do
-
-
-
-
-
-
-
-        ! integration and assembly
-        if(allocated(lib_tri)) then
-            ntri=size(lib_tri)
-            do i=1,ntri
-                call integrate(lib_tri(i),Ki,Fi)
-            end do
-        end if
-
-        if(allocated(lib_quad)) then
-            nquad=size(lib_quad)
-            do i=1,nquad
-                call integrate(lib_quad(i),Ki,Fi)
-            end do
-        end if
-
-        if(allocated(lib_wedge)) then
-            nwedge=size(lib_wedge)
-            do i=1,nwedge
-                call integrate(lib_wedge(i),Ki,Fi)
-            end do
-        end if
-
-        if(allocated(lib_brick)) then
-            nbrick=size(lib_brick)
-            do i=1,nbrick
-                call integrate(lib_brick(i),Ki,Fi)
-            end do
-        end if
-
-        if(allocated(lib_coh2d)) then
-            ncoh2d=size(lib_coh2d)
-            do i=1,ncoh2d
-                call integrate(lib_coh2d(i),Ki,Fi)
-            end do
-        end if
 
         ! obtain the current working directory
         call getcwd(outdir)
-        !print*,outdir
-        call output(1,outdir)
+
+        ! set loading rates and increments
+        vx=0.02_dp
+        vy=0.01_dp
+        ninc=10
+
+
+        ! -----------------------------------------------!
+        !   perform step by step loading on boundaries   !
+        ! -----------------------------------------------!
+
+        do kinc=1,ninc
+
+
+            ! update global clock
+            call update_glb_clock(kstep=1,kinc=kinc)
+
+            ux=vx*kinc
+            uy=vy*kinc
+
+            ! input here some test disp. loading
+            do i=1,size(ndset(2)%setnode)
+                call update(lib_node(ndset(2)%setnode(i)),u=[ux,uy])
+            end do
+
+
+
+            ! integration and assembly
+            if(allocated(lib_tri)) then
+                ntri=size(lib_tri)
+                do i=1,ntri
+                    call integrate(lib_tri(i),Ki,Fi)
+                end do
+            end if
+
+            if(allocated(lib_quad)) then
+                nquad=size(lib_quad)
+                do i=1,nquad
+                    call integrate(lib_quad(i),Ki,Fi)
+                end do
+            end if
+
+            if(allocated(lib_wedge)) then
+                nwedge=size(lib_wedge)
+                do i=1,nwedge
+                    call integrate(lib_wedge(i),Ki,Fi)
+                end do
+            end if
+
+            if(allocated(lib_brick)) then
+                nbrick=size(lib_brick)
+                do i=1,nbrick
+                    call integrate(lib_brick(i),Ki,Fi)
+                end do
+            end if
+
+            if(allocated(lib_coh2d)) then
+                ncoh2d=size(lib_coh2d)
+                do i=1,ncoh2d
+                    call integrate(lib_coh2d(i),Ki,Fi)
+                end do
+            end if
+
+
+            !print*,outdir
+            call output(kinc,outdir)
+
+        end do
 
     end program test_tri
