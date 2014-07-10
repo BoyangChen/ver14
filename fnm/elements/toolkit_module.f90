@@ -332,23 +332,38 @@
     subroutine normalize(a,amag)
        
         real(kind=dp), intent(inout) :: a(:)
-        real(kind=dp), intent(out)   :: amag
+        real(kind=dp), optional, intent(out)   :: amag
        
-        amag=zero
-       
-        amag=sqrt(dot_product(a,a))
+        real(dp) :: amag2
         
-        if(amag .gt. tiny(one)) then
-            a=a/amag
+        if(present(amag)) amag=zero
+        amag2=zero
+       
+        amag2=sqrt(dot_product(a,a))
+        
+        if(amag2 .gt. tiny(one)) then
+            a=a/amag2
         else
             write(msg_file,*) 'warning:zero vector for kunitv!'
 !           do nothing
         end if
+        
+        if(present(amag)) amag=amag2
 
        return
     end subroutine normalize
 !********************************************************************************************
 !********************************************************************************************
+
+
+    function CrossProduct3D(a, b)
+      real(dp), intent(in)  :: a(3), b(3)
+      real(dp)              :: CrossProduct3D(3)
+
+      CrossProduct3D(1) = a(2) * b(3) - a(3) * b(2)
+      CrossProduct3D(2) = a(3) * b(1) - a(1) * b(3)
+      CrossProduct3D(3) = a(1) * b(2) - a(2) * b(1)
+    end function CrossProduct3D
     
     
     end module toolkit_module

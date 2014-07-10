@@ -1,15 +1,15 @@
-    module coh2d_element_module
+    module coh3d6_element_module
     use parameter_module
     use integration_point_module        ! integration point type
     
     implicit none
     private
     
-    integer, parameter          :: ndim=2, nst=2, nnode=4, nig=2, ndof=ndim*nnode ! constants for type coh2d_element 
+    integer, parameter          :: ndim=3, nst=3, nnode=6, nig=3, ndof=ndim*nnode ! constants for type coh3d6_element 
     real(kind=dp), parameter    :: dfail=one                                      ! max. degradation at final failure
     
     
-    type, public :: coh2d_element 
+    type, public :: coh3d6_element 
         private
         
         integer :: key=0                            ! glb index of this element
@@ -27,19 +27,19 @@
     
     
     interface empty
-        module procedure empty_coh2d_element
+        module procedure empty_coh3d6_element
     end interface
     
     interface prepare
-        module procedure prepare_coh2d_element
+        module procedure prepare_coh3d6_element
     end interface
     
     interface integrate
-        module procedure integrate_coh2d_element
+        module procedure integrate_coh3d6_element
     end interface
     
     interface extract
-        module procedure extract_coh2d_element
+        module procedure extract_coh3d6_element
     end interface
     
     
@@ -55,9 +55,9 @@
     
     ! this subroutine is used to format the element for use
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine empty_coh2d_element(elem)
+    subroutine empty_coh3d6_element(elem)
     
-        type(coh2d_element),intent(out) ::elem
+        type(coh3d6_element),intent(out) ::elem
         
         integer :: i
         i=0
@@ -72,16 +72,16 @@
           
         if(allocated(elem%sdv)) deallocate(elem%sdv)
     
-    end subroutine empty_coh2d_element
+    end subroutine empty_coh3d6_element
     
     
     
     
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_coh2d_element(elem,key,connec,matkey)
+    subroutine prepare_coh3d6_element(elem,key,connec,matkey)
     
-        type(coh2d_element),    intent(inout)   :: elem
+        type(coh3d6_element),    intent(inout)   :: elem
         integer,                intent(in)      :: connec(nnode)
         integer,                intent(in)      :: key,matkey
         
@@ -98,14 +98,14 @@
             call update(elem%ig_point(i),x=x,u=u,stress=stress,strain=strain)
         end do
     
-    end subroutine prepare_coh2d_element
+    end subroutine prepare_coh3d6_element
     
     
     
     
-    subroutine extract_coh2d_element(elem,key,connec,matkey,ig_point,sdv)
+    subroutine extract_coh3d6_element(elem,key,connec,matkey,ig_point,sdv)
     
-        type(coh2d_element), intent(in) :: elem
+        type(coh3d6_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: key, matkey
         integer,                 allocatable, optional, intent(out) :: connec(:)
@@ -133,7 +133,7 @@
             end if
         end if
          
-    end subroutine extract_coh2d_element
+    end subroutine extract_coh3d6_element
 
 
     
@@ -142,13 +142,13 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_coh2d_element(elem,K_matrix,F_vector,gauss)
+    subroutine integrate_coh3d6_element(elem,K_matrix,F_vector,gauss)
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
         use lib_node_module                 ! global node library
         use glb_clock_module                ! global analysis progress (curr. step, inc, time, dtime)
     
-        type(coh2d_element), intent(inout)      :: elem 
+        type(coh3d6_element), intent(inout)      :: elem 
         real(kind=dp), allocatable, intent(out) :: K_matrix(:,:), F_vector(:)
         logical, optional, intent(in)           :: gauss
  
@@ -173,6 +173,7 @@
         ! - variables extracted from element nodes
         real(kind=dp),allocatable :: xj(:),uj(:)        ! nodal vars extracted from glb lib_node array
         real(kind=dp)   :: coords(ndim,nnode)           ! coordinates of the element nodes, formed from xj of each node
+        real(kind=dp)   :: midcoords(ndim,nnode/2)      ! coordinates of the mid-plane
         real(kind=dp)   :: u(ndof)                      ! element nodal disp. vector, formed from uj of each node
         
         ! - variables extracted from element material
@@ -195,7 +196,7 @@
                
         real(kind=dp)   :: fn(nnode)                    ! shape functions
         real(kind=dp)   :: Nmatrix(ndim,ndof)           ! obtained from fn, to compute disp. jump acrss intfc: {u}_jump = [N]*{u}
-        real(kind=dp)   :: normal(ndim),tangent(ndim)   ! normal and tangent vectors of the interface, obtained from coords
+        real(kind=dp)   :: normal(ndim),tangent1(ndim),tangent2(ndim)   ! normal and tangent vectors of the interface, obtained from coords
         real(kind=dp)   :: det                          ! determinant of jacobian (=length of element/2); 2 is length of ref. elem
         real(kind=dp)   :: Qmatrix(ndim,ndim)           ! rotation matrix from global to local coordinates (from normal & tangent)
         real(kind=dp)   :: ujump(ndim),delta(ndim)      ! {delta}=[Q]*{u}_jump, {delta} is the jump vector in lcl coords.
@@ -228,13 +229,13 @@
         curr_step=0; curr_inc=0
         
         ! pure local variables
-        coords=zero; u=zero 
+        coords=zero; midcoords=zero; u=zero 
         matname=''; mattype=''; matkey=0 
         nstep=0; ninc=0; last_converged=.false.
         igxi=zero; igwt=zero
         tmpx=zero; tmpu=zero
         fn=zero; Nmatrix=zero
-        tangent=zero; normal=zero 
+        tangent1=zero; tangent2=zero; normal=zero 
         det=zero; Qmatrix=zero
         ujump=zero; delta=zero
         Dee=zero; Tau=zero
@@ -283,6 +284,11 @@
             end if    
         end do
         
+        ! calculate mid-plane coordinates
+        do j=1,nnode/2
+            midcoords(:,j)=half*(coords(:,j)+coords(:,j+nnode/2))
+        end do
+        
         
         ! - extract values from mat (material type) and assign to local vars (matname, mattype & matkey)
         call extract(mat,matname,mattype,matkey) 
@@ -314,24 +320,32 @@
         !   compute Q matrix (rotation) and determinat 
         !------------------------------------------------!
         
-        ! - compute tangent of the interface: node 2,3 coords - node 1,4 coords
-        tangent(1)=half*(coords(1,2)+coords(1,3)) - half*(coords(1,1)+coords(1,4))
-        tangent(2)=half*(coords(2,2)+coords(2,3)) - half*(coords(2,1)+coords(2,4))
+        ! - compute tangent1 of the interface: node 2 coords - node 1 coords
+        tangent1(1)=midcoords(1,2)-midcoords(1,1)
+        tangent1(2)=midcoords(2,2)-midcoords(2,1)
+        tangent1(3)=midcoords(3,2)-midcoords(3,1)
         
-        ! - normalize tangent vector
-        call normalize(tangent,det) !-tangent vector normalized
+        ! - compute tangent2 of the interface: node 3 coords - node 1 coords
+        tangent2(1)=midcoords(1,3)-midcoords(1,1)
+        tangent2(2)=midcoords(2,3)-midcoords(2,1)
+        tangent2(3)=midcoords(3,3)-midcoords(3,1)
         
-        ! - compute determinant of the line element: actual length/reference length
-        det=det/two !-ref. line starts from -1 to 1, length=2
-
-        ! - compute normal of the interface
-        normal(1)=-tangent(2)
-        normal(2)=tangent(1)
-
-        ! - compute Q matrix: rotate global coords to local coords; Q = transpose[normal,tangent]
-        do j=1,2
+        ! - compute normal vector of the interface, its magnitude is the area of the triangle-> det
+        normal=CrossProduct3D(tangent1,tangent2)
+        
+        ! - re-evaluate tangent1 so that it is perpendicular to both tangent2 and normal
+        tangent1=CrossProduct3D(tangent2,normal)
+        
+        ! - normalize these vectors
+        call normalize(normal,det) ! magnitude is det
+        call normalize(tangent1)
+        call normalize(tangent2)
+        
+        ! - compute Q matrix
+        do j=1,3
             Qmatrix(1,j)=normal(j)
-            Qmatrix(2,j)=tangent(j)
+            Qmatrix(2,j)=tangent1(j)
+            Qmatrix(3,j)=tangent2(j)
         end do
         
         
@@ -447,7 +461,7 @@
        	end do !-looped over all int points. ig=nig
           
     
-    end subroutine integrate_coh2d_element
+    end subroutine integrate_coh3d6_element
     
     
     
@@ -475,18 +489,34 @@
       real(kind=dp), intent(inout)  :: xi(ndim-1,nig), wt(nig)
       logical, optional, intent(in) :: gauss
       
-      real(kind=dp) :: cn=zero
-	
-        cn=one !-newton cotes
     
-        if(present(gauss).and.gauss) cn=0.5773502691896260_dp !-gauss ig point
+        
     
-        if (nig .eq. 2) then          
-            xi(1,1)=-cn
-            xi(1,2)=cn
-            wt=one
+        if (nig .eq. 3) then   
+
+            if(present(gauss).and.gauss) then
+                xi(1,1)=one_half
+                xi(1,1)=one_half
+                
+                xi(1,2)=one_half
+                xi(2,2)=zero
+                
+                xi(1,3)=zero
+                xi(2,3)=one_half
+            else
+                xi(1,1)=zero
+                xi(1,1)=zero
+                
+                xi(1,2)=one
+                xi(2,2)=zero
+                
+                xi(1,3)=zero
+                xi(2,3)=one
+            end if
+            wt=one_sixth
+            
         else
-            write(msg_file,*) 'no. of integration points incorrect for coh2d_ig!'
+            write(msg_file,*) 'no. of integration points incorrect for coh3d6_ig!'
             call exit_function
         end if
 
@@ -499,17 +529,20 @@
         real(kind=dp),intent(inout) :: f(nnode)
         real(kind=dp),intent(in) :: igxi(ndim-1)
         
-        real(kind=dp) :: xi ! local variables
+        real(kind=dp) :: xi, eta ! local variables
         xi=zero
-        
+        eta=zero
+
         xi=igxi(1)
-        
-        f(1)=half*(one-xi)
-        f(2)=half*(one+xi)
-        f(3)=f(2)
+        eta=igxi(2)
+        f(1)=one-xi-eta
+        f(2)=xi
+        f(3)=eta
         f(4)=f(1)
+        f(5)=f(2)
+        f(6)=f(3)
 
     end subroutine init_shape
     
     
-    end module coh2d_element_module
+    end module coh3d6_element_module

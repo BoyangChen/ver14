@@ -395,7 +395,9 @@
         real(kind=dp),intent(in) :: igxi(ndim)
         
         real(kind=dp) :: xi,eta ! local variables
-
+        xi=zero
+        eta=zero
+        
         xi=igxi(1)
         eta=igxi(2)
         
