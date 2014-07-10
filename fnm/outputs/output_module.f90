@@ -27,8 +27,10 @@
         real(kind=dp), allocatable  :: disp(:)  ! displacements of nodes extracted from lib_node
         real(kind=dp)               :: disp3d(3)! displacements of a node in 3D
         real(kind=dp), allocatable  :: sig(:), eps(:) ! stress & strain arrays extracted from lib_elem ig pnt
-        real(kind=dp)               :: sigtsr(3,3), epstsr(3,3) ! stress & strain tensors for vtk output 
+        real(kind=dp)               :: sigtsr(3,3), epstsr(3,3) ! stress & strain tensors for vtk output
+        real(kind=dp)               :: fstat
         type(integration_point), allocatable :: igpnt(:) ! intg point array
+        type(sdv_array),allocatable :: fsdv(:)
         character(len=dirlength)    :: outfile  ! output file name
         character(len=dirlength)    :: outnum   ! output increment number (embedded in the outfile name)
         character(len=10)           :: fmat     ! format specs
@@ -460,6 +462,28 @@
                 write(u,'(a)')'' ! separate from next element               
             end do 
         end if
+        
+        
+        
+        
+        ! write element failure status
+        write(u,'(a)')'SCALARS fstat float'
+        
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                fstat=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh2d(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    fstat=fstat+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fstat=fstat/size(igpnt)
+                write(u,*) fstat
+                !write(u,'(a)')'' ! separate from next element               
+            end do 
+        end if
+        write(u,'(a)')''
 
         
         

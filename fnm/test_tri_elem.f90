@@ -73,7 +73,7 @@
         ! input here some test disp. loading
         ! uniform tension in y dir on top surf, u_y=0.1
         do i=1,size(ndset(2)%setnode)
-            call update(lib_node(ndset(2)%setnode(i)),u=[zero,0.1_dp])
+            call update(lib_node(ndset(2)%setnode(i)),u=[0.11_dp,zero])
         end do
 
 
