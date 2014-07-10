@@ -39,45 +39,47 @@
         character(len=dirlength)  :: outdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nbrick,nndset
+        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,nndset
+
+
+
 
         ! initialize variables
+        
         outdir=''
         i=0
         jl=0; ml=0; nl=0
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
-        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0; nndset=0
+        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0; ncoh2d=0; nndset=0
 
+        call initialize_glb_clock
         call initialize_lib_node
         call initialize_lib_elem
         call initialize_lib_mat
-
-        ! obtain nnode value from glb libraries
-        nnode=size(lib_node)
-
-        ! total no. of dof
-        ndof=ndim*nnode
-
-        ! allocate K, F and U
-        allocate(K(ndof,ndof),F(ndof),U(ndof))
-
-        ! initialize K, F and U
-        K=zero; F=zero; U=zero
-
+        
+        
+        ! update global clock
+        call update_glb_clock(kstep=1,kinc=1)
+        
 
         ! Apply boundary test loading
         nndset=2
         allocate(ndset(nndset))
 
-        ndset(1)=nodeset(setname='bottom',setnode=[1,2,7,8])
-        ndset(2)=nodeset(setname='top',setnode=[3,4,9,10])
+        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
+        ndset(2)=nodeset(setname='top',setnode=[3,4])
 
         ! input here some test disp. loading
         ! uniform tension in y dir on top surf, u_y=0.1
         do i=1,size(ndset(2)%setnode)
-            call update(lib_node(ndset(2)%setnode(i)),u=[zero,zero,0.1_dp])
+            call update(lib_node(ndset(2)%setnode(i)),u=[zero,0.1_dp])
         end do
+        
+        
+
+     
+        
 
 
         ! integration and assembly
@@ -106,6 +108,13 @@
             nbrick=size(lib_brick)
             do i=1,nbrick
                 call integrate(lib_brick(i),Ki,Fi)
+            end do
+        end if
+        
+        if(allocated(lib_coh2d)) then
+            ncoh2d=size(lib_coh2d)
+            do i=1,ncoh2d
+                call integrate(lib_coh2d(i),Ki,Fi)
             end do
         end if
 

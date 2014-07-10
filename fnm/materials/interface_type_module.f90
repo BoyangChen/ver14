@@ -42,8 +42,12 @@
         module procedure update_interface
     end interface
     
+    interface ddsdde
+        module procedure ddsdde_interface
+    end interface
+    
    
-    public :: empty,update
+    public :: empty,update,ddsdde
   
 
 
@@ -107,14 +111,14 @@
         real(kind=dp) :: Dnn0, Dtt0, Dll0
         real(kind=dp) :: sigma(size(dee(:,1)))  ! local replica of stress
         real(kind=dp) :: dmax                   ! local replica of dfail
-        integer :: nst
+        integer :: nst, fstat
         
         
         ! initialize variables
         dee=zero; if(present(stress)) stress=zero ! intent(out) vars
         Dnn0=zero; Dtt0=zero; Dll0=zero
         sigma=zero; dmax=zero
-        nst=0
+        nst=0; fstat=0
         
         
         
@@ -172,8 +176,10 @@
 
              
         ! extract max. degradation at total failure
-        if(present(dfail))  dmax=dfail ! input parameter, valued at the coh. elem.
-        else                dmax=one
+        if(present(dfail))  then
+            dmax=dfail ! input parameter, valued at the coh. elem.
+        else                
+            dmax=one
         end if
       
         
@@ -235,15 +241,15 @@
         real(dp),                 intent(in)    :: jump(:), dmax
       
         ! local variables
-        real(dp) :: Dnn0, fstat, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
+        real(dp) :: Dnn0, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
         & Gn, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
-        integer  :: nst
+        integer  :: nst, fstat
 
         ! initialize local variables
-        Dnn0=zero; fstat=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
+        Dnn0=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
         Glc=zero;  Gsc=zero;  eta=zero; findex=zero;  Gn=zero;  Gs=zero; bk=zero
         Gmc=zero; u_eff=zero; T_eff=zero; T0=zero; dm2=zero
-        nst=0
+        nst=0; fstat=0
         
         ! extract Dnn0 and nst
         Dnn0=dee(1,1)
@@ -257,7 +263,7 @@
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
         ! --------------------------------------------------------- !
-        if(fstat==failed)    ! already failed
+        if(fstat==failed) then    ! already failed
             ! calculate penalty stiffness
             dee=dee*(one-dmax)
             if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
@@ -310,21 +316,25 @@
             call FailureCriterion(sigma,strength,fstat,findex)
             
             ! failure onset
-            if(fstat==onset)
+            if(fstat==onset) then
             ! calculate u0, uf and go to next control
             
                 ! normal and shear strain energy density
                 Gn=half*max(zero,sigma(1))*max(zero,jump(1))
-                if(nst==2)  Gs=half*sigma(2)*jump(2)
-                else        Gs=half*(sigma(2)*jump(2)+sigma(3)*jump(3))
+                if(nst==2)  then
+                    Gs=half*sigma(2)*jump(2)
+                else        
+                    Gs=half*(sigma(2)*jump(2)+sigma(3)*jump(3))
                 end if
                 
                 ! BK ratio
                 bk=Gs/(Gn+Gs)
                 
                 ! effective jump and traction
-                if(nst==2)  u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
-                else        u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
+                if(nst==2)  then
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
+                else        
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
                 end if
                 T_eff=two*(Gn+Gs)/u_eff
                 
@@ -339,7 +349,7 @@
                 ! effective jump at final failure
                 uf=two*Gmc/T0
                 
-            else if(fstat==failed)
+            else if(fstat==failed) then
             ! this is the case where strength is close to zero
                 dm=dmax
                 
@@ -357,11 +367,13 @@
                 dm=dmax
             else
                 ! effective jump and traction
-                if(nst==2)  u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
-                else        u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
+                if(nst==2)  then
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
+                else        
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
                 end if
                 ! linear cohesive softening law 
-                if(u_eff > tiny(one))
+                if(u_eff > tiny(one)) then
                     dm2=uf/u_eff*(u_eff-u0)/(uf-u0)
                     dm=max(dm,dm2) ! must be larger than last equilibrium dm
                 end if
@@ -370,7 +382,7 @@
             ! check dm and update fstat
             if (dm>=dmax) then
                 dm=dmax
-                fstat==failed
+                fstat=failed
             end if
         end if
      
@@ -396,14 +408,20 @@
       
         real(dp),                   intent(in) :: sigma(:)
         type(interface_strength),   intent(in) :: strength
-        real(dp),                  intent(out) :: fstat, findex
+        integer,                   intent(out) :: fstat
+        real(dp), optional,        intent(out) :: findex
       
         ! local variables
-        real(dp)    :: tau_nc, tau_tc, tau_lc
+        integer     :: nst
+        real(dp)    :: tau_nc, tau_tc, tau_lc, findex2
         
         ! initialize variables
-        fstat=zero; findex=zero                 ! intent (out)
-        tau_nc=zero; tau_tc=zero; tau_lc=zero   ! local
+        if(present(findex)) findex=zero                     ! intent (out)
+        tau_nc=zero; tau_tc=zero; tau_lc=zero; findex2=zero ! local
+        nst=0; fstat=0
+        
+        ! extract nst
+        nst=size(sigma)
       
         ! extract strength parameters
 
@@ -425,18 +443,18 @@
         
         if(min(tau_nc,tau_tc,tau_lc) > tiny(one)) then
             if(nst==3) then 
-            findex=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
+            findex2=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
             else
-            findex=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
+            findex2=sqrt((sigma(1)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
             end if
             
-            if(findex>=one) fstat=onset
+            if(findex2>=one) fstat=onset
         else
             ! strength close to zero == already failed
             fstat=failed
         end if
         
-        
+        if(present(findex)) findex=findex2
       
       end subroutine FailureCriterion
       

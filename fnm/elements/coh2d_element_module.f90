@@ -205,7 +205,7 @@
         real(kind=dp)   :: QN(ndim,ndof),DQN(ndim,ndof)         ! [Q]*[N], [D]*[Q]*[N]
         real(kind=dp)   :: NtQt(ndof,ndim),NtQtDQN(ndof,ndof)   ! [N']*[Q'], [N']*[Q']*[D]*[Q]*[N] 
         real(kind=dp)   :: NtQtTau(ndof)                        ! [N']*[Q']*{Tau}
-        integer         :: i,j,kig
+        integer         :: i,j,k,kig
       
         
         
@@ -218,7 +218,7 @@
         allocate(K_matrix(ndof,ndof),F_vector(ndof)); K_matrix=zero; F_vector=zero 
         
         ! integer counters
-        i=0; j=0; kig=0
+        i=0; j=0; k=0; kig=0
         
         ! local variables, extracted from glb libs
         do i=1,nnode
@@ -344,8 +344,10 @@
         !------------------------------------------------!
         
         ! - calculate ig point xi and weight
-        if(present(gauss).and.gauss)  call init_ig(igxi,igwt,gauss)
-        else                          call init_ig(igxi,igwt)
+        if(present(gauss).and.gauss)  then
+            call init_ig(igxi,igwt,gauss)
+        else                          
+            call init_ig(igxi,igwt)
         end if
          
         !-calculate strain,stress,stiffness,sdv etc. at each int point
@@ -385,8 +387,10 @@
             
             ! update converged sdvs (sdv1) with iterating sdvs (sdv2) when last iteration has converged
             ! and revalue iterating sdvs (sdv2) to the last converged sdvs (sdv1) if otherwise
-            if(last_converged) ig_sdv(1)=ig_sdv(2)
-            else               ig_sdv(2)=ig_sdv(1)
+            if(last_converged) then
+                ig_sdv(1)=ig_sdv(2)
+            else               
+                ig_sdv(2)=ig_sdv(1)
             end if
             
             ! get D matrix dee accord. to material properties, and update intg point variables
@@ -394,7 +398,7 @@
                 case ('interface')
                     
                     ! calculate D matrix, update stress, and iterating sdv
-                    call ddsdde(lib_interface(matkey), Dee, strain=delta, stress=Tau, sdv=ig_sdv(2), dfail) 
+                    call ddsdde(lib_interface(matkey), Dee, jump=delta, stress=Tau, sdv=ig_sdv(2), dfail=dfail) 
                     
                 case default
                     write(msg_file,*) 'material type not supported for cohesive element!'

@@ -25,6 +25,7 @@
     type(material), allocatable          :: lib_mat(:)
     type(isotropic_type), allocatable    :: lib_iso(:)
     type(lamina_type), allocatable       :: lib_lamina(:)
+    type(interface_type), allocatable    :: lib_interface(:)
     
     contains
     

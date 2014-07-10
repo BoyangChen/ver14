@@ -19,7 +19,7 @@
         character(len=dirlength),intent(in) :: outdir   ! output directory name
       
         integer                     :: nnode, nelem    ! no. of nodes & elem in the mesh
-        integer                     :: ntri, nquad, ntetra, nwedge, nbrick ! no. of elems of each elem type
+        integer                     :: ntri, nquad, ntetra, nwedge, nbrick, ncoh2d ! no. of elems of each elem type
         integer                     :: i, j, l, u, nsize, elnode
         integer, allocatable        :: connec(:)! connectivity of an elem extracted from lib_elem
         real(kind=dp), allocatable  :: x(:)     ! coordinates of nodes extracted from lib_node
@@ -35,7 +35,7 @@
       
         ! initialize variables
         i=0; j=0; l=0; u=0; nnode=0; nelem=0
-        ntri=0; nquad=0; ntetra=0; nwedge=0; nbrick=0
+        ntri=0; nquad=0; ntetra=0; nwedge=0; nbrick=0; ncoh2d=0
         nsize=0; elnode=0
         outfile=''; outnum=''; fmat=''
         
@@ -88,13 +88,14 @@
         !~if(allocated(lib_tetra)) ntetra=size(lib_tetra)
         if(allocated(lib_wedge)) nwedge=size(lib_wedge)
         if(allocated(lib_brick)) nbrick=size(lib_brick)
+        if(allocated(lib_coh2d)) ncoh2d=size(lib_coh2d)
         ! .... and other elem types ....
         
         ! total no. of elems
-        nelem=ntri+nquad+ntetra+nwedge+nbrick
+        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d
         
         ! calculate total no. of nodes to print; each row has 1+elnode no. of indices to print
-        nsize=ntri*(1+3)+nquad*(1+4)+ntetra*(1+4)+nwedge*(1+6)+nbrick*(1+8)
+        nsize=ntri*(1+3)+nquad*(1+4)+ntetra*(1+4)+nwedge*(1+6)+nbrick*(1+8)+ncoh2d*(1+4)
         
         write(u,'(a, i5, i5)')'CELLS ', nelem, nsize ! write a summary of output
         
@@ -140,6 +141,15 @@
                 ! print connec in vtk; note that in vtk node no. starts from 0
                 connec=connec-1
                 write(u,*) 8,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6),connec(7),connec(8)
+            end do
+        end if
+        
+        if(ncoh2d > 0) then
+            do i=1,ncoh2d ! write each element's connec individually
+                call extract(lib_coh2d(i),connec=connec) ! extract connec from lib_tri
+                ! print connec in vtk; note that in vtk node no. starts from 0
+                connec=connec-1
+                write(u,*) 4,connec(1),connec(2),connec(3),connec(4) 
             end do
         end if
         
@@ -391,6 +401,32 @@
                 write(u,'(a)')'' ! separate from next element                
             end do 
         end if
+        
+        
+        
+        if (ncoh2d > 0) then
+            do i=1,ncoh2d
+                epstsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh2d(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),strain=eps)  
+                    epstsr(1,1)=epstsr(1,1)+eps(1)
+                    epstsr(2,2)=epstsr(2,2)+eps(2)
+                    epstsr(1,2)=epstsr(1,2)+eps(3)
+                    epstsr(2,1)=epstsr(2,1)+eps(3)                           
+                end do 
+                ! average strain in the element
+                epstsr=epstsr/size(igpnt)
+                do l=1,3
+                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                end do
+                write(u,'(a)')'' ! separate from next element               
+            end do 
+        end if
+
+        
+        
+        
         
         !~if (nquad > 0 ) then
         !~! fill in the same ....

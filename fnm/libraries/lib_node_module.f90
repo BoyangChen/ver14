@@ -29,19 +29,27 @@
             call empty(lib_node(i))
         end do
         
-        call update(lib_node(1),key=1,x=[zero,zero,zero],u=[zero,zero,zero])
-        call update(lib_node(2),key=2,x=[one,zero,zero],u=[zero,zero,zero])
-        call update(lib_node(3),key=3,x=[zero,one,zero],u=[zero,zero,zero])
-        call update(lib_node(4),key=4,x=[one,one,zero],u=[zero,zero,zero])
-        call update(lib_node(5),key=5,x=[zero,two,zero],u=[zero,zero,zero])
-        call update(lib_node(6),key=6,x=[one,two,zero],u=[zero,zero,zero])
         
-        call update(lib_node(7),key=1,x=[zero,zero,one],u=[zero,zero,zero])
-        call update(lib_node(8),key=2,x=[one,zero,one],u=[zero,zero,zero])
-        call update(lib_node(9),key=3,x=[zero,one,one],u=[zero,zero,zero])
-        call update(lib_node(10),key=4,x=[one,one,one],u=[zero,zero,zero])
-        call update(lib_node(11),key=5,x=[zero,two,one],u=[zero,zero,zero])
-        call update(lib_node(12),key=6,x=[one,two,one],u=[zero,zero,zero])
+        call update(lib_node(1),key=1,x=[zero,zero],u=[zero,zero])
+        call update(lib_node(2),key=2,x=[one,zero],u=[zero,zero])
+        call update(lib_node(3),key=3,x=[zero,zero],u=[zero,zero])
+        call update(lib_node(4),key=4,x=[one,zero],u=[zero,zero])
+        
+        
+        
+        !~call update(lib_node(1),key=1,x=[zero,zero,zero],u=[zero,zero,zero])
+        !~call update(lib_node(2),key=2,x=[one,zero,zero],u=[zero,zero,zero])
+        !~call update(lib_node(3),key=3,x=[zero,one,zero],u=[zero,zero,zero])
+        !~call update(lib_node(4),key=4,x=[one,one,zero],u=[zero,zero,zero])
+        !~call update(lib_node(5),key=5,x=[zero,two,zero],u=[zero,zero,zero])
+        !~call update(lib_node(6),key=6,x=[one,two,zero],u=[zero,zero,zero])
+        !~
+        !~call update(lib_node(7),key=1,x=[zero,zero,one],u=[zero,zero,zero])
+        !~call update(lib_node(8),key=2,x=[one,zero,one],u=[zero,zero,zero])
+        !~call update(lib_node(9),key=3,x=[zero,one,one],u=[zero,zero,zero])
+        !~call update(lib_node(10),key=4,x=[one,one,one],u=[zero,zero,zero])
+        !~call update(lib_node(11),key=5,x=[zero,two,one],u=[zero,zero,zero])
+        !~call update(lib_node(12),key=6,x=[one,two,one],u=[zero,zero,zero])
     
     end subroutine initialize_lib_node
     
