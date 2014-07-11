@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <CodeBlocks_layout_file>
 	<ActiveTarget name="Debug" />
-	<File name="test_tri_elem.f90" open="1" top="1" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="main.f90" open="1" top="1" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="2202" topLine="73" />
+			<Cursor1 position="2489" topLine="82" />
 		</Cursor>
-		<Folding>
-			<Collapse line="107" />
-			<Collapse line="114" />
-			<Collapse line="121" />
-			<Collapse line="128" />
-			<Collapse line="135" />
-		</Folding>
 	</File>
 </CodeBlocks_layout_file>
