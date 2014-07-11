@@ -86,9 +86,9 @@
 
 
         ! set loading rates and increments
-        vx=-0.01_dp
-        vy=0.01_dp
-        vz=0.01_dp
+        !vx=-0.01_dp/sqrt(two)
+        vy=-0.01_dp/sqrt(two)
+        vz=0.01_dp/sqrt(two)
         ninc=10
 
 
