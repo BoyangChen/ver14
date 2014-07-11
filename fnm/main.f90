@@ -1,11 +1,11 @@
-    include 'parameter_module.f90'
-    include 'libraries/glb_clock_module.f90'
+    include 'globals/parameter_module.f90'
+    include 'globals/glb_clock_module.f90'
     include 'libraries/lib_node_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
     include 'outputs/output_module.f90'
 
-    program test_tri
+    program test_main
         use parameter_module
         use glb_clock_module
         use lib_mat_module
@@ -36,12 +36,12 @@
         type(nodeset),allocatable :: ndset(:)
 
         ! output directory name
-        character(len=dirlength)  :: outdir
+        character(len=dirlength)  :: workdir, outdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nbrick,ncoh2d
+        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8
         integer :: kinc, ninc, nndset
-        real(dp):: ux, uy, vx, vy
+        real(dp):: ux, uy, uz, vx, vy, vz
 
 
 
@@ -53,9 +53,11 @@
         jl=0; ml=0; nl=0
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
-        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0; ncoh2d=0
+        nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0
+        ncoh2d=0; ncoh3d6=0; ncoh3d8=0
         nndset=0; kinc=0; ninc=0
-        ux=zero; uy=zero; vx=zero; vy=zero
+        ux=zero; uy=zero; uz=zero
+        vx=zero; vy=zero; vz=zero
 
 
         ! initialize global clock and libraries
@@ -71,16 +73,22 @@
         nndset=2
         allocate(ndset(nndset))
 
-        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
-        ndset(2)=nodeset(setname='top',setnode=[3,4])
+!        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
+!        ndset(2)=nodeset(setname='top',setnode=[3,4])
+
+        ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
+        ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
 
 
-        ! obtain the current working directory
-        call getcwd(outdir)
+        ! obtain the current working directory and specify output directory
+        call getcwd(workdir)
+        outdir=trim(workdir)//'/outputs/'
+
 
         ! set loading rates and increments
-        vx=0.02_dp
+        vx=-0.01_dp
         vy=0.01_dp
+        vz=0.01_dp
         ninc=10
 
 
@@ -96,10 +104,15 @@
 
             ux=vx*kinc
             uy=vy*kinc
+            uz=vz*kinc
 
             ! input here some test disp. loading
             do i=1,size(ndset(2)%setnode)
-                call update(lib_node(ndset(2)%setnode(i)),u=[ux,uy])
+                if(ndim==2) then
+                    call update(lib_node(ndset(2)%setnode(i)),u=[ux,uy])
+                else if(ndim==3) then
+                    call update(lib_node(ndset(2)%setnode(i)),u=[ux,uy,uz])
+                end if
             end do
 
 
@@ -140,10 +153,24 @@
                 end do
             end if
 
+            if(allocated(lib_coh3d6)) then
+                ncoh3d6=size(lib_coh3d6)
+                do i=1,ncoh3d6
+                    call integrate(lib_coh3d6(i),Ki,Fi)
+                end do
+            end if
+
+            if(allocated(lib_coh3d8)) then
+                ncoh3d8=size(lib_coh3d8)
+                do i=1,ncoh3d8
+                    call integrate(lib_coh3d8(i),Ki,Fi)
+                end do
+            end if
+
 
             !print*,outdir
-            call output(kinc,outdir)
+            call output(1,kinc,outdir)
 
         end do
 
-    end program test_tri
+    end program test_main

@@ -14,6 +14,8 @@
     include 'elements/wedge_element_module.f90'
     include 'elements/brick_element_module.f90'
     include 'elements/coh2d_element_module.f90'
+    include 'elements/coh3d6_element_module.f90'
+    include 'elements/coh3d8_element_module.f90'
     ! ... and other future element modules ...
    
     module lib_elem_module
@@ -23,6 +25,8 @@
     use wedge_element_module
     use brick_element_module
     use coh2d_element_module
+    use coh3d6_element_module
+    use coh3d8_element_module
     ! ... and other future element modules ...
     
     implicit none
@@ -33,12 +37,15 @@
     type(wedge_element),allocatable :: lib_wedge(:)
     type(brick_element),allocatable :: lib_brick(:)
     type(coh2d_element),allocatable :: lib_coh2d(:)
+    type(coh3d6_element),allocatable :: lib_coh3d6(:)
+    type(coh3d8_element),allocatable :: lib_coh3d8(:)
     
     contains
     
     subroutine initialize_lib_elem
     
-        integer :: i=0, ntri=0, nquad=0, nwedge=0, nbrick=0, ncoh2d=0
+        integer :: i=0, ntri=0, nquad=0, nwedge=0, nbrick=0, &
+        &          ncoh2d=0, ncoh3d6=0, ncoh3d8=0
         
         
         
@@ -48,17 +55,36 @@
         !------------------------------------------------------------!
 
 
+        ncoh3d6=2
+        ncoh3d8=1
+        allocate(lib_coh3d6(ncoh3d6))
+        allocate(lib_coh3d8(ncoh3d8))
 
-        
-        ncoh2d=1
-        
-        allocate(lib_coh2d(ncoh2d))
-        
-        do i=1, ncoh2d
-            call empty(lib_coh2d(i))
+        do i=1, ncoh3d6
+            call empty(lib_coh3d6(i))
         end do
         
-        call prepare(lib_coh2d(1),key=1,connec=[1,2,4,3],matkey=3)
+        do i=1, ncoh3d8
+            call empty(lib_coh3d8(i))
+        end do
+
+        call prepare(lib_coh3d6(1),key=1,connec=[1,2,3,7,8,9],matkey=3)
+        call prepare(lib_coh3d6(2),key=2,connec=[2,4,3,8,10,9],matkey=3)
+        
+        call prepare(lib_coh3d8(1),key=3,connec=[3,4,6,5,9,10,12,11],matkey=3)
+        
+        
+        
+        
+        !~ncoh2d=1
+        !~
+        !~allocate(lib_coh2d(ncoh2d))
+        !~
+        !~do i=1, ncoh2d
+        !~    call empty(lib_coh2d(i))
+        !~end do
+        !~
+        !~call prepare(lib_coh2d(1),key=1,connec=[1,2,4,3],matkey=3)
         
         
         

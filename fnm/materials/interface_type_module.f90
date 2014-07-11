@@ -339,6 +339,7 @@
                 ! BK ratio
                 bk=Gs/(Gn+Gs)
                 
+                
                 ! effective jump and traction
                 if(nst==2)  then
                     u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
@@ -353,11 +354,16 @@
                 
                 ! mixed mode fracture toughness (BK formula)
                 !Gsc=sqrt(Gtc**2+Glc**2) ! a quadratic avg of the two shear toughness
-                Gsc=Gtc*(Gt/Gs)+Glc*(Gl/Gs)
+                if(Gs>tiny(one)) then
+                    Gsc=Gtc*(Gt/Gs)+Glc*(Gl/Gs)
+                else
+                    Gsc=half*Gtc+half*Glc
+                end if
                 Gmc=Gnc+(Gsc-Gnc)*(bk**eta)
                 
                 ! effective jump at final failure
                 uf=two*Gmc/T0
+                
                 
             else if(fstat==failed) then
             ! this is the case where strength is close to zero

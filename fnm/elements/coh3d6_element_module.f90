@@ -495,14 +495,14 @@
         if (nig .eq. 3) then   
 
             if(present(gauss).and.gauss) then
-                xi(1,1)=one_half
-                xi(1,1)=one_half
+                xi(1,1)=half
+                xi(1,1)=half
                 
-                xi(1,2)=one_half
+                xi(1,2)=half
                 xi(2,2)=zero
                 
                 xi(1,3)=zero
-                xi(2,3)=one_half
+                xi(2,3)=half
             else
                 xi(1,1)=zero
                 xi(1,1)=zero

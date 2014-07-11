@@ -13,33 +13,75 @@
       contains
       
       
-      subroutine output(kinc,outdir)
-      
+      subroutine output(kstep,kinc,outdir)
+         
+        ! passed-in variables
+        integer,intent(in)          :: kstep    ! current step number
         integer,intent(in)          :: kinc     ! increment number of current step
         character(len=dirlength),intent(in) :: outdir   ! output directory name
-      
-        integer                     :: nnode, nelem    ! no. of nodes & elem in the mesh
-        integer                     :: ntri, nquad, ntetra, nwedge, nbrick, ncoh2d ! no. of elems of each elem type
-        integer                     :: i, j, l, u, nsize, elnode
-        integer, allocatable        :: connec(:)! connectivity of an elem extracted from lib_elem
-        real(kind=dp), allocatable  :: x(:)     ! coordinates of nodes extracted from lib_node
-        real(kind=dp)               :: x3d(3)   ! coordinates of a node in 3D
-        real(kind=dp), allocatable  :: disp(:)  ! displacements of nodes extracted from lib_node
-        real(kind=dp)               :: disp3d(3)! displacements of a node in 3D
-        real(kind=dp), allocatable  :: sig(:), eps(:) ! stress & strain arrays extracted from lib_elem ig pnt
-        real(kind=dp)               :: sigtsr(3,3), epstsr(3,3) ! stress & strain tensors for vtk output
-        real(kind=dp)               :: fstat
-        type(integration_point), allocatable :: igpnt(:) ! intg point array
-        type(sdv_array),allocatable :: fsdv(:)
+        
+        ! output file variables
+        integer                     :: outunit  ! output file unit
         character(len=dirlength)    :: outfile  ! output file name
         character(len=dirlength)    :: outnum   ! output increment number (embedded in the outfile name)
         character(len=10)           :: fmat     ! format specs
       
-        ! initialize variables
-        i=0; j=0; l=0; u=0; nnode=0; nelem=0
-        ntri=0; nquad=0; ntetra=0; nwedge=0; nbrick=0; ncoh2d=0
+        ! no. of nodes & elem in the mesh
+        integer                     :: nnode, nelem
+        
+        ! no. of elems of each elem type
+        integer                     :: ntri, nquad, ntetra, nwedge, nbrick, ncoh2d, ncoh3d6, ncoh3d8
+        
+        ! nsize: size of vtk element output; elnode: no. nodes in each elem
+        integer                     :: nsize, elnode
+
+        ! connectivity of an elem extracted from lib_elem
+        integer, allocatable        :: connec(:)
+        
+        ! nodal coordinates
+        real(kind=dp), allocatable  :: x(:)     ! coordinates of nodes extracted from lib_node
+        real(kind=dp)               :: x3d(3)   ! coordinates of a node in 3D
+        
+        ! nodal displacements
+        real(kind=dp), allocatable  :: disp(:)  ! displacements of nodes extracted from lib_node
+        real(kind=dp)               :: disp3d(3)! displacements of a node in 3D
+        
+        ! integration points
+        type(integration_point), allocatable :: igpnt(:) ! intg point array
+        
+        ! stress and strain
+        real(kind=dp), allocatable  :: sig(:), eps(:) ! stress & strain arrays extracted from lib_elem ig pnt
+        real(kind=dp)               :: sigtsr(3,3), epstsr(3,3) ! stress & strain tensors for vtk output
+        
+        ! damage/failure variables
+        real(kind=dp)               :: fvar    ! temporary failure variable for scalar outpt
+        type(sdv_array),allocatable :: fsdv(:)  ! failure variables extracted from ig point sdv array
+        
+        ! counters
+        integer                     :: i, j, l
+
+      
+      
+      
+      
+
+
+
+
+      
+        ! -----------------------------------------------------------------!
+        !                       initialize variables
+        ! -----------------------------------------------------------------!
+        
+        outunit=0; outfile=''; outnum=''; fmat=''
+        nnode=0; nelem=0
+        ntri=0; nquad=0; ntetra=0; nwedge=0; nbrick=0
+        ncoh2d=0; ncoh3d6=0; ncoh3d8=0
         nsize=0; elnode=0
-        outfile=''; outnum=''; fmat=''
+        x3d=zero; disp3d=zero
+        sigtsr=zero; epstsr=zero
+        fvar=zero
+        i=0; j=0; l=0
         
         ! obtain nnode value from glb libraries
         nnode=size(lib_node)
@@ -50,28 +92,40 @@
         ! write the increment number as a character and store in outnum
         write(outnum,fmat) kinc
         
-        !~! obtain the current working directory
-        !~call getcwd(outdir)
         
         ! create the output file name
-        outfile=trim(outdir)//'/outputs/'//trim(outnum)//'.vtk'
+        !~outfile=trim(outdir)//'/outputs/'//trim(outnum)//'.vtk'
+        outfile=trim(outdir)//'fnm-'//trim(outnum)//'.vtk'
         outfile=trim(outfile)
         
         ! open the outfile
-        open(newunit(u), file=outfile,status="replace")
+        open(newunit(outunit), file=outfile,status="replace")
+        
         
         ! write header
-        write(u,'(a)')'# vtk DataFile Version 3.1'
-        write(u,'(a)')'for Floating Node Method output'
+        write(outunit,'(a)')'# vtk DataFile Version 3.1'
+        write(outunit,'(a)')'for Floating Node Method output'
         
         ! write vtk format
-        write(u,'(a)')'ASCII'
+        write(outunit,'(a)')'ASCII'      
         
         ! write vtk data type
-        write(u,'(a)')'DATASET UNSTRUCTURED_GRID'
+        write(outunit,'(a)')'DATASET UNSTRUCTURED_GRID'      
         
-        ! write points
-        write(u,'(a, i5, a)')'POINTS ',nnode,' FLOAT'    
+  
+
+
+
+
+
+      
+        
+        
+        ! -----------------------------------------------------------------!
+        !                     write nodes
+        ! -----------------------------------------------------------------!
+        
+        write(outunit,'(a, i5, a)')'POINTS ',nnode,' FLOAT'    
         do i=1,nnode
             ! empty x3d array
             x3d=zero
@@ -80,33 +134,54 @@
             ! pass nodal coords to x3d array
             if(allocated(x)) x3d(1:size(x))=x(:)
             ! write x3d array into output file
-            write(u,*) x3d(1),x3d(2),x3d(3)
+            write(outunit,*) x3d(1),x3d(2),x3d(3)
         end do            
-        write(u,'(a)')''
+        write(outunit,'(a)')''
         
-        ! write elements' connec
-        if(allocated(lib_tri)) ntri=size(lib_tri) ! no. of tri elem in the mesh
-        if(allocated(lib_quad)) nquad=size(lib_quad)
-        !~if(allocated(lib_tetra)) ntetra=size(lib_tetra)
-        if(allocated(lib_wedge)) nwedge=size(lib_wedge)
-        if(allocated(lib_brick)) nbrick=size(lib_brick)
-        if(allocated(lib_coh2d)) ncoh2d=size(lib_coh2d)
+        
+        
+        
+
+
+
+
+
+        
+        ! -----------------------------------------------------------------!
+        !                     write elements 
+        !       (order matters: new elem type must join the queue)
+        ! -----------------------------------------------------------------!
+        
+        
+        !                   write elements' connec (order matters)
+        
+        ! get no. of elems of each type
+        if(allocated(lib_tri))      ntri=size(lib_tri) ! no. of tri elem in the mesh
+        if(allocated(lib_quad))     nquad=size(lib_quad)
+        !~if(allocated(lib_tetra))  ntetra=size(lib_tetra)
+        if(allocated(lib_wedge))    nwedge=size(lib_wedge)
+        if(allocated(lib_brick))    nbrick=size(lib_brick)
+        if(allocated(lib_coh2d))    ncoh2d=size(lib_coh2d)
+        if(allocated(lib_coh3d6))   ncoh3d6=size(lib_coh3d6)
+        if(allocated(lib_coh3d8))   ncoh3d8=size(lib_coh3d8)
         ! .... and other elem types ....
         
         ! total no. of elems
-        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d
+        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d+ncoh3d6+ncoh3d8
         
         ! calculate total no. of nodes to print; each row has 1+elnode no. of indices to print
-        nsize=ntri*(1+3)+nquad*(1+4)+ntetra*(1+4)+nwedge*(1+6)+nbrick*(1+8)+ncoh2d*(1+4)
+        nsize=ntri*(1+3)+nquad*(1+4)+ntetra*(1+4)+nwedge*(1+6)+nbrick*(1+8) &
+        &    +ncoh2d*(1+4)+ncoh3d6*(1+6)+ncoh3d8*(1+8)
         
-        write(u,'(a, i5, i5)')'CELLS ', nelem, nsize ! write a summary of output
+        ! write a summary of output
+        write(outunit,'(a, i5, i5)')'CELLS ', nelem, nsize
         
         if(ntri > 0) then
             do i=1,ntri ! write each element's connec individually
                 call extract(lib_tri(i),connec=connec) ! extract connec from lib_tri
                 ! print connec in vtk; note that in vtk node no. starts from 0
                 connec=connec-1
-                write(u,*) 3,connec(1),connec(2),connec(3) 
+                write(outunit,*) 3,connec(1),connec(2),connec(3) 
             end do
         end if
         
@@ -115,7 +190,7 @@
                 call extract(lib_quad(i),connec=connec) ! extract connec from lib_tri
                 ! print connec in vtk; note that in vtk node no. starts from 0
                 connec=connec-1
-                write(u,*) 4,connec(1),connec(2),connec(3),connec(4) 
+                write(outunit,*) 4,connec(1),connec(2),connec(3),connec(4) 
             end do
         end if
         !~
@@ -124,7 +199,7 @@
         !~        call extract(lib_tetra(i),connec=connec) ! extract connec from lib_tri
         !~        ! print connec in vtk; note that in vtk node no. starts from 0
         !~        connec=connec-1
-        !~        write(u,*) 4,connec(1),connec(2),connec(3),connec(4)
+        !~        write(outunit,*) 4,connec(1),connec(2),connec(3),connec(4)
         !~    end do
         !~end if
         !~
@@ -133,16 +208,16 @@
                 call extract(lib_wedge(i),connec=connec) ! extract connec from lib_tri
                 ! print connec in vtk; note that in vtk node no. starts from 0
                 connec=connec-1
-                write(u,*) 6,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6)
+                write(outunit,*) 6,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6)
             end do
         end if
-        !~
+        
         if(nbrick > 0) then
             do i=1,nbrick ! write each element's connec individually
                 call extract(lib_brick(i),connec=connec) ! extract connec from lib_tri
                 ! print connec in vtk; note that in vtk node no. starts from 0
                 connec=connec-1
-                write(u,*) 8,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6),connec(7),connec(8)
+                write(outunit,*) 8,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6),connec(7),connec(8)
             end do
         end if
         
@@ -151,74 +226,130 @@
                 call extract(lib_coh2d(i),connec=connec) ! extract connec from lib_tri
                 ! print connec in vtk; note that in vtk node no. starts from 0
                 connec=connec-1
-                write(u,*) 4,connec(1),connec(2),connec(3),connec(4) 
+                write(outunit,*) 4,connec(1),connec(2),connec(3),connec(4) 
             end do
         end if
         
-        write(u,'(a)')''
+        if(ncoh3d6 > 0) then
+            do i=1,ncoh3d6 ! write each element's connec individually
+                call extract(lib_coh3d6(i),connec=connec) ! extract connec from lib_tri
+                ! print connec in vtk; note that in vtk node no. starts from 0
+                connec=connec-1
+                write(outunit,*) 6,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6)
+            end do
+        end if
         
+        if(ncoh3d8 > 0) then
+            do i=1,ncoh3d8 ! write each element's connec individually
+                call extract(lib_coh3d8(i),connec=connec) ! extract connec from lib_tri
+                ! print connec in vtk; note that in vtk node no. starts from 0
+                connec=connec-1
+                write(outunit,*) 8,connec(1),connec(2),connec(3),connec(4),connec(5),connec(6),connec(7),connec(8)
+            end do
+        end if
         
+        write(outunit,'(a)')''
+
+
+         
         
-        ! write element type
-        write(u,'(a, i5)')'CELL_TYPES ', nelem
+        !                   write elements' types (order matters)
+        
+        write(outunit,'(a, i5)')'CELL_TYPES ', nelem
         
         if (ntri > 0) then
             do i=1,ntri
-                write(u,'(i2)') 5 ! 5 for tri
+                write(outunit,'(i2)') 5 ! 5 for tri
             end do 
         end if
         
         if (nquad > 0) then
             do i=1,nquad
-                write(u,'(i2)') 9 ! 9 for quad
+                write(outunit,'(i2)') 9 ! 9 for quad
             end do 
         end if
         
         if (ntetra > 0) then
             do i=1,ntetra
-                write(u,'(i2)') 10 ! 10 for tetra
+                write(outunit,'(i2)') 10 ! 10 for tetra
             end do 
         end if
         
         if (nwedge > 0) then
             do i=1,nwedge
-                write(u,'(i2)') 13 ! 13 for wedge
+                write(outunit,'(i2)') 13 ! 13 for wedge
             end do 
         end if
         
         if (nbrick > 0) then
             do i=1,nbrick
-                write(u,'(i2)') 12 ! 12 for brick
+                write(outunit,'(i2)') 12 ! 12 for brick
             end do 
         end if
         
         if (ncoh2d > 0) then
             do i=1,ncoh2d
-                write(u,'(i2)') 9 ! 9 for quad
+                write(outunit,'(i2)') 9 ! 9 for coh2d
+            end do 
+        end if
+        
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                write(outunit,'(i2)') 13 ! 13 for coh3d6
+            end do 
+        end if
+        
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                write(outunit,'(i2)') 12 ! 12 for coh3d8
             end do 
         end if
      
-        write(u,'(a)')''
+        write(outunit,'(a)')''
+
+
+
+
+
+
+
+
+
+
+        ! -----------------------------------------------------------------!
+        !                     write displacements
+        ! -----------------------------------------------------------------!
 
 
         ! write nodal varibales (disp.)
-        write(u,'(a, i5)')'POINT_DATA ', nnode
-        write(u,'(a)')'VECTORS displacement float'
-        !write(u,'(a)')'LOOKUP_TABLE default' ! ** this is only for scalar **
+        write(outunit,'(a, i5)')'POINT_DATA ', nnode
+        write(outunit,'(a)')'VECTORS displacement float'
+        !~write(outunit,'(a)')'LOOKUP_TABLE default' ! ** this is only for scalar **
         
         do i=1, nnode
             disp3d=zero ! empty disp3d for reuse
             call extract(lib_node(i),u=disp)
             if(allocated(disp)) disp3d(1:size(disp))=disp(:)
-            write(u,*) disp3d(1),disp3d(2),disp3d(3)
+            write(outunit,*) disp3d(1),disp3d(2),disp3d(3)
         end do            
-        write(u,'(a)')''
+        write(outunit,'(a)')''
         
+        
+        
+        
+   
+
+
+
+
+
+        ! -----------------------------------------------------------------!
+        !                     write stress (order matters)
+        ! -----------------------------------------------------------------!     
         
         ! write element stress
-        write(u,'(a, i5)')'CELL_DATA ', nelem
-        write(u,'(a)')'TENSORS stress float'
-        !write(u,'(a)')'LOOKUP_TABLE default'
+        write(outunit,'(a, i5)')'CELL_DATA ', nelem
+        write(outunit,'(a)')'TENSORS stress float'
         
         if (ntri > 0) then
             do i=1,ntri
@@ -234,9 +365,9 @@
                 ! average stress in the element
                 sigtsr=sigtsr/size(igpnt)  
                 do l=1,3
-                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element                
+                write(outunit,'(a)')'' ! separate from next element                
             end do 
         end if
         
@@ -254,9 +385,9 @@
                 ! average stress in the element
                 sigtsr=sigtsr/size(igpnt)  
                 do l=1,3
-                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element                
+                write(outunit,'(a)')'' ! separate from next element                
             end do 
         end if
         
@@ -279,9 +410,9 @@
                 ! average stress in the element
                 sigtsr=sigtsr/size(igpnt)  
                 do l=1,3
-                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element                
+                write(outunit,'(a)')'' ! separate from next element                
             end do 
         end if
         
@@ -304,9 +435,9 @@
                 ! average stress in the element
                 sigtsr=sigtsr/size(igpnt)  
                 do l=1,3
-                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element                
+                write(outunit,'(a)')'' ! separate from next element                
             end do 
         end if
         
@@ -324,15 +455,51 @@
                 ! average strain in the element
                 sigtsr=sigtsr/size(igpnt)
                 do l=1,3
-                    write(u,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element               
+                write(outunit,'(a)')'' ! separate from next element               
             end do 
         end if
         
-        !~if (nquad > 0 ) then
-        !~! fill in the same ....
-        !~end if
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                sigtsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d6(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),stress=sig)  
+                    !epstsr(1,1)
+                    sigtsr(2,2)=sigtsr(2,2)+sig(1)
+                    sigtsr(1,2)=sigtsr(1,2)+sig(2)
+                    sigtsr(2,1)=sigtsr(2,1)+sig(2)                           
+                end do 
+                ! average strain in the element
+                sigtsr=sigtsr/size(igpnt)
+                do l=1,3
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                end do
+                write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        end if
+        
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                sigtsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d8(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),stress=sig)  
+                    !epstsr(1,1)
+                    sigtsr(2,2)=sigtsr(2,2)+sig(1)
+                    sigtsr(1,2)=sigtsr(1,2)+sig(2)
+                    sigtsr(2,1)=sigtsr(2,1)+sig(2)                           
+                end do 
+                ! average strain in the element
+                sigtsr=sigtsr/size(igpnt)
+                do l=1,3
+                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                end do
+                write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        end if
         
         
         
@@ -340,16 +507,15 @@
         
         
         
+               
         
         
-        
-        
-        
-        
-        
+        ! -----------------------------------------------------------------!
+        !                     write strain (order matters)
+        ! -----------------------------------------------------------------!  
         
         ! write element strain
-        write(u,'(a)')'TENSORS strain float'
+        write(outunit,'(a)')'TENSORS strain float'
         
         if (ntri > 0) then
             do i=1,ntri
@@ -365,9 +531,9 @@
                 ! average strain in the element
                 epstsr=epstsr/size(igpnt)
                 do l=1,3
-                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element               
+                write(outunit,'(a)')'' ! separate from next element               
             end do 
         end if
         
@@ -385,9 +551,9 @@
                 ! average strain in the element
                 epstsr=epstsr/size(igpnt)
                 do l=1,3
-                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element               
+                write(outunit,'(a)')'' ! separate from next element               
             end do 
         end if
         
@@ -410,9 +576,9 @@
                 ! average stress in the element
                 epstsr=epstsr/size(igpnt)  
                 do l=1,3
-                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element                
+                write(outunit,'(a)')'' ! separate from next element                
             end do 
         end if
         
@@ -435,13 +601,11 @@
                 ! average stress in the element
                 epstsr=epstsr/size(igpnt)  
                 do l=1,3
-                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element                
+                write(outunit,'(a)')'' ! separate from next element                
             end do 
-        end if
-        
-        
+        end if    
         
         if (ncoh2d > 0) then
             do i=1,ncoh2d
@@ -457,107 +621,604 @@
                 ! average strain in the element
                 epstsr=epstsr/size(igpnt)
                 do l=1,3
-                    write(u,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                 end do
-                write(u,'(a)')'' ! separate from next element               
+                write(outunit,'(a)')'' ! separate from next element               
             end do 
         end if
         
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                epstsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d6(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),strain=eps)  
+                    !epstsr(1,1)
+                    epstsr(2,2)=epstsr(2,2)+eps(1)
+                    epstsr(1,2)=epstsr(1,2)+eps(2)
+                    epstsr(2,1)=epstsr(2,1)+eps(2)                           
+                end do 
+                ! average strain in the element
+                epstsr=epstsr/size(igpnt)
+                do l=1,3
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                end do
+                write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        end if
         
-        
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                epstsr=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d8(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),strain=eps)  
+                    !epstsr(1,1)
+                    epstsr(2,2)=epstsr(2,2)+eps(1)
+                    epstsr(1,2)=epstsr(1,2)+eps(2)
+                    epstsr(2,1)=epstsr(2,1)+eps(2)                           
+                end do 
+                ! average strain in the element
+                epstsr=epstsr/size(igpnt)
+                do l=1,3
+                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                end do
+                write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        end if
+
+
+
+
+
+
+
+
+        ! -----------------------------------------------------------------!
+        !                     write failure status
+        ! -----------------------------------------------------------------! 
         
         ! write element failure status
-        write(u,'(a)')'SCALARS fstat float'
+        write(outunit,'(a)')'SCALARS fstat float'
+        write(outunit,'(a)')'LOOKUP_TABLE default'
+        
+        if (ntri > 0) then
+            do i=1,ntri
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_tri(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nquad > 0) then
+            do i=1,nquad
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_quad(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nwedge > 0) then
+            do i=1,nwedge
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_wedge(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nbrick > 0) then
+            do i=1,nbrick
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_brick(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
         
         if (ncoh2d > 0) then
             do i=1,ncoh2d
-                fstat=zero ! empty sig & eps tensor for reuse
+                fvar=zero ! empty sig & eps tensor for reuse
                 call extract(lib_coh2d(i),ig_point=igpnt)
                 do j=1,size(igpnt)
                     call extract(igpnt(j),sdv=fsdv)
-                    fstat=fstat+fsdv(2)%i(1)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
                 end do 
                 ! average strain in the element
-                fstat=fstat/size(igpnt)
-                write(u,*) fstat
-                !write(u,'(a)')'' ! separate from next element               
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
             end do 
+        write(outunit,'(a)')''
         end if
-        write(u,'(a)')''
+        
 
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d6(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d8(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+
+
+
+
+
+
+        ! -----------------------------------------------------------------!
+        !                     write damage variable
+        ! -----------------------------------------------------------------! 
         
         ! write element damage variable
-        write(u,'(a)')'SCALARS dm float'
+        write(outunit,'(a)')'SCALARS dm float'
+        write(outunit,'(a)')'LOOKUP_TABLE default'
+        
+        
+        if (ntri > 0) then
+            do i=1,ntri
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_tri(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nquad > 0) then
+            do i=1,nquad
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_quad(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nwedge > 0) then
+            do i=1,nwedge
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_wedge(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nbrick > 0) then
+            do i=1,nbrick
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_brick(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
         
         if (ncoh2d > 0) then
             do i=1,ncoh2d
-                fstat=zero ! empty sig & eps tensor for reuse
+                fvar=zero ! empty sig & eps tensor for reuse
                 call extract(lib_coh2d(i),ig_point=igpnt)
                 do j=1,size(igpnt)
                     call extract(igpnt(j),sdv=fsdv)
-                    fstat=fstat+fsdv(2)%r(1)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
                 end do 
                 ! average strain in the element
-                fstat=fstat/size(igpnt)
-                write(u,*) fstat
-                !write(u,'(a)')'' ! separate from next element               
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
             end do 
+        write(outunit,'(a)')''
         end if
-        write(u,'(a)')''
+        
 
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d6(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d8(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+
+
+
+
+
+
+
+
+
+
+
+        ! -----------------------------------------------------------------!
+        !                     write cohesive law variable u0
+        ! -----------------------------------------------------------------!
 
         ! write element damage variable
-        write(u,'(a)')'SCALARS u0 float'
+        write(outunit,'(a)')'SCALARS u0 float'
+        write(outunit,'(a)')'LOOKUP_TABLE default'
+        
+        if (ntri > 0) then
+            do i=1,ntri
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_tri(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nquad > 0) then
+            do i=1,nquad
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_quad(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nwedge > 0) then
+            do i=1,nwedge
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_wedge(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nbrick > 0) then
+            do i=1,nbrick
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_brick(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
         
         if (ncoh2d > 0) then
             do i=1,ncoh2d
-                fstat=zero ! empty sig & eps tensor for reuse
+                fvar=zero ! empty sig & eps tensor for reuse
                 call extract(lib_coh2d(i),ig_point=igpnt)
                 do j=1,size(igpnt)
                     call extract(igpnt(j),sdv=fsdv)
-                    fstat=fstat+fsdv(2)%r(2)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
                 end do 
                 ! average strain in the element
-                fstat=fstat/size(igpnt)
-                write(u,*) fstat
-                !write(u,'(a)')'' ! separate from next element               
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
             end do 
+        write(outunit,'(a)')''
         end if
-        write(u,'(a)')''
+       
 
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d6(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d8(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+
+
+
+
+
+
+
+
+
+
+        ! -----------------------------------------------------------------!
+        !                     write cohesive law variable uf
+        ! -----------------------------------------------------------------!
 
         ! write element damage variable
-        write(u,'(a)')'SCALARS uf float'
+        write(outunit,'(a)')'SCALARS uf float'
+        write(outunit,'(a)')'LOOKUP_TABLE default'
+        
+        if (ntri > 0) then
+            do i=1,ntri
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_tri(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nquad > 0) then
+            do i=1,nquad
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_quad(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nwedge > 0) then
+            do i=1,nwedge
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_wedge(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
+        
+        if (nbrick > 0) then
+            do i=1,nbrick
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_brick(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+
+        
         
         if (ncoh2d > 0) then
             do i=1,ncoh2d
-                fstat=zero ! empty sig & eps tensor for reuse
+                fvar=zero ! empty sig & eps tensor for reuse
                 call extract(lib_coh2d(i),ig_point=igpnt)
                 do j=1,size(igpnt)
                     call extract(igpnt(j),sdv=fsdv)
-                    fstat=fstat+fsdv(2)%r(3)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
                 end do 
                 ! average strain in the element
-                fstat=fstat/size(igpnt)
-                write(u,*) fstat
-                !write(u,'(a)')'' ! separate from next element               
-            end do 
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do
+        write(outunit,'(a)')''
         end if
-        write(u,'(a)')''
 
 
+        if (ncoh3d6 > 0) then
+            do i=1,ncoh3d6
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d6(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''   
+        end if
+        
 
+        if (ncoh3d8 > 0) then
+            do i=1,ncoh3d8
+                fvar=zero ! empty sig & eps tensor for reuse
+                call extract(lib_coh3d8(i),ig_point=igpnt)
+                do j=1,size(igpnt)
+                    call extract(igpnt(j),sdv=fsdv)
+                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                end do 
+                ! average strain in the element
+                fvar=fvar/size(igpnt)
+                write(outunit,*) fvar
+                !write(outunit,'(a)')'' ! separate from next element               
+            end do 
+        write(outunit,'(a)')''
+        end if
+        
 
         
         
-        !~if (nquad > 0 ) then
-        !~! fill in the same ....
-        !~end if
+
         
         
         
         
-        close(u)
+        close(outunit)
+        
         end subroutine output
         
         
