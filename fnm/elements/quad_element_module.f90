@@ -16,7 +16,6 @@
         integer :: matkey=0 ! material index in the global material arrays
         real(kind=dp) :: theta=zero ! material (local) orientation for composite lamina
         type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
-        logical :: plstrain=.false.
         
         ! below are optional terms 
         
@@ -70,7 +69,7 @@
         do i=1,nig
             call empty(elem%ig_point(i))
         end do       
-        elem%plstrain=.false. ! default value      
+   
         if(allocated(elem%sdv)) deallocate(elem%sdv) 
     
     end subroutine empty_quad_element
@@ -106,13 +105,12 @@
     
     
     
-    subroutine extract_quad_element(elem,key,connec,matkey,theta,ig_point,plstrain,sdv)
+    subroutine extract_quad_element(elem,key,connec,matkey,theta,ig_point,sdv)
     
         type(quad_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: key, matkey
         real(kind=dp),                        optional, intent(out) :: theta
-        logical,                              optional, intent(out) :: plstrain
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
@@ -123,7 +121,6 @@
         
         if(present(theta)) theta=elem%theta
         
-        if(present(plstrain)) plstrain=elem%plstrain
         
         if(present(connec)) then
             allocate(connec(nnode))
@@ -152,13 +149,14 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_quad_element(elem,K_matrix,F_vector)
+    subroutine integrate_quad_element(elem,K_matrix,F_vector,planestrain)
     use toolkit_module                  ! global tools for element integration
     use lib_mat_module                  ! global material library
     use lib_node_module                 ! global node library
     
-        type(quad_element),intent(inout)         :: elem 
+        type(quad_element),intent(inout)        :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
+        logical, optional, intent(in)           :: planestrain
         
         ! the rest are all local variables
         
@@ -229,7 +227,7 @@
         call extract(mat,matname,mattype,matkey)
         
         ! extract plain strain variable from element
-        plstrain=elem%plstrain
+        if(present(planestrain)) plstrain=planestrain
         
         ! extract orientation from element
         theta=elem%theta

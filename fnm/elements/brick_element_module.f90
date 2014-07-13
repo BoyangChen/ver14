@@ -16,7 +16,6 @@
         integer :: matkey=0 ! material index in the global material arrays
         real(kind=dp) :: theta=zero ! material (local) orientation for composite lamina
         type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
-        logical :: plstrain=.false.
         
         ! below are optional terms 
         
