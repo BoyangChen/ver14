@@ -356,6 +356,15 @@
 !********************************************************************************************
 
 
+
+
+
+
+
+
+!********************************************************************************************
+!               function to compute the cross-product of two 3D vectors
+!********************************************************************************************
     function CrossProduct3D(a, b)
       real(dp), intent(in)  :: a(3), b(3)
       real(dp)              :: CrossProduct3D(3)
@@ -364,6 +373,124 @@
       CrossProduct3D(2) = a(3) * b(1) - a(1) * b(3)
       CrossProduct3D(3) = a(1) * b(2) - a(2) * b(1)
     end function CrossProduct3D
+!********************************************************************************************
+!********************************************************************************************    
+    
+    
+    
+    
+    
+    
+
+
+
+    
+!********************************************************************************************
+!           subroutine to checks if two lines cross, and locate the crossing point
+!********************************************************************************************    
+      subroutine klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
+
+      
+      ! feed in variables
+      real(kind=dp),intent(in) :: x1,y1,x2,y2       ! nodal coords of line 1 (elem edge)
+      real(kind=dp),intent(in) :: xp1,yp1,xp2,yp2   ! nodal coords of line 2 (precrack)
+      ! update variables
+      real(kind=dp),intent(inout) :: xct,yct        ! coords of intersection
+      integer,intent(inout) :: iscross              ! status of intersection
+      ! local variables
+      real(kind=dp) :: a1,b1,c1,a2,b2,c2,det
+      real(kind=dp) :: xmin,ymin,xpmin,ypmin,xmax,ymax,xpmax,ypmax
+      ! initialize local/update variables (don't use data in subroutines)     
+      a1=zero;b1=zero;c1=zero
+      a2=zero;b2=zero;c2=zero
+      xmin=zero;ymin=zero;xmax=zero;ymax=zero
+      xpmin=zero;ypmin=zero;xpmax=zero;ypmax=zero
+!
+!     **************** algorithm for the determination of precrack intersecting with element edges: *****************
+!     equation of a line: a*x+b*y=c
+!     the intersection of line 1 (an edge) and line 2 (a precrack) is to solve the system equation:
+!     a1*x+b1*y=c1
+!     a2*x+b2*y=c2
+!     first, det=a1*b2-a2*b1; 
+!     if det=0: lines are parallel, no intersection possible
+!     else if det/=0, then the intersection point is:
+!       xct=(b2*c1-b1*c2)/det
+!       yct=(a1*c2-a2*c1)/det
+!       check xct, yct with range of x,y of the edge and of the precrack
+!       if (xmin<xct<xmax) or (ymin<yct<ymax): point on edge
+!       if (xpmin<xct<xpmax) or (ypmin<yct<ypmax): point on precrack
+!       if the point is both on edge and on precrack, then store the coords of this point
+!           xp(edge no.)=xct
+!           yp(edge no.)=yct
+!           fedg(edge no.)=1 !edge crossed by precrack
+!      
+! line 1 equation
+      a1=y2-y1
+      b1=x1-x2
+      c1=a1*x1+b1*y1
+! line 2 equation
+      a2=yp2-yp1
+      b2=xp1-xp2
+      c2=a2*xp1+b2*yp1
+! range of line 1
+      xmin=min(x1,x2)
+      ymin=min(y1,y2)
+      xmax=max(x1,x2)
+      ymax=max(y1,y2)
+! range of line 2
+      xpmin=min(xp1,xp2)
+      ypmin=min(yp1,yp2)
+      xpmax=max(xp1,xp2)
+      ypmax=max(yp1,yp2)
+      ! check intersection
+      det=a1*b2-a2*b1
+      if(abs(det)<=tiny(one)) then ! lines are parallel; no intersection possible
+        ! do nothing
+        
+      else ! intersection possible
+      
+        xct=(b2*c1-b1*c2)/det !-find intersection point
+        yct=(a1*c2-a2*c1)/det
+
+        if ((xmin.gt.xct).or.(xmax.lt.xct).or.(ymin.gt.yct).or.(ymax.lt.yct)) then ! intersection not on edge
+        ! do nothing
+          !write(6,*)'intersection out of range of edge'
+        else if (xct.eq.x1.and.yct.eq.y1) then
+            !write(6,*)'precrack line passes node 1'
+            xct=max(xct,xmin+tolerance*(xmax-xmin))
+            xct=min(xct,xmax-tolerance*(xmax-xmin))
+            yct=max(yct,ymin+tolerance*(ymax-ymin))
+            yct=min(yct,ymax-tolerance*(ymax-ymin))
+            if ((xpmin.gt.xct).or.(xpmax.lt.xct) .or. (ypmin.gt.yct).or.(ypmax.lt.yct)) then                    
+                iscross=21  ! intersection pass node 1 but not on precrack
+            else
+                iscross=11  ! intersection pass node 1 and lie on precrack
+            end if
+        else if (xct.eq.x2.and.yct.eq.y2) then
+            !write(6,*)'precrack line passes node 2'
+            xct=max(xct,xmin+tolerance*(xmax-xmin))
+            xct=min(xct,xmax-tolerance*(xmax-xmin))
+            yct=max(yct,ymin+tolerance*(ymax-ymin))
+            yct=min(yct,ymax-tolerance*(ymax-ymin))
+            if ((xpmin.gt.xct).or.(xpmax.lt.xct) .or. (ypmin.gt.yct).or.(ypmax.lt.yct)) then
+                iscross=22  ! intersection pass node 2 but not on precrack
+            else
+                iscross=12  ! intersection pass node 2 and lie on precrack
+            end if
+        else !-intersection on this edge
+            xct=max(xct,xmin+tolerance*(xmax-xmin))
+            xct=min(xct,xmax-tolerance*(xmax-xmin))
+            yct=max(yct,ymin+tolerance*(ymax-ymin))
+            yct=min(yct,ymax-tolerance*(ymax-ymin))
+            if ((xpmin.gt.xct).or.(xpmax.lt.xct) .or. (ypmin.gt.yct).or.(ypmax.lt.yct)) then                    
+                iscross=2   ! intersection on edge but not on precrack
+            else
+                iscross=1   ! intersection on edge and also on precrack
+            end if
+        end if
+      end if 
+             
+      end subroutine klinecross
     
     
     end module toolkit_module

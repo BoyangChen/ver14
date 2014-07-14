@@ -16,12 +16,10 @@ module xquad_element_module
         integer :: curr_status=0        ! 0 means intact
         integer :: key=0 
         integer :: matkey=0
-        real(dp):: theta=zero
+        real(dp):: theta=zero           ! fibre orientation for lamina
         
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
-        !~integer :: rlcnc(nndr)                 ! cnc to glb node arrays for accessing glb real(vertex) node numbers
-        !~integer,allocatable :: flcnc(:)        ! assigned to this surface, in addition to the flo nodes on edge
         
         type(sub2d_element), allocatable :: subelem(:)
         
@@ -35,6 +33,10 @@ module xquad_element_module
         module procedure prepare_xquad_element
     end interface
     
+    interface precrack
+        module procedure precrack_xquad_element
+    end interface
+    
     interface integrate
         module procedure integrate_xquad_element
     end interface
@@ -46,7 +48,7 @@ module xquad_element_module
 
 
 
-    public :: empty,prepare,integrate,extract
+    public :: empty,prepare,precrack,integrate,extract
 
 
 
@@ -96,14 +98,14 @@ module xquad_element_module
     
     subroutine extract_xquad_element(elem,curr_status,key,matkey,theta,nodecnc,edgecnc,subelem)
     
-        type(xquad_element),    intent(in)  :: elem
-        integer, optional,      intent(out) :: curr_status
-        integer, optional,      intent(out) :: key
-        integer, optional,      intent(out) :: matkey
-        real(dp),optional,      intent(out) :: theta
-        integer, allocatable, optional, intent(out) :: nodecnc(:)
-        integer, allocatable, optional, intent(out) :: edgecnc(:)
-        type(sub2d_element), allocatable, optional, intent(out) :: subelem(:)
+        type(xquad_element),                      intent(in)  :: elem
+        integer,                        optional, intent(out) :: curr_status
+        integer,                        optional, intent(out) :: key
+        integer,                        optional, intent(out) :: matkey
+        real(dp),                       optional, intent(out) :: theta
+        integer,            allocatable,optional, intent(out) :: nodecnc(:)
+        integer,            allocatable,optional, intent(out) :: edgecnc(:)
+        type(sub2d_element),allocatable,optional, intent(out) :: subelem(:)
 
         if(present(curr_status)) curr_status=elem%curr_status
         if(present(key)) key=elem%key 
@@ -131,6 +133,13 @@ module xquad_element_module
 
 
 
+
+
+
+
+
+
+
     subroutine precrack_xquad_element(elem)
     use toolkit_module                  ! global tools for element integration
     use lib_mat_module                  ! global material library
@@ -139,6 +148,15 @@ module xquad_element_module
     use lib_precrack_module             ! global precrack library
     
         type(xquad_element),intent(inout)       :: elem
+        !~integer :: curr_status=0        ! 0 means intact
+        !~integer :: key=0 
+        !~integer :: matkey=0
+        !~real(dp):: theta=zero           ! fibre orientation for lamina
+        !~
+        !~integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
+        !~integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
+        !~
+        !~type(sub2d_element), allocatable :: subelem(:)
 
 !==========================================================================
 !----- check for precrack in this element during 1st increment ------------
@@ -150,6 +168,13 @@ module xquad_element_module
         
         
     end subroutine precrack_xquad_element
+
+
+
+
+
+
+
 
 
 
