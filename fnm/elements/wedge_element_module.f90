@@ -69,9 +69,7 @@
         do i=1,nig
             call empty(elem%ig_point(i))
         end do
-        !~elem%K_matrix=zero   
-        !~elem%F_vector=zero       
-        elem%plstrain=.false. ! default value      
+      
         if(allocated(elem%sdv)) deallocate(elem%sdv)
     
     end subroutine empty_wedge_element
@@ -107,13 +105,12 @@
     
     
     
-    subroutine extract_wedge_element(elem,key,connec,matkey,theta,ig_point,plstrain,sdv)
+    subroutine extract_wedge_element(elem,key,connec,matkey,theta,ig_point,sdv)
     
         type(wedge_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: key, matkey
         real(kind=dp),                        optional, intent(out) :: theta
-        logical,                              optional, intent(out) :: plstrain
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
@@ -123,8 +120,6 @@
         if(present(matkey)) matkey=elem%matkey
         
         if(present(theta)) theta=elem%theta
-        
-        if(present(plstrain)) plstrain=elem%plstrain
         
         if(present(connec)) then
             allocate(connec(nnode))
@@ -175,7 +170,6 @@
         real(kind=dp)   :: coords(ndim,nnode) ! coordinates of the element nodes
         real(kind=dp)   :: theta ! orientation of element local coordinates
         real(kind=dp)   :: u(ndof) ! nodal disp. vector
-        logical         :: plstrain ! true for plane strain stiffness
         logical         :: failure ! true for failure analysis
         real(kind=dp)   :: fn(nnode),dn(nnode,ndim) ! shape functions & their deriv. physical space
         real(kind=dp)   :: jac(ndim,ndim),gn(nnode,ndim),detj ! jacobian & shape func. deriv. natural space
@@ -199,7 +193,7 @@
         
         igxi=zero; igwt=zero
         coords=zero; theta=zero; u=zero
-        plstrain=.false.; failure=.false.
+        failure=.false.
         
         ! copy nodes from global node array 
         node(:)=lib_node(elem%connec(:))
@@ -229,8 +223,6 @@
         mat=lib_mat(elem%matkey)
         call extract(mat,matname,mattype,matkey)
         
-        ! extract plain strain variable from element
-        plstrain=elem%plstrain
         
         ! extract orientation from element
         theta=elem%theta
@@ -296,7 +288,7 @@
                     & wedge_element type isotropic material; only linear elastic stiffness matrix is integrated."
                     
                     ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_iso(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
+                    call ddsdde(lib_iso(matkey),dee,strain=tmpstrain,stress=tmpstress) 
                     
                 case ('lamina')
                 
@@ -308,7 +300,7 @@
                     
                 
                     ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
+                    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress)
                     
                 case default
                     write(msg_file,*) 'material type not supported for tri element!'

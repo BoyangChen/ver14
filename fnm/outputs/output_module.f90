@@ -31,6 +31,11 @@
         
         ! no. of elems of each elem type
         integer                     :: ntri, nquad, ntetra, nwedge, nbrick, ncoh2d, ncoh3d6, ncoh3d8
+        integer                     :: nsub2d, nsubtri, nsubquad, nsubcoh2d
+        integer                     :: nsub3d, nsubwedge, nsubbrick, nsubcoh3d6, nsubcoh3d8
+        
+        ! sub element type variable
+        character(len=eltypelength) :: subtype
         
         ! nsize: size of vtk element output; elnode: no. nodes in each elem
         integer                     :: nsize, elnode
@@ -73,10 +78,12 @@
         !                       initialize variables
         ! -----------------------------------------------------------------!
         
-        outunit=0; outfile=''; outnum=''; fmat=''
+        outunit=0; outfile=''; outnum=''; fmat=''; subtype=''
         nnode=0; nelem=0
         ntri=0; nquad=0; ntetra=0; nwedge=0; nbrick=0
         ncoh2d=0; ncoh3d6=0; ncoh3d8=0
+        nsub2d=0; nsubtri=0; nsubquad=0; nsubcoh2d=0
+        nsub3d=0; nsubwedge=0; nsubbrick=0; nsubcoh3d6=0; nsubcoh3d8=0
         nsize=0; elnode=0
         x3d=zero; disp3d=zero
         sigtsr=zero; epstsr=zero
@@ -164,14 +171,33 @@
         if(allocated(lib_coh2d))    ncoh2d=size(lib_coh2d)
         if(allocated(lib_coh3d6))   ncoh3d6=size(lib_coh3d6)
         if(allocated(lib_coh3d8))   ncoh3d8=size(lib_coh3d8)
+        
+        if(allocated(lib_sub2d)) then 
+        nsub2d=size(lib_sub2d)
+            do i=1,nsub2d
+                call extract(lib_sub2d(i),eltype=subtype)
+                select case(subtype)
+                    case('tri')
+                        nsubtri=nsubtri+1
+                    case('quad')
+                        nsubquad=nsubquad+1
+                    case('coh2d')
+                        nsubcoh2d=nsubcoh2d+1
+                    case default
+                        continue
+                end select
+            end do
+        end if
         ! .... and other elem types ....
         
         ! total no. of elems
-        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d+ncoh3d6+ncoh3d8
+        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d+ncoh3d6+ncoh3d8+nsub2d+nsub3d
         
         ! calculate total no. of nodes to print; each row has 1+elnode no. of indices to print
         nsize=ntri*(1+3)+nquad*(1+4)+ntetra*(1+4)+nwedge*(1+6)+nbrick*(1+8) &
-        &    +ncoh2d*(1+4)+ncoh3d6*(1+6)+ncoh3d8*(1+8)
+        &    +ncoh2d*(1+4)+ncoh3d6*(1+6)+ncoh3d8*(1+8)                      &
+        &    +nsubtri*(1+3)+nsubquad*(1+4)+nsubcoh2d*(1+4)                  &
+        &    +nsubwedge*(1+6)+nsubbrick*(1+8)+nsubcoh3d6*(1+6)+nsubcoh3d8*(1+8)
         
         ! write a summary of output
         write(outunit,'(a, i5, i5)')'CELLS ', nelem, nsize
@@ -248,6 +274,23 @@
             end do
         end if
         
+        
+        ! ------ write sub elements ---------
+        
+        if(nsub2d > 0) then
+            do i=1,nsub2d ! write each element's connec individually
+                call extract(lib_sub2d(i),glbcnc=connec) ! extract connec
+                ! print connec in vtk; note that in vtk node no. starts from 0
+                connec=connec-1
+                write(outunit,'(i2)',advance="no") size(connec)
+                do j=1,size(connec)
+                    write(outunit,'(i2)',advance="no") connec(j)
+                end do
+                write(outunit,'(a)')''
+            end do
+        end if
+        
+        
         write(outunit,'(a)')''
 
 
@@ -303,6 +346,22 @@
             do i=1,ncoh3d8
                 write(outunit,'(i2)') 12 ! 12 for coh3d8
             end do 
+        end if
+        
+        if (nsub2d > 0) then
+            do i=1,nsub2d
+                call extract(lib_sub2d(i),eltype=subtype)
+                select case(subtype)
+                    case('tri')
+                        write(outunit,'(i2)') 5 ! 5 for tri
+                    case('quad')
+                        write(outunit,'(i2)') 9 ! 9 for quad
+                    case('coh2d')
+                        write(outunit,'(i2)') 9 ! 9 for coh2d
+                    case default
+                        continue
+                end select    
+            end do
         end if
      
         write(outunit,'(a)')''

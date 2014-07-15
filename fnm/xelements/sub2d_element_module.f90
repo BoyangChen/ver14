@@ -13,10 +13,10 @@
         type,public :: sub2d_element
             private ! encapsulate components of this type
             
-            character(len=namelength)       :: eltype=''    ! can be all types of 2D elements
+            character(len=eltypelength)       :: eltype=''    ! can be all types of 2D elements
             integer                         :: matkey=0     ! material index in glb material array
             real(kind=dp)                   :: theta=zero   ! fibre orientation (lamina)
-            logical                         :: plstrain=.false. ! true for plane strain analysis
+
             integer,allocatable             :: glbcnc(:)    ! sub_elem connec to global node library
             integer,allocatable             :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
@@ -52,7 +52,17 @@
         
         
         
+        
+        
+        
+        
         contains
+        
+        
+        
+        
+        
+        
         
         
         subroutine empty_sub2d_element(elem)
@@ -62,7 +72,6 @@
             elem%eltype=''    ! can be all types of 2D elements
             elem%matkey=0     ! material index in glb material array
             elem%theta=zero   ! fibre orientation (lamina)
-            elem%plstrain=.false. ! true for plane strain analysis
             
             if(allocated(elem%glbcnc))  deallocate(elem%glbcnc)
             if(allocated(elem%subcnc))  deallocate(elem%subcnc)
@@ -74,6 +83,203 @@
          
             
         end subroutine empty_sub2d_element
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        subroutine prepare_sub2d_element(elem,eltype,matkey,theta,glbcnc,subcnc,Tmatrix,mnode)
+        
+            type(sub2d_element), intent(inout) :: elem
+            
+            character(len=*),intent(in)    :: eltype       ! can be all types of 2D elements
+            integer,intent(in)                      :: matkey       ! material index in glb material array
+            
+            integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
+            integer,intent(in)                      :: subcnc(:)    ! sub_elem connec to parent elem nodes
+            
+            real(kind=dp),intent(in),optional       :: theta        ! fibre orientation (lamina)
+            real(kind=dp),intent(in),optional       :: Tmatrix(:,:) ! interpolation matrix
+            type(xnode),  intent(in),optional       :: mnode(:)     ! interpolated (material domain) nodes
+            
+            ! local variables
+            integer :: lrow,lcol,nrow,ncol
+            
+            lrow=0; lcol=0; nrow=0; ncol=0
+                       
+            
+            elem%eltype=eltype   
+            elem%matkey=matkey     
+             
+            if(allocated(elem%glbcnc))  then
+                if(size(elem%glbcnc)/=size(glbcnc)) then
+                    deallocate(elem%glbcnc)
+                    allocate(elem%glbcnc(size(glbcnc)))
+                end if
+            else
+                allocate(elem%glbcnc(size(glbcnc)))
+            end if
+            elem%glbcnc=glbcnc
+                
+            if(allocated(elem%subcnc))  then
+                if(size(elem%subcnc)/=size(subcnc)) then
+                    deallocate(elem%subcnc)
+                    allocate(elem%subcnc(size(subcnc)))
+                end if
+            else
+                allocate(elem%subcnc(size(subcnc)))
+            end if
+            elem%subcnc=subcnc
+
+            if(present(theta)) elem%theta=theta
+            
+            if(present(Tmatrix)) then
+                if(.not.present(mnode)) then
+                    write(msg_file,*)'mnode need to be passed in tgt with Tmatrix in preparing sub2d elem'
+                    call exit_function
+                end if
+            
+                lrow=size(Tmatrix(:,1))
+                lcol=size(Tmatrix(1,:))
+            
+                if(allocated(elem%Tmatrix))  then
+                    nrow=size(elem%Tmatrix(:,1))
+                    ncol=size(elem%Tmatrix(1,:))
+                    if(nrow/=lrow .or. ncol/=lcol) then
+                        deallocate(elem%Tmatrix)
+                        !~allocate(elem%Tmatrix,source=Tmatrix) ! not yet supported on Centos 6.5 gfortran
+                        allocate(elem%Tmatrix(lrow,lcol))
+                    end if
+                else
+                    !~allocate(elem%Tmatrix,source=Tmatrix)
+                    allocate(elem%Tmatrix(lrow,lcol))
+                end if 
+                elem%Tmatrix=Tmatrix
+            end if
+            
+            if(present(mnode)) then
+                if(.not.present(Tmatrix)) then
+                    write(msg_file,*)'Tmatrix need to be passed in tgt with mnode in preparing sub2d elem'
+                    call exit_function
+                end if
+            
+                if(allocated(elem%mnode))  then
+                    if(size(elem%mnode)/=size(mnode)) then
+                        deallocate(elem%mnode)
+                        allocate(elem%mnode(size(mnode)))
+                    end if
+                else
+                    allocate(elem%mnode(size(mnode)))
+                end if
+                elem%mnode=mnode          
+            end if 
+            
+        end subroutine prepare_sub2d_element
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        subroutine extract_sub2d_element(elem,eltype,matkey,theta,glbcnc,subcnc,tri,quad,coh2d,Tmatrix,mnode)
+        
+            type(sub2d_element), intent(in) :: elem
+            
+            character(len=eltypelength),  intent(out),optional    :: eltype       ! can be all types of 2D elements
+            integer,                    intent(out),optional    :: matkey       ! material index in glb material array
+            real(kind=dp),              intent(out),optional    :: theta        ! fibre orientation (lamina)
+            
+            integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
+            integer,        allocatable,intent(out),optional    :: subcnc(:)    ! sub_elem connec to parent elem nodes
+            
+            type(tri_element),  allocatable,intent(out),optional:: tri(:)       ! tri sub elements
+            type(quad_element), allocatable,intent(out),optional:: quad(:)      ! quad sub elements
+            type(coh2d_element),allocatable,intent(out),optional:: coh2d(:)     ! 2D coh. sub elements
+            
+            
+            real(kind=dp),  allocatable,intent(out),optional    :: Tmatrix(:,:) ! interpolation matrix
+            type(xnode),    allocatable,intent(out),optional    :: mnode(:)     ! interpolated (material domain) nodes
+
+                       
+            
+            if(present(eltype)) eltype=elem%eltype
+            if(present(matkey)) matkey=elem%matkey
+            if(present(theta))  theta=elem%theta
+            
+            
+            if(present(glbcnc)) then
+                if(allocated(elem%glbcnc))  then
+                    allocate(glbcnc(size(elem%glbcnc)))
+                    glbcnc=elem%glbcnc
+                end if
+            end if    
+                
+                
+            if(present(subcnc)) then
+                if(allocated(elem%subcnc))  then
+                    allocate(subcnc(size(elem%subcnc)))
+                    subcnc=elem%subcnc
+                end if
+            end if
+            
+            
+            if(present(tri)) then
+                if(allocated(elem%tri))  then
+                    allocate(tri(size(elem%tri)))
+                    tri=elem%tri
+                end if
+            end if
+            
+            
+            if(present(quad)) then
+                if(allocated(elem%quad))  then
+                    allocate(quad(size(elem%quad)))
+                    quad=elem%quad
+                end if
+            end if
+            
+            
+            if(present(coh2d)) then
+                if(allocated(elem%coh2d))  then
+                    allocate(coh2d(size(elem%coh2d)))
+                    coh2d=elem%coh2d
+                end if
+            end if
+            
+            
+            if(present(Tmatrix)) then           
+                if(allocated(elem%Tmatrix))  then
+                    allocate(Tmatrix(size(elem%Tmatrix(:,1)),size(elem%Tmatrix(1,:))))
+                    Tmatrix=elem%Tmatrix
+                end if     
+            end if
+            
+            
+            if(present(mnode)) then           
+                if(allocated(elem%mnode))  then
+                    allocate(mnode(size(elem%mnode)))
+                    mnode=elem%mnode
+                end if         
+            end if 
+            
+        end subroutine extract_sub2d_element
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         
         
@@ -91,7 +297,7 @@
             i=0; j=0; l=0
             gauss=.false.
             
-            if(present(isgauss)) gauss=cohgauss
+            if(present(cohgauss)) gauss=cohgauss
             
             select case(elem%eltype)
                 case('tri')
@@ -136,4 +342,4 @@
         
         
     
-    end sub2d_element_module
+    end module sub2d_element_module

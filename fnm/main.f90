@@ -23,7 +23,7 @@
         end type
 
 
-        integer, parameter :: ndim=3 ! dimension of problem
+        integer, parameter :: ndim=2 ! dimension of problem
 
         ! K, F and connectivity of each element, extracted from glb lib
         real(kind=dp),allocatable :: Ki(:,:), Fi(:), strsi(:), strni(:)
@@ -39,7 +39,7 @@
         character(len=dirlength)  :: workdir, outdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8
+        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8,nsub2d
         integer :: kinc, ninc, nndset
         real(dp):: ux, uy, uz, vx, vy, vz
 
@@ -54,7 +54,7 @@
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
         nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0
-        ncoh2d=0; ncoh3d6=0; ncoh3d8=0
+        ncoh2d=0; ncoh3d6=0; ncoh3d8=0; nsub2d=0
         nndset=0; kinc=0; ninc=0
         ux=zero; uy=zero; uz=zero
         vx=zero; vy=zero; vz=zero
@@ -73,11 +73,11 @@
         nndset=2
         allocate(ndset(nndset))
 
-!        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
-!        ndset(2)=nodeset(setname='top',setnode=[3,4])
+        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
+        ndset(2)=nodeset(setname='top',setnode=[3,4])
 
-        ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
-        ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
+!        ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
+!        ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
 
 
         ! obtain the current working directory and specify output directory
@@ -86,8 +86,8 @@
 
 
         ! set loading rates and increments
-        !vx=-0.01_dp/sqrt(two)
-        vy=-0.01_dp/sqrt(two)
+        vx=-0.01_dp/sqrt(two)
+        vy=0.01_dp/sqrt(two)
         vz=0.01_dp/sqrt(two)
         ninc=10
 
@@ -166,6 +166,14 @@
                     call integrate(lib_coh3d8(i),Ki,Fi)
                 end do
             end if
+
+            if(allocated(lib_sub2d)) then
+                nsub2d=size(lib_sub2d)
+                do i=1,nsub2d
+                    call integrate(lib_sub2d(i),Ki,Fi)
+                end do
+            end if
+
 
 
             !print*,outdir

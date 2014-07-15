@@ -30,26 +30,26 @@
         end do
         
         
-        !~call update(lib_node(1),key=1,x=[zero,zero],u=[zero,zero])
-        !~call update(lib_node(2),key=2,x=[one,one],u=[zero,zero])
-        !~call update(lib_node(3),key=3,x=[zero,zero],u=[zero,zero])
-        !~call update(lib_node(4),key=4,x=[one,one],u=[zero,zero])
+        call update(lib_node(1),key=1,x=[zero,zero],u=[zero,zero])
+        call update(lib_node(2),key=2,x=[one,one],u=[zero,zero])
+        call update(lib_node(3),key=3,x=[zero,zero],u=[zero,zero])
+        call update(lib_node(4),key=4,x=[one,one],u=[zero,zero])
         
         
         
-        call update(lib_node(1),key=1,x=[zero,zero,-one],u=[zero,zero,zero])
-        call update(lib_node(2),key=2,x=[one,zero,-one],u=[zero,zero,zero])
-        call update(lib_node(3),key=3,x=[zero,one,zero],u=[zero,zero,zero])
-        call update(lib_node(4),key=4,x=[one,one,zero],u=[zero,zero,zero])
-        call update(lib_node(5),key=5,x=[zero,two,one],u=[zero,zero,zero])
-        call update(lib_node(6),key=6,x=[one,two,one],u=[zero,zero,zero])
-        
-        call update(lib_node(7),key=7,x=[zero,zero,-one],u=[zero,zero,zero])
-        call update(lib_node(8),key=8,x=[one,zero,-one],u=[zero,zero,zero])
-        call update(lib_node(9),key=9,x=[zero,one,zero],u=[zero,zero,zero])
-        call update(lib_node(10),key=10,x=[one,one,zero],u=[zero,zero,zero])
-        call update(lib_node(11),key=11,x=[zero,two,one],u=[zero,zero,zero])
-        call update(lib_node(12),key=12,x=[one,two,one],u=[zero,zero,zero])
+        !~call update(lib_node(1),key=1,x=[zero,zero,-one],u=[zero,zero,zero])
+        !~call update(lib_node(2),key=2,x=[one,zero,-one],u=[zero,zero,zero])
+        !~call update(lib_node(3),key=3,x=[zero,one,zero],u=[zero,zero,zero])
+        !~call update(lib_node(4),key=4,x=[one,one,zero],u=[zero,zero,zero])
+        !~call update(lib_node(5),key=5,x=[zero,two,one],u=[zero,zero,zero])
+        !~call update(lib_node(6),key=6,x=[one,two,one],u=[zero,zero,zero])
+        !~
+        !~call update(lib_node(7),key=7,x=[zero,zero,-one],u=[zero,zero,zero])
+        !~call update(lib_node(8),key=8,x=[one,zero,-one],u=[zero,zero,zero])
+        !~call update(lib_node(9),key=9,x=[zero,one,zero],u=[zero,zero,zero])
+        !~call update(lib_node(10),key=10,x=[one,one,zero],u=[zero,zero,zero])
+        !~call update(lib_node(11),key=11,x=[zero,two,one],u=[zero,zero,zero])
+        !~call update(lib_node(12),key=12,x=[one,two,one],u=[zero,zero,zero])
         
         !~call update(lib_node(7),key=1,x=[zero,zero,one],u=[zero,zero,zero])
         !~call update(lib_node(8),key=2,x=[one,zero,one],u=[zero,zero,zero])

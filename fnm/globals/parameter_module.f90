@@ -8,6 +8,7 @@
         
         integer, parameter :: matnamelength=20 ! character length of a user-input material name
         integer, parameter :: mattypelength=20 ! character length of a system material type name
+        integer, parameter :: eltypelength=20 ! character length of a system element type name
         integer, parameter :: setnamelength=20 ! character length of a set name
         integer, parameter :: dirlength=256 ! character length of a directory name
         
