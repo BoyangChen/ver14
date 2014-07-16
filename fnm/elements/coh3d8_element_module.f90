@@ -142,15 +142,16 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_coh3d8_element(elem,K_matrix,F_vector,gauss)
+    subroutine integrate_coh3d8_element(elem,K_matrix,F_vector,gauss,mnode)
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
         use lib_node_module                 ! global node library
         use glb_clock_module                ! global analysis progress (curr. step, inc, time, dtime)
     
-        type(coh3d8_element), intent(inout)      :: elem 
-        real(kind=dp), allocatable, intent(out) :: K_matrix(:,:), F_vector(:)
-        logical, optional, intent(in)           :: gauss
+        type(coh3d8_element),       intent(inout)   :: elem 
+        real(kind=dp), allocatable, intent(out)     :: K_matrix(:,:), F_vector(:)
+        logical,        optional,   intent(in)      :: gauss
+        type(xnode),    optional,   intent(in)      :: mnode(:)  ! material (interpolated) nodes
  
         !-----------------------------------------!
         ! local variables, extracted from glb libs
@@ -249,8 +250,13 @@
         !   extract variables from global arrays 
         !------------------------------------------------!
         
-        ! - extract nodes from global node array 
-        node(:)=lib_node(elem%connec(:))
+        if(present(mnode)) then
+            ! - extract nodes from passed-in node array
+            node(:)=mnode(:)
+        else
+            ! - extract nodes from global node array 
+            node(:)=lib_node(elem%connec(:))
+        end if
         
         ! - extract material values from global material array
         mat=lib_mat(elem%matkey)

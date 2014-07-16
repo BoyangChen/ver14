@@ -145,7 +145,6 @@
     subroutine integrate_coh2d_element(elem,K_matrix,F_vector,gauss,mnode)
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
-        use xnode_module
         use lib_node_module                 ! global node library
         use glb_clock_module                ! global analysis progress (curr. step, inc, time, dtime)
     

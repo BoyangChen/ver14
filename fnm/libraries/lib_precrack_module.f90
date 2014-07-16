@@ -6,7 +6,7 @@
     !   preprocessing programme             !
     !***************************************!
 
-include 'precrack_module.f90'
+include 'globals/precrack_module.f90'
 
 module lib_precrack_module
 use parameter_module

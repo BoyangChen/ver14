@@ -22,6 +22,7 @@ module xquad_element_module
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
         
         type(sub2d_element), allocatable :: subelem(:)
+        integer,             allocatable :: subcnc(:,:)      ! sub_elem connec to parent elem nodes
         
     end type xquad_element
   
@@ -33,9 +34,9 @@ module xquad_element_module
         module procedure prepare_xquad_element
     end interface
     
-    interface precrack
-        module procedure precrack_xquad_element
-    end interface
+    !~interface precrack
+    !~    module procedure precrack_xquad_element
+    !~end interface
     
     interface integrate
         module procedure integrate_xquad_element
@@ -48,7 +49,7 @@ module xquad_element_module
 
 
 
-    public :: empty,prepare,precrack,integrate,extract
+    public :: empty,prepare,integrate,extract
 
 
 
@@ -140,34 +141,34 @@ module xquad_element_module
 
 
 
-    subroutine precrack_xquad_element(elem)
-    use toolkit_module                  ! global tools for element integration
-    use lib_mat_module                  ! global material library
-    use lib_node_module                 ! global node library
-    use lib_edge_module                 ! global edge library
-    use lib_precrack_module             ! global precrack library
-    
-        type(xquad_element),intent(inout)       :: elem
-        !~integer :: curr_status=0        ! 0 means intact
-        !~integer :: key=0 
-        !~integer :: matkey=0
-        !~real(dp):: theta=zero           ! fibre orientation for lamina
-        !~
-        !~integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
-        !~integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
-        !~
-        !~type(sub2d_element), allocatable :: subelem(:)
-
-!==========================================================================
-!----- check for precrack in this element during 1st increment ------------
-!==========================================================================
-        if(nprc.gt.0) then
-          call kcheckprecrack(fstat,pstat,jelem,parent,mcrd,coordsf, &
-            & nnode,cncsub,mxnd)
-        end if
-        
-        
-    end subroutine precrack_xquad_element
+!~    subroutine precrack_xquad_element(elem)
+!~    use toolkit_module                  ! global tools for element integration
+!~    use lib_mat_module                  ! global material library
+!~    use lib_node_module                 ! global node library
+!~    use lib_edge_module                 ! global edge library
+!~    use lib_precrack_module             ! global precrack library
+!~    
+!~        type(xquad_element),intent(inout)       :: elem
+!~        !~integer :: curr_status=0        ! 0 means intact
+!~        !~integer :: key=0 
+!~        !~integer :: matkey=0
+!~        !~real(dp):: theta=zero           ! fibre orientation for lamina
+!~        !~
+!~        !~integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
+!~        !~integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
+!~        !~
+!~        !~type(sub2d_element), allocatable :: subelem(:)
+!~
+!~!==========================================================================
+!~!----- check for precrack in this element during 1st increment ------------
+!~!==========================================================================
+!~        !~if(nprc.gt.0) then
+!~        !~  call kcheckprecrack(fstat,pstat,jelem,parent,mcrd,coordsf, &
+!~        !~    & nnode,cncsub,mxnd)
+!~        !~end if
+!~        
+!~        
+!~    end subroutine precrack_xquad_element
 
 
 
@@ -188,43 +189,55 @@ module xquad_element_module
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
     
     
+        ! local variables
+        
+        real(kind=dp),allocatable       :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
+        
+        integer :: fstat, fstat0
+    
     
         ! initialize K & F
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
         K_matrix=zero; F_vector=zero
         
+        fstat=0; fstat0=0
         
         
-!==========================================================================
-!----- check for fnode status in this element -----------------------------
-!==========================================================================     
-        if(fstat.eq.five) then 
+        fstat=elem%curr_status
+        
+
+        !---------------------------------------------------------------------!
+        !               update sub element definitions
+        !---------------------------------------------------------------------!
+     
+        if(fstat==5) then 
             ! go straight to sub-element calculations
+            continue
+        else  
+            ! check elem edge status variables and update elem status and sub elem cnc
+            call edge_status_partition(elem%edgecnc,nodedge,elem%curr_status,elem%subcnc)         
+        end if 
+
+        !---------------------------------------------------------------------!
+        !       integrate and assemble sub element system arrays
+        !---------------------------------------------------------------------!
+        
+        if(allocated(elem%subelem)) then
+            do i=1, size(elem%subelem)
+                ! integrate sub elements
+                call integrate(elem%subelem(i),Ki,Fi)               
+                ! assemble into global matrix
+                call assemble(K_matrix,F_vector,Ki,Fi,elem%subcnc(:,i))
+            end do
         else
-            fstat0=fstat
-            call edgstatus(fstat,pstat,jelem,parent,mcrd,coordsf,&
-            & nnode,cncsub,mxnd,theta)
-        write(6,*) 'element',jelem,'fstat =',fstat,'pstat=',pstat
-            if(fstat.gt.fstat0) then
-                istep0=kstep !- failure step number
-                iinc0=kinc !- failure increment number                
-                !- update failure info in svars
-                svars(1)=fstat
-                svars(2)=pstat
-                svars(4)=istep0
-                svars(5)=iinc0
-                !- update sub-element connectivities to the global arrays
-                !kntr=0
-                do i=1,nsub
-                    do j=1,mxnd+1
-                    !kntr=kntr+1
-                    elmsub(j,i,jelem)=cncsub(j,i)
-                    end do
-                end do
-            end if                
-            
-            
-        end if    
+            write(msg_file,*) 'subelem not allocated in element',elem%key
+            call exit_function
+        end if
+
+
+        !---------------------------------------------------------------------!
+        !               deallocate local arrays 
+        !---------------------------------------------------------------------!
     
  
     end subroutine integrate_xquad_element

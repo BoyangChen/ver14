@@ -1,47 +1,49 @@
-    module sub2d_element_module
+    module sub3d_element_module
         use parameter_module
         use xnode_module
-        use tri_element_module
-        use quad_element_module
-        use coh2d_element_module
+        use wedge_element_module
+        use brick_element_module
+        use coh3d6_element_module
+        use coh3d8_element_module
     
         implicit none
         private
         
-        integer, parameter :: ndim=2
+        integer, parameter :: ndim=3
     
-        type,public :: sub2d_element
+        type,public :: sub3d_element
             private ! encapsulate components of this type
             
-            character(len=eltypelength)       :: eltype=''    ! can be all types of 2D elements
+            character(len=eltypelength)     :: eltype=''    ! can be all types of 2D elements
             integer                         :: matkey=0     ! material index in glb material array
             real(kind=dp)                   :: theta=zero   ! fibre orientation (lamina)
 
             integer,allocatable             :: glbcnc(:)    ! sub_elem connec to global node library
             integer,allocatable             :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
-            type(tri_element), allocatable  :: tri(:)       ! tri sub elements
-            type(quad_element),allocatable  :: quad(:)      ! quad sub elements
-            type(coh2d_element),allocatable :: coh2d(:)     ! 2D coh. sub elements
+            type(wedge_element), allocatable :: wedge(:)      ! wedge sub elements
+            type(brick_element),allocatable  :: brick(:)      ! brick sub elements
+            type(coh3d6_element),allocatable :: coh3d6(:)     ! 3D coh. sub elements
+            type(coh3d8_element),allocatable :: coh3d8(:)     ! 3D coh. sub elements
             
             real(kind=dp),allocatable       :: Tmatrix(:,:) ! interpolation matrix
             type(xnode),  allocatable       :: mnode(:)     ! interpolated (material domain) nodes
         end type
     
         interface empty
-            module procedure empty_sub2d_element
+            module procedure empty_sub3d_element
         end interface
       
         interface prepare
-            module procedure prepare_sub2d_element
+            module procedure prepare_sub3d_element
         end interface
         
         interface integrate
-            module procedure integrate_sub2d_element
+            module procedure integrate_sub3d_element
         end interface
         
         interface extract
-            module procedure extract_sub2d_element
+            module procedure extract_sub3d_element
         end interface
     
     
@@ -65,24 +67,25 @@
         
         
         
-        subroutine empty_sub2d_element(elem)
+        subroutine empty_sub3d_element(elem)
         
-            type(sub2d_element), intent(out) :: elem
+            type(sub3d_element), intent(out) :: elem
             
             elem%eltype=''    ! can be all types of 2D elements
             elem%matkey=0     ! material index in glb material array
             elem%theta=zero   ! fibre orientation (lamina)
             
-            if(allocated(elem%glbcnc))  deallocate(elem%glbcnc)
-            if(allocated(elem%subcnc))  deallocate(elem%subcnc)
-            if(allocated(elem%tri))     deallocate(elem%tri)
-            if(allocated(elem%quad))    deallocate(elem%quad)
-            if(allocated(elem%coh2d))   deallocate(elem%coh2d)
-            if(allocated(elem%Tmatrix)) deallocate(elem%Tmatrix)
-            if(allocated(elem%mnode))   deallocate(elem%mnode)
+            if(allocated(elem%glbcnc))      deallocate(elem%glbcnc)
+            if(allocated(elem%subcnc))      deallocate(elem%subcnc)
+            if(allocated(elem%wedge))       deallocate(elem%wedge)
+            if(allocated(elem%brick))       deallocate(elem%brick)
+            if(allocated(elem%coh3d6))      deallocate(elem%coh3d6)
+            if(allocated(elem%coh3d8))      deallocate(elem%coh3d8)
+            if(allocated(elem%Tmatrix))     deallocate(elem%Tmatrix)
+            if(allocated(elem%mnode))       deallocate(elem%mnode)
          
             
-        end subroutine empty_sub2d_element
+        end subroutine empty_sub3d_element
         
         
         
@@ -92,11 +95,11 @@
         
         
         
-        subroutine prepare_sub2d_element(elem,eltype,matkey,theta,glbcnc,subcnc,Tmatrix,mnode)
+        subroutine prepare_sub3d_element(elem,eltype,matkey,theta,glbcnc,subcnc,Tmatrix,mnode)
         
-            type(sub2d_element), intent(inout) :: elem
+            type(sub3d_element), intent(inout) :: elem
             
-            character(len=*),intent(in)    :: eltype       ! can be all types of 2D elements
+            character(len=*),intent(in)             :: eltype       ! can be all types of 2D elements
             integer,intent(in)                      :: matkey       ! material index in glb material array
             
             integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
@@ -139,7 +142,7 @@
             
             if(present(Tmatrix)) then
                 if(.not.present(mnode)) then
-                    write(msg_file,*)'mnode need to be passed in tgt with Tmatrix in preparing sub2d elem'
+                    write(msg_file,*)'mnode need to be passed in tgt with Tmatrix in preparing sub3d elem'
                     call exit_function
                 end if
             
@@ -163,7 +166,7 @@
             
             if(present(mnode)) then
                 if(.not.present(Tmatrix)) then
-                    write(msg_file,*)'Tmatrix need to be passed in tgt with mnode in preparing sub2d elem'
+                    write(msg_file,*)'Tmatrix need to be passed in tgt with mnode in preparing sub3d elem'
                     call exit_function
                 end if
             
@@ -178,7 +181,7 @@
                 elem%mnode=mnode          
             end if 
             
-        end subroutine prepare_sub2d_element
+        end subroutine prepare_sub3d_element
         
         
         
@@ -189,9 +192,9 @@
         
         
         
-        subroutine extract_sub2d_element(elem,eltype,matkey,theta,glbcnc,subcnc,tri,quad,coh2d,Tmatrix,mnode)
+        subroutine extract_sub3d_element(elem,eltype,matkey,theta,glbcnc,subcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
         
-            type(sub2d_element), intent(in) :: elem
+            type(sub3d_element), intent(in) :: elem
             
             character(len=eltypelength),  intent(out),optional    :: eltype       ! can be all types of 2D elements
             integer,                    intent(out),optional    :: matkey       ! material index in glb material array
@@ -200,9 +203,10 @@
             integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
             integer,        allocatable,intent(out),optional    :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
-            type(tri_element),  allocatable,intent(out),optional:: tri(:)       ! tri sub elements
-            type(quad_element), allocatable,intent(out),optional:: quad(:)      ! quad sub elements
-            type(coh2d_element),allocatable,intent(out),optional:: coh2d(:)     ! 2D coh. sub elements
+            type(wedge_element), allocatable,intent(out),optional:: wedge(:)       ! wedge sub elements
+            type(brick_element), allocatable,intent(out),optional:: brick(:)      ! brick sub elements
+            type(coh3d6_element),allocatable,intent(out),optional:: coh3d6(:)     ! 3D coh. sub elements
+            type(coh3d8_element),allocatable,intent(out),optional:: coh3d8(:)     ! 3D coh. sub elements
             
             
             real(kind=dp),  allocatable,intent(out),optional    :: Tmatrix(:,:) ! interpolation matrix
@@ -231,26 +235,34 @@
             end if
             
             
-            if(present(tri)) then
-                if(allocated(elem%tri))  then
-                    allocate(tri(size(elem%tri)))
-                    tri=elem%tri
+            if(present(wedge)) then
+                if(allocated(elem%wedge))  then
+                    allocate(wedge(size(elem%wedge)))
+                    wedge=elem%wedge
                 end if
             end if
             
             
-            if(present(quad)) then
-                if(allocated(elem%quad))  then
-                    allocate(quad(size(elem%quad)))
-                    quad=elem%quad
+            if(present(brick)) then
+                if(allocated(elem%brick))  then
+                    allocate(brick(size(elem%brick)))
+                    brick=elem%brick
                 end if
             end if
             
             
-            if(present(coh2d)) then
-                if(allocated(elem%coh2d))  then
-                    allocate(coh2d(size(elem%coh2d)))
-                    coh2d=elem%coh2d
+            if(present(coh3d6)) then
+                if(allocated(elem%coh3d6))  then
+                    allocate(coh3d6(size(elem%coh3d6)))
+                    coh3d6=elem%coh3d6
+                end if
+            end if
+            
+            
+            if(present(coh3d8)) then
+                if(allocated(elem%coh3d8))  then
+                    allocate(coh3d8(size(elem%coh3d8)))
+                    coh3d8=elem%coh3d8
                 end if
             end if
             
@@ -270,7 +282,7 @@
                 end if         
             end if 
             
-        end subroutine extract_sub2d_element
+        end subroutine extract_sub3d_element
         
         
         
@@ -283,9 +295,9 @@
         
         
         
-        subroutine integrate_sub2d_element(elem,Kmatrix,Fvector,cohgauss)
+        subroutine integrate_sub3d_element(elem,Kmatrix,Fvector,cohgauss)
         
-            type(sub2d_element), intent(inout) :: elem
+            type(sub3d_element), intent(inout) :: elem
             real(dp), allocatable, intent(out) :: Kmatrix(:,:),Fvector(:)
             logical,  optional,  intent(in)    :: cohgauss
             
@@ -300,46 +312,82 @@
             if(present(cohgauss)) gauss=cohgauss
             
             select case(elem%eltype)
-                case('tri')
-                    if(.not.allocated(elem%tri)) allocate(elem%tri(1))
-                    call empty(elem%tri(1))
-                    call prepare(elem%tri(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,theta=elem%theta)
-                    call integrate(elem%tri(1),Kmatrix,Fvector)
-                    
-                case('quad')
-                    if(.not.allocated(elem%quad)) allocate(elem%quad(1))
-                    call empty(elem%quad(1))
-                    call prepare(elem%quad(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,theta=elem%theta)
-                    call integrate(elem%quad(1),Kmatrix,Fvector)
-                    
-                case('coh2d')
-                    if(.not.allocated(elem%coh2d)) allocate(elem%coh2d(1))
-                    call empty(elem%coh2d(1))
-                    
-                    ! check if the coh domain is an interpolated domain
-                    if(allocated(elem%Tmatrix)) then
-                        ! connec array is not needed any more; zero it instead
-                        call prepare(elem%coh2d(1),key=0,connec=[0,0,0,0],matkey=elem%matkey)
-                        ! material nodes need to be passed into the integration subroutine
-                        if(allocated(elem%mnode)) then
-                            call integrate(elem%coh2d(1),Kmatrix,Fvector,gauss,elem%mnode)
-                        else
-                            write(msg_file,*)'interoplated material nodes must be allocated in sub2d element module!'
-                            call exit_function
-                        end if
-                    else
-                        call prepare(elem%coh2d(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
-                        call integrate(elem%coh2d(1),Kmatrix,Fvector,gauss)
+                case('wedge')
+                    ! first call, prepare element
+                    if(.not.allocated(elem%wedge)) then
+                        allocate(elem%wedge(1))
+                        call empty(elem%wedge(1))
+                        call prepare(elem%wedge(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,theta=elem%theta)
                     end if
                     
+                    call integrate(elem%wedge(1),Kmatrix,Fvector)
+                    
+                case('brick')
+                    if(.not.allocated(elem%brick)) then
+                        allocate(elem%brick(1))
+                        call empty(elem%brick(1))
+                        call prepare(elem%brick(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,theta=elem%theta)
+                    end if
+                    
+                    call integrate(elem%brick(1),Kmatrix,Fvector)
+                    
+                case('coh3d6')
+                    if(.not.allocated(elem%coh3d6)) then 
+                        allocate(elem%coh3d6(1))
+                        call empty(elem%coh3d6(1))
+                        ! check if the coh domain is an interpolated domain
+                        if(allocated(elem%Tmatrix)) then
+                            ! connec array is not needed any more; zero it instead
+                            call prepare(elem%coh3d6(1),key=0,connec=[0,0,0,0,0,0],matkey=elem%matkey)
+                            ! material nodes need to be passed into the integration subroutine
+                            if(.not.allocated(elem%mnode)) then
+                                write(msg_file,*)'interoplated material nodes must be allocated in sub3d element module!'
+                                call exit_function
+                            end if
+                        else
+                            call prepare(elem%coh3d6(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
+                        end if
+                    end if
+                    
+                    if(allocated(elem%Tmatrix)) then
+                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,gauss,elem%mnode)
+                    else
+                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,gauss)
+                    end if
+                    
+                case('coh3d8')
+                    if(.not.allocated(elem%coh3d8)) then 
+                        allocate(elem%coh3d8(1))
+                        call empty(elem%coh3d8(1))
+                        ! check if the coh domain is an interpolated domain
+                        if(allocated(elem%Tmatrix)) then
+                            ! connec array is not needed any more; zero it instead
+                            call prepare(elem%coh3d8(1),key=0,connec=[0,0,0,0,0,0,0,0],matkey=elem%matkey)
+                            ! material nodes need to be passed into the integration subroutine
+                            if(.not.allocated(elem%mnode)) then
+                                write(msg_file,*)'interoplated material nodes must be allocated in sub3d element module!'
+                                call exit_function
+                            end if
+                        else
+                            call prepare(elem%coh3d8(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
+                        end if
+                    end if
+                    
+                    if(allocated(elem%Tmatrix)) then
+                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,gauss,elem%mnode)
+                    else
+                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,gauss)
+                    end if
+                    
+                    
                 case default
-                    write(msg_file,*)'unsupported elem type in sub2d element module!'
+                    write(msg_file,*)'unsupported elem type in sub3d element module!'
                     call exit_function
             end select
         
-        end subroutine integrate_sub2d_element
+        end subroutine integrate_sub3d_element
         
         
         
     
-    end module sub2d_element_module
+    end module sub3d_element_module

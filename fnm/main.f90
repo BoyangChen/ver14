@@ -1,5 +1,7 @@
-    include 'globals/parameter_module.f90'
-    include 'globals/glb_clock_module.f90'
+    include 'globals/parameter_module.f90'          ! used in all modules
+    include 'globals/glb_clock_module.f90'          ! used in main and elem modules
+    include 'globals/integration_point_module.f90'  ! used in elem and output modules
+    include 'globals/toolkit_module.f90'            ! used in elem and precrack modules
     include 'libraries/lib_node_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
@@ -23,7 +25,7 @@
         end type
 
 
-        integer, parameter :: ndim=2 ! dimension of problem
+        integer, parameter :: ndim=3 ! dimension of problem
 
         ! K, F and connectivity of each element, extracted from glb lib
         real(kind=dp),allocatable :: Ki(:,:), Fi(:), strsi(:), strni(:)
@@ -39,7 +41,7 @@
         character(len=dirlength)  :: workdir, outdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8,nsub2d
+        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8,nsub2d,nsub3d
         integer :: kinc, ninc, nndset
         real(dp):: ux, uy, uz, vx, vy, vz
 
@@ -54,7 +56,7 @@
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
         nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0
-        ncoh2d=0; ncoh3d6=0; ncoh3d8=0; nsub2d=0
+        ncoh2d=0; ncoh3d6=0; ncoh3d8=0; nsub2d=0; nsub3d=0
         nndset=0; kinc=0; ninc=0
         ux=zero; uy=zero; uz=zero
         vx=zero; vy=zero; vz=zero
@@ -73,11 +75,11 @@
         nndset=2
         allocate(ndset(nndset))
 
-        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
-        ndset(2)=nodeset(setname='top',setnode=[3,4])
+!        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
+!        ndset(2)=nodeset(setname='top',setnode=[3,4])
 
-!        ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
-!        ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
+        ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
+        ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
 
 
         ! obtain the current working directory and specify output directory
@@ -86,8 +88,8 @@
 
 
         ! set loading rates and increments
-        vx=-0.01_dp/sqrt(two)
-        vy=0.01_dp/sqrt(two)
+        !vx=-0.01_dp/sqrt(two)
+        vy=-0.01_dp/sqrt(two)
         vz=0.01_dp/sqrt(two)
         ninc=10
 
@@ -174,6 +176,12 @@
                 end do
             end if
 
+            if(allocated(lib_sub3d)) then
+                nsub3d=size(lib_sub3d)
+                do i=1,nsub3d
+                    call integrate(lib_sub3d(i),Ki,Fi)
+                end do
+            end if
 
 
             !print*,outdir
