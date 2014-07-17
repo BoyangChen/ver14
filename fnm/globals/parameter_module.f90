@@ -29,11 +29,11 @@
             logical,        allocatable :: l(:)
         end type
         
-        type :: int_array
+        type :: int_alloc_array
             integer,    allocatable :: array(:)
         end type
         
-        type :: real_array
+        type :: real_alloc_array
             real(dp),   allocatable :: array(:)
         end type
       
