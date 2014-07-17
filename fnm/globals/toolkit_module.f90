@@ -491,6 +491,42 @@
       end if 
              
       end subroutine klinecross
+      
+      
+      
+      
+
+
+
+
+
+
+!********************************************************************************************
+!           subroutine to assemble elem/subelem K and F to system/xelem K and F
+!******************************************************************************************** 
+    subroutine assembleKF(Kmat,Fvec,Ki,Fi,cnc)
+    
+        real(dp),intent(inout) :: Kmat(:,:),Fvec(:)
+        real(dp),intent(in)    :: Ki(:,:), Fi(:)
+        integer, intent(in)    :: cnc(:)
+        
+        ! local variable
+        integer :: i, j, nsize
+        i=0; j=0; nsize=0
+        
+        nsize=size(cnc)
+        
+        do i=1, nsize
+            do j=1, nsize
+                Kmat(cnc(j),cnc(i))=Kmat(cnc(j),cnc(i))+Ki(j,i)
+            end do
+            Fvec(cnc(i))=Fvec(cnc(i))+Fi(i)
+        end do    
+    
+    end subroutine assembleKF
+
+
+
     
     
     end module toolkit_module
