@@ -19,7 +19,6 @@
             real(kind=dp)                   :: theta=zero   ! fibre orientation (lamina)
 
             integer,allocatable             :: glbcnc(:)    ! sub_elem connec to global node library
-            integer,allocatable             :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
             type(wedge_element), allocatable :: wedge(:)      ! wedge sub elements
             type(brick_element),allocatable  :: brick(:)      ! brick sub elements
@@ -76,7 +75,6 @@
             elem%theta=zero   ! fibre orientation (lamina)
             
             if(allocated(elem%glbcnc))      deallocate(elem%glbcnc)
-            if(allocated(elem%subcnc))      deallocate(elem%subcnc)
             if(allocated(elem%wedge))       deallocate(elem%wedge)
             if(allocated(elem%brick))       deallocate(elem%brick)
             if(allocated(elem%coh3d6))      deallocate(elem%coh3d6)
@@ -95,7 +93,7 @@
         
         
         
-        subroutine prepare_sub3d_element(elem,eltype,matkey,theta,glbcnc,subcnc,Tmatrix,mnode)
+        subroutine prepare_sub3d_element(elem,eltype,matkey,theta,glbcnc,Tmatrix,mnode)
         
             type(sub3d_element), intent(inout) :: elem
             
@@ -103,7 +101,6 @@
             integer,intent(in)                      :: matkey       ! material index in glb material array
             
             integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
-            integer,intent(in)                      :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
             real(kind=dp),intent(in),optional       :: theta        ! fibre orientation (lamina)
             real(kind=dp),intent(in),optional       :: Tmatrix(:,:) ! interpolation matrix
@@ -128,15 +125,6 @@
             end if
             elem%glbcnc=glbcnc
                 
-            if(allocated(elem%subcnc))  then
-                if(size(elem%subcnc)/=size(subcnc)) then
-                    deallocate(elem%subcnc)
-                    allocate(elem%subcnc(size(subcnc)))
-                end if
-            else
-                allocate(elem%subcnc(size(subcnc)))
-            end if
-            elem%subcnc=subcnc
 
             if(present(theta)) elem%theta=theta
             
@@ -192,7 +180,7 @@
         
         
         
-        subroutine extract_sub3d_element(elem,eltype,matkey,theta,glbcnc,subcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
+        subroutine extract_sub3d_element(elem,eltype,matkey,theta,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
         
             type(sub3d_element), intent(in) :: elem
             
@@ -201,8 +189,7 @@
             real(kind=dp),              intent(out),optional    :: theta        ! fibre orientation (lamina)
             
             integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
-            integer,        allocatable,intent(out),optional    :: subcnc(:)    ! sub_elem connec to parent elem nodes
-            
+                        
             type(wedge_element), allocatable,intent(out),optional:: wedge(:)       ! wedge sub elements
             type(brick_element), allocatable,intent(out),optional:: brick(:)      ! brick sub elements
             type(coh3d6_element),allocatable,intent(out),optional:: coh3d6(:)     ! 3D coh. sub elements
@@ -227,12 +214,6 @@
             end if    
                 
                 
-            if(present(subcnc)) then
-                if(allocated(elem%subcnc))  then
-                    allocate(subcnc(size(elem%subcnc)))
-                    subcnc=elem%subcnc
-                end if
-            end if
             
             
             if(present(wedge)) then

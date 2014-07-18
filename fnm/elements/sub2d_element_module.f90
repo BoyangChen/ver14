@@ -13,12 +13,11 @@
         type,public :: sub2d_element
             private ! encapsulate components of this type
             
-            character(len=eltypelength)       :: eltype=''    ! can be all types of 2D elements
+            character(len=eltypelength)     :: eltype=''    ! can be all types of 2D elements
             integer                         :: matkey=0     ! material index in glb material array
             real(kind=dp)                   :: theta=zero   ! fibre orientation (lamina)
 
             integer,allocatable             :: glbcnc(:)    ! sub_elem connec to global node library
-            integer,allocatable             :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
             type(tri_element), allocatable  :: tri(:)       ! tri sub elements
             type(quad_element),allocatable  :: quad(:)      ! quad sub elements
@@ -74,7 +73,6 @@
             elem%theta=zero   ! fibre orientation (lamina)
             
             if(allocated(elem%glbcnc))  deallocate(elem%glbcnc)
-            if(allocated(elem%subcnc))  deallocate(elem%subcnc)
             if(allocated(elem%tri))     deallocate(elem%tri)
             if(allocated(elem%quad))    deallocate(elem%quad)
             if(allocated(elem%coh2d))   deallocate(elem%coh2d)
@@ -92,7 +90,7 @@
         
         
         
-        subroutine prepare_sub2d_element(elem,eltype,matkey,theta,glbcnc,subcnc,Tmatrix,mnode)
+        subroutine prepare_sub2d_element(elem,eltype,matkey,theta,glbcnc,Tmatrix,mnode)
         
             type(sub2d_element), intent(inout) :: elem
             
@@ -100,7 +98,6 @@
             integer,intent(in)                      :: matkey       ! material index in glb material array
             
             integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
-            integer,intent(in)                      :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
             real(kind=dp),intent(in),optional       :: theta        ! fibre orientation (lamina)
             real(kind=dp),intent(in),optional       :: Tmatrix(:,:) ! interpolation matrix
@@ -125,16 +122,6 @@
             end if
             elem%glbcnc=glbcnc
                 
-            if(allocated(elem%subcnc))  then
-                if(size(elem%subcnc)/=size(subcnc)) then
-                    deallocate(elem%subcnc)
-                    allocate(elem%subcnc(size(subcnc)))
-                end if
-            else
-                allocate(elem%subcnc(size(subcnc)))
-            end if
-            elem%subcnc=subcnc
-
             if(present(theta)) elem%theta=theta
             
             if(present(Tmatrix)) then
@@ -189,7 +176,7 @@
         
         
         
-        subroutine extract_sub2d_element(elem,eltype,matkey,theta,glbcnc,subcnc,tri,quad,coh2d,Tmatrix,mnode)
+        subroutine extract_sub2d_element(elem,eltype,matkey,theta,glbcnc,tri,quad,coh2d,Tmatrix,mnode)
         
             type(sub2d_element), intent(in) :: elem
             
@@ -198,7 +185,6 @@
             real(kind=dp),              intent(out),optional    :: theta        ! fibre orientation (lamina)
             
             integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
-            integer,        allocatable,intent(out),optional    :: subcnc(:)    ! sub_elem connec to parent elem nodes
             
             type(tri_element),  allocatable,intent(out),optional:: tri(:)       ! tri sub elements
             type(quad_element), allocatable,intent(out),optional:: quad(:)      ! quad sub elements
@@ -221,14 +207,7 @@
                     glbcnc=elem%glbcnc
                 end if
             end if    
-                
-                
-            if(present(subcnc)) then
-                if(allocated(elem%subcnc))  then
-                    allocate(subcnc(size(elem%subcnc)))
-                    subcnc=elem%subcnc
-                end if
-            end if
+            
             
             
             if(present(tri)) then
