@@ -162,10 +162,10 @@ module xquad_element_module
     
     
         ! local variables
+        type(int_alloc_array), allocatable  :: subglbcnc(:)     ! glb cnc of sub element, used when elem is intact
+        real(kind=dp),allocatable           :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
         
-        real(kind=dp),allocatable       :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
-        
-        integer :: i,j,l
+        integer :: i,j,l, elstat
     
     
         ! initialize K & F
@@ -174,6 +174,7 @@ module xquad_element_module
         
         ! initialize local variables
         i=0; j=0; l=0
+        elstat=0
 
         
 
@@ -181,41 +182,84 @@ module xquad_element_module
         !               update sub element definitions
         !---------------------------------------------------------------------!
      
-        if(elem%curr_status==5) then 
-            ! xelement already cracked
-            ! go straight to sub-element calculations
-            continue
-        else  
-            ! check elem edge status variables and update elem status and sub elem cnc
-            call edge_status_partition(elem)
-            
-            if(elem%curr_status==0) then 
-            ! elem still intact, no broken edges
-                call failure_criterion_partition(elem)
+        ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
+        if(elem%curr_status<5) then   
+            call edge_status_partition(elem)   
+        end if
+        
+        !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
+
+
+        ! if elem is still intact after checking edge status (no broken edges), assign 1 quad subelem if not yet done
+        if(elem%curr_status==0) then 
+            if(.not.allocated(elem%subelem)) then 
+                allocate(elem%subelem(1))
+                allocate(elem%subcnc(1))
+                allocate(elem%subcnc(1)%array(4))   ! quad elem
+                ! sub elm 1 connec
+                elem%subcnc(1)%array=[1,2,3,4]
+                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+                ! create sub elements
+                call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
             end if
         end if 
+        
+        !******* reaching here, elem curr status can be any value from intact to failed, and in all cases, subelems have been created
+
+
+
 
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays
-        !---------------------------------------------------------------------!
+        !---------------------------------------------------------------------!        
         
-        if(allocated(elem%subelem)) then
+        ! if elem is not yet failed, integrate sub elem and check the failure criterion, and repartition if necessary
+        if(elem%curr_status<5) then
+            ! store current status value
+            elstat=elem%curr_status
+              
+            ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
-                ! integrate sub elements
-                call integrate(elem%subelem(i),Ki,Fi)               
-                ! assemble into global matrix
+                call integrate(elem%subelem(i),Ki,Fi)
                 call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
             end do
+ 
+            !***** check failure criterion *****
+            call failure_criterion_partition(elem)
+            
+            if(elem%curr_status/=elstat) then
+            ! elem status changed, elem failed, partition changed, reintegrate subelems
+                ! empty K and F for reuse
+                K_matrix=zero; F_vector=zero
+                ! integrate sub elements and assemble into global matrix
+                do i=1, size(elem%subelem)
+                    call integrate(elem%subelem(i),Ki,Fi)
+                    call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                end do          
+            end if
+               
+        else if(elem%curr_status==5) then
+        ! element is already failed, integrate and assemble subelem
+        
+            ! integrate sub elements and assemble into global matrix
+            do i=1, size(elem%subelem)
+                call integrate(elem%subelem(i),Ki,Fi) 
+                call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+            end do
+            
         else
-            write(msg_file,*) 'subelem not allocated in element',elem%key
+            write(msg_file,*)'unsupported elem curr status value in xquad!'
             call exit_function
         end if
-
-
+        
+         
+        
+        
         !---------------------------------------------------------------------!
         !               deallocate local arrays 
         !---------------------------------------------------------------------!
-        deallocate(Ki,Fi)
+        if(allocated(Ki)) deallocate(Ki)
+        if(allocated(Fi)) deallocate(Fi)
     
  
     end subroutine integrate_xquad_element
@@ -480,8 +524,8 @@ module xquad_element_module
 
 !       deallocate local dynamic arrays
 
-        deallocate(edgstat)
-        deallocate(ifedg)
+        if(allocated(edgstat))  deallocate(edgstat)
+        if(allocated(ifedg))    deallocate(ifedg)
     
     
     end subroutine edge_status_partition
@@ -496,139 +540,153 @@ module xquad_element_module
 !******************* subroutine kplyfail ****************************************************
 !*********** quadratic stress failure criteria and element partition criterion **************
 !********************************************************************************************
-      subroutine kplyfail(nst,nig,sig,yt,s,fstat,pstat,element,
-     & ndim,xelm,nnode,cncsub,mxnd,theta,jelm)
+    subroutine failure_criterion_parition(elem)
 
-!     ! passed in variables
-      real(kind=dp),intent(in) :: sig(nst,nig),yt,s,theta
-      integer,intent(in) :: jelm
-      character(len=10),intent(in) :: element
-      real(kind=dp),intent(inout) :: xelm(ndim,nnode),fstat,pstat
-      integer,intent(inout) :: nst,nig,ndim,nnode,mxnd,cncsub(mxnd+1,*)     
-      ! local variables
-      real(kind=dp) :: ff,xo,yo,xct,yct
-      real(kind=dp) :: xp1,xp2,yp1,yp2 ! precrack is (xp1,yp1) to (xp2,yp2)
-      real(kind=dp) :: x1,x2,y1,y2 ! elm edge is (x1,y1) to (x2,y2)
-      integer :: ig, cntr, i, j, k, iscross
-      integer :: kfedg, jfnd, jfnd2
-      integer,allocatable :: edg(:,:) ! edg(:,j): fl. nodes on edge j 
-      integer,allocatable :: edgstat(:) !edgstat: status of edge, 0: intact, 1: broken
-      integer,allocatable :: ifedg(:)
-!
-      ! initialize local variables
-      ff=zero     
-      xo=zero;yo=zero
-      xct=zero;yct=zero
-      xp1=zero;xp2=zero;yp1=zero;yp2=zero
-      x1=zero;x2=zero;y1=zero;y2=zero
-      ig=0;cntr=0;i=0;j=0;k=0;iscross=0
-      kfedg=0;jfnd=0;jfnd2=0
-	  
+    ! passed in variables
+    type(xquad_element) :: elem
+  
+    ! extracted variables, from glb libraries
+    integer :: edgstat(nedge)               ! status variable array of element edges
+    type(real_alloc_array) :: coord(nnode)  ! nodal coord arrays to store the coords of elem nodes extracted from glb node lib
+    
+    integer     :: edg(4,nedge)             ! local copy of parameter topo (legacy format, no time to change...)
+    real(dp)    :: xelm(ndim,nnode)         ! local copy of element nodal coords
+    
+    real(dp)    :: theta
+    
+    
+    
+    ! local variable
+    
+    integer :: nfailedge        ! no. of failed edges in the element
+    integer :: ifedg(nedge)     ! index of failed edges in the element
+    integer :: elstat           ! local copy of elem curr status
+    integer :: jbe1,jbe2, jnode ! indices of 2 broken edges, and a variable to hold a glb node index
+    integer :: iscross          ! indicator of line intersection; >0 if two lines intersect
+    integer :: i, j, l, k       ! counters
+    integer :: subelstat        ! sub elem status
+    logical :: failed           ! true if elem is failed (one of the sub elems reached failure onset)
+    
+      
+    real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
+    real(dp) :: x1, y1, x2, y2          ! (x,y) of node 1 and node 2 of an element edge
+    real(dp) :: xct, yct                ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
+    real(dp) :: xo, yo                  ! (x,y) of element centroid
+    
+    
+    ! --------------------------------------------------------------------!
+    !       *** workings of edgstat, nfailedge, ifedg ***
+    !
+    !       e.g.: element edge 1 and 3 are broken, then:
+    !
+    !           - nfailedge=2
+    !           - edgstat(1)>0; edgstat(2)=0; edgstat(3)>0; edgstat(4)=0
+    !           - ifedg(1)=1; ifedg(2)=3; ifedg(3:)=0
+    !
+    ! --------------------------------------------------------------------!
+    
+    
+        ! initialize local variables
         
-        allocate(edgstat(nedge),ifedg(nedge))
-        edgstat(:)=0 !initialize edgstat
-        ifedg(:)=0
-
-
-    ! failure criterion
+        edgstat=0; edg=0; xelm=zero; theta=zero
+          
+        nfailedge=0; ifedg=0; elstat=0
+        jbe1=0; jbe2=0; jnode=0
+        iscross=0
+        i=0; j=0; l=0; k=0
+        subelstat=0
         
-      if((yt .eq. zero) .or. (s .eq. zero)) then
-        write(6,*) 'zero strength value!'
-        ff=one
-      else
-        do ig=1,nig
-            if(nst .eq. 3) then ! bulk element
-            ff=(max(zero,sig(2,ig))/yt)**2+(sig(3,ig)/s)**2
-            else if(nst .eq. 2) then ! cohesive element
-            ff=(max(zero,sig(1,ig))/yt)**2+(sig(2,ig)/s)**2
-            else
-                write(6,*) 'unsupported no. of strains!'
-                call xit
-            end if	
+        failed=.false.
+           
+        xp1=zero; yp1=zero
+        xp2=zero; yp2=zero
+
+        x1=zero; y1=zero
+        x2=zero; y2=zero
+        
+        xct=zero; yct=zero
+        
+        xo=zero; yo=zero
+        
+        
+
+
+!-----------------------------------------------------------------------!
+!               EXTRACTION INTERFACE
+!           extract variables from global libraries
+!-----------------------------------------------------------------------!
+        ! extract edge status variables from glb edge library
+        edgstat(:)=lib_edge(elem%edgecnc(:))
+        
+        ! extract nodal coords from glb node library
+        do i=1, nnode
+            call extract(lib_node(elem%nodecnc(i)),x=coord(i)%array)
+            xelm(:,i)=coord(i)%array(:)
         end do
-      end if
+        
+        edg=topo
+
+        theta=elem%theta
 
 
+!-----------------------------------------------------------------------!
+!           check failure criterion on all sub elements
+!   elem is judged failed a.l.a. 1 sub elem has reached failure onset
+!-----------------------------------------------------------------------!
+        do i=1, size(elem%subelem)
+            call extract(elem%subelem(i),curr_status=subelstat)
+            if(subelstat>0) failed=.true.
+            if(failed) exit
+        end do
+        !~do i=1, size(elem%subelem)
+        !~    ! extract subelem integration point array accord. to subelem type
+        !~    call extract(elem%subelem(i),eltype=subtype)
+        !~    select case(subtype)
+        !~        case('tri')
+        !~            call extract(elem%subelem(i),tri=subtri)
+        !~            call extract(subtri(1),ig_point=subigpt)
+        !~        case('quad')
+        !~            call extract(elem%subelem(i),quad=subquad)
+        !~            call extract(subquad(1),ig_point=subigpt)
+        !~        case('coh2d')
+        !~            call extract(elem%subelem(i),coh2d=subcoh2d)
+        !~            call extract(subcoh2d(1),ig_point=subigpt)
+        !~        case default
+        !~            write(msg_file,*)'unsupported sub elem type in xquad'
+        !~            call exit_function
+        !~    end select
+        !~    ! check if any intg point has reached failure onset
+        !~    do j=1, size(subigpnt)
+        !~        call extract(subigpt(j),sdv=subsdv)
+        !~        ! sdv(1) is the backup storage of equil. version of sdv
+        !~        ! 1st integer sdv is the failure status in this code
+        !~        fstat=subsdv(2)%i(1) 
+        !~        if(fstat>0) then
+        !~            failed=.true.
+        !~            exit
+        !~        end if
+        !~        if(failed) exit
+        !~    end do
+        !~    if(failed) exit
+        !~end do
+
+
+        
             
-      if(ff .ge. one) then
+        if(failed) then
+        ! element failed, find newly broken edge and update edge status vars
         
           ! find xp1, yp1
-          if(fstat .eq. zero) then ! element originally intact
-            ! find centroid
-            xo=quarter*(xelm(1,1)+xelm(1,2)+xelm(1,3)+xelm(1,4))
-            yo=quarter*(xelm(2,1)+xelm(2,2)+xelm(2,3)+xelm(2,4))
-            xp1=xo
-            yp1=yo
-            ! find xp2, yp2
-            xp2=xp1+cos(theta/halfcirc*pi)
-            yp2=yp1+sin(theta/halfcirc*pi)
-            do i=1,nedge 
-                ! tip corods of edge i
-                x1=xelm(1,edg(1,i))
-                y1=xelm(2,edg(1,i))
-                x2=xelm(1,edg(2,i))
-                y2=xelm(2,edg(2,i))
-                iscross=0
-                xct=zero
-                yct=zero
-                call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,
-     &              iscross,xct,yct)
-                if (iscross.gt.0) then
-                    edgstat(i)=4 ! edge i cracked
-                    kfedg=kfedg+1
-                    xelm(1,edg(3,i))=xct ! store c tip coords on edge i fl. nd 1
-                    xelm(2,edg(3,i))=yct
-                    xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
-                    xelm(2,edg(4,i))=yct
-                    !jfnd=min(ndelm(edg(3,i),jelm),ndelm(edg(4,i),jelm))! find the smaller fnode on this edge
-                    jfnd=ndelm(edg(3,i),jelm)
-                    fnode(1,jfnd)=four ! update its status
-                    fnode(2,jfnd)=xct
-                    fnode(3,jfnd)=yct
-                    jfnd=ndelm(edg(4,i),jelm)
-                    fnode(1,jfnd)=four ! update its status
-                    fnode(2,jfnd)=xct
-                    fnode(3,jfnd)=yct
-                 endif
-                 if(kfedg.eq.2) exit ! found 2 broken edges already
-            end do
-          
-          else ! element already partitioned
-            !---------- find no. of broken edges -------------------------
-            do i=1,nedge
-                jfnd=min(ndelm(edg(3,i),jelm),ndelm(edg(4,i),jelm))! find the smaller fnode on this edge
-                if(fnode(1,jfnd).gt.zero) then
-                    !edgstat(i)=int(fnode(1,jfnd))
-                    kfedg=kfedg+1
-                    ifedg(kfedg)=i              
-                end if
-            end do
-            !-------------------------------------------------------------
-            ! find (xp1,yp1), (xp2,yp2)
-            if (fstat .eq. one) then ! transition elm, already has an edge partitioned
-                if(kfedg.ne.1) then 
-                 write(6,*)'inconsistency in kplyfail,fstat=1!'
-                 call xit
-                else !kfedg=1
-                 j=ifedg(1)
-                 jfnd=min(ndelm(edg(3,j),jelm),ndelm(edg(4,j),jelm))
-                 ! update edgstat(j) & fnode(jfnd)
-                 edgstat(j)=4 ! cohesive crack
-                 fnode(1,jfnd)=four
-                 ! find xp1, yp1
-                 xp1=fnode(2,jfnd)           
-                 yp1=fnode(3,jfnd)
-                 ! update fnode status of the other fnode on the edge
-                 jfnd2=max(ndelm(edg(3,j),jelm),ndelm(edg(4,j),jelm))
-                 do k=1,3
-                    fnode(k,jfnd2)=fnode(k,jfnd)
-                 end do                 
-                 ! find xp2, yp2
-                 xp2=xp1+cos(theta/halfcirc*pi)
-                 yp2=yp1+sin(theta/halfcirc*pi)
-                 ! next, find the edge crossed by the crack line
-                 do i=1,nedge
-                    if (i.eq.j) cycle ! the already cracked edge,go to next edge
+            if(elstat .eq. 0) then ! element originally intact
+                ! find centroid
+                xo=quarter*(xelm(1,1)+xelm(1,2)+xelm(1,3)+xelm(1,4))
+                yo=quarter*(xelm(2,1)+xelm(2,2)+xelm(2,3)+xelm(2,4))
+                xp1=xo
+                yp1=yo
+                ! find xp2, yp2
+                xp2=xp1+cos(theta/halfcirc*pi)
+                yp2=yp1+sin(theta/halfcirc*pi)
+                do i=1,nedge 
                     ! tip corods of edge i
                     x1=xelm(1,edg(1,i))
                     y1=xelm(2,edg(1,i))
@@ -637,77 +695,139 @@ module xquad_element_module
                     iscross=0
                     xct=zero
                     yct=zero
-                    call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,
-     &              iscross,xct,yct)
+                    call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
                     if (iscross.gt.0) then
-                        edgstat(i)=4 ! edge i cracked
-                        kfedg=kfedg+1
+                        edgstat(i)=4         ! edge i cracked
+                        nfailedge=nfailedge+1
+                        ifedg(nfailedge)=i   ! store failed edge indices
                         xelm(1,edg(3,i))=xct ! store c tip coords on edge i fl. nd 1
                         xelm(2,edg(3,i))=yct
                         xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
                         xelm(2,edg(4,i))=yct
-                        !jfnd=min(ndelm(edg(3,i),jelm),ndelm(edg(4,i),jelm))! find the smaller fnode on this edge
-                        jfnd=ndelm(edg(3,i),jelm)
-                        fnode(1,jfnd)=four ! update its status
-                        fnode(2,jfnd)=xct
-                        fnode(3,jfnd)=yct
-                        jfnd=ndelm(edg(4,i),jelm)
-                        fnode(1,jfnd)=four ! update its status
-                        fnode(2,jfnd)=xct
-                        fnode(3,jfnd)=yct
                      endif
-                     if(kfedg.eq.2) exit ! found 2 broken edges already
-                 end do
-                endif
-            elseif (fstat.gt.one .and. fstat.lt.five) then ! element already has two edges partitioned
-                if(kfedg.lt.2) then 
-                 write(6,*)'inconsistency in kplyfail,fstat>1!'
-                 call xit
+                     if(nfailedge.eq.2) exit ! found 2 broken edges already
+                end do
+              
+            else ! element already partitioned
+                !---------- find no. of broken edges -------------------------
+                do i=1,nedge
+                    if(edgstat(i)/=0) then
+                        nfailedge=nfailedge+1   ! update total no. of damaged edges
+                        ifedg(nfailedge)=i  ! update the indices of damaged edges
+                    end if
+                end do
+                !-------------------------------------------------------------
+                ! find (xp1,yp1), (xp2,yp2)
+                if (elstat .eq. 1) then ! transition elm, already has an edge partitioned
+                    if(nfailedge .ne. 1) then 
+                         write(msg_file,*)'inconsistency in kplyfail,elstat=1!'
+                         call exit_function
+                    end if
+                    j=ifedg(1)
+
+                    ! update edgstat(j) & fnode(jfnd)
+                    edgstat(j)=4 ! cohesive crack
+
+                    ! find xp1, yp1
+                    xp1=xelm(1,edg(3,j))           
+                    yp1=xelm(2,edg(3,j))
+                 
+                    ! find xp2, yp2
+                    xp2=xp1+cos(theta/halfcirc*pi)
+                    yp2=yp1+sin(theta/halfcirc*pi)
+                     
+                     ! next, find the edge crossed by the crack line
+                    do i=1,nedge
+                        if (i.eq.j) cycle ! the already cracked edge,go to next edge
+                        ! tip corods of edge i
+                        x1=xelm(1,edg(1,i))
+                        y1=xelm(2,edg(1,i))
+                        x2=xelm(1,edg(2,i))
+                        y2=xelm(2,edg(2,i))
+                        iscross=0
+                        xct=zero
+                        yct=zero
+                        call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
+                        if (iscross .gt. 0) then
+                            edgstat(i)=4         ! edge i cracked
+                            nfailedge=nfailedge+1
+                            ifedg(nfailedge)=i   ! 2nd broken edge index is i
+                            xelm(1,edg(3,i))=xct ! store c tip coords on edge i fl. nd 1
+                            xelm(2,edg(3,i))=yct
+                            xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
+                            xelm(2,edg(4,i))=yct
+                        end if
+                        if(nfailedge .eq. 2) exit ! found 2 broken edges already
+                    end do                    
+                else if (elstat.gt.1 .and. elstat.lt.5) then 
+                ! element already has two edges partitioned; just update edge status var to coh crack status
+                    if(nfailedge.lt.2) then 
+                         write(msg_file,*)'inconsistency in kplyfail,elstat>1!'
+                         call exit_function
+                    end if
+                    nfailedge=2 ! ignore more than 2 broken edges at the moment
+                    ! update first edge status var & fl. node status var
+                    j=ifedg(1)
+                    edgstat(j)=4 ! cohesive crack 
+                    ! update second edge status var & fl. node status var
+                    j=ifedg(2)
+                    edgstat(j)=4 ! cohesive crack            
                 else
-                 kfedg=2 ! ignore more than 2 broken edges at the moment
-                 ! update first edge status var & fl. node status var
-                 j=ifedg(1)
-                 jfnd=min(ndelm(edg(3,j),jelm),ndelm(edg(4,j),jelm))
-                 edgstat(j)=4 ! cohesive crack
-                 fnode(1,jfnd)=four
-                 ! update fnode status of the other fnode on the edge
-                 jfnd2=max(ndelm(edg(3,j),jelm),ndelm(edg(4,j),jelm))
-                 do k=1,3
-                    fnode(k,jfnd2)=fnode(k,jfnd)
-                 end do
-                 ! update second edge status var & fl. node status var
-                 j=ifedg(2)
-                 jfnd=min(ndelm(edg(3,j),jelm),ndelm(edg(4,j),jelm))
-                 edgstat(j)=4 ! cohesive crack
-                 fnode(1,jfnd)=four
-                 ! update fnode status of the other fnode on the edge
-                 jfnd2=max(ndelm(edg(3,j),jelm),ndelm(edg(4,j),jelm))
-                 do k=1,3
-                    fnode(k,jfnd2)=fnode(k,jfnd)
-                 end do
-                endif         
-            else
-                write(6,*) 'unsupported fstat value for failure!'
-                call xit          
-            endif
-          
-          end if
-          
-          ! update the fstat, pstat, cncsub
-          fstat=five
-          call subcnc(jelm,element,edg,nedge,edgstat,kfedg,
-     &    pstat,cncsub,mxnd)
+                    write(msg_file,*) 'unsupported elstat value for failure!'
+                    call exit_function          
+                end if
+              
+            end if
           
           
+          
+            ! update the elstat to failed status value
+            elstat=5
             
-      end if
-!
-      deallocate(edgstat)
-      deallocate(ifedg)
-      deallocate(edg)
+            
+        end if
+
+
+
+!       update element curr_status and sub-element cnc matrices
+
+        elem%curr_status=elstat                       
+        call update_subcnc(elem,edgstat,ifedg,nfailedge)
+
+
+
+
+!-----------------------------------------------------------------------!
+!                   UPDATE INTERFACE
+!               update global libraries
+!-----------------------------------------------------------------------!
+
+        ! update glb edge array, only the broken edges' status variables
+        lib_edge(elem%edgecnc(ifedg(:)))=edgstat(ifedg(:))
+        
+        ! update glb node array, only the broken edges' fl. node coord
+        do i=1, nfailedge
+            j=ifedg(i)          ! local index of broken edge
+            
+            l=edg(3,j)          ! elem lcl index of broken edge fl. node 1
+            coord(l)%array(:)=xelm(:,l)
+            k=elem%nodecnc(l)   ! global index of broken edge fl. node 1
+            call update(lib_node(k),x=coord(l)%array)
+            
+            l=edg(4,j)          ! elem lcl index of broken edge fl. node 2
+            coord(l)%array(:)=xelm(:,l)
+            k=elem%nodecnc(l)   ! global index of broken edge fl. node 2
+            call update(lib_node(k),x=coord(l)%array)
+        end do
+
+
+        ! deallocate local arrays
+        
+        if(allocated(edgstat)) deallocate(edgstat)
+        if(allocated(ifedg)) deallocate(ifedg)
         
       return  
-      end subroutine kplyfail
+      end subroutine failure_criterion_parition
 
 
 
@@ -730,6 +850,7 @@ module xquad_element_module
     integer :: e1,e2,e3,e4                              ! edge indices, used for partitioning element
     integer :: nsub, nbulk                              ! no. of sub elements, and no. of bulk partitions
     integer :: jnode, jnode1, jnode2, jnode3, jnode4    ! node index variables
+    logical :: iscoh
 
 
 
@@ -740,87 +861,91 @@ module xquad_element_module
         ibe=0; ibe1=0; ibe2=0
         nsub=0; nbulk=0
         jnode=0; jnode1=0; jnode2=0; jnode3=0; jnode4=0
+        iscoh=.false.
         
 
 
 10      select case (nfailedge)
-            case (0) !- no cracked edge, do nothing
-                continue
+        case (0) !- no cracked edge, do nothing
+            continue
             
             
-            case (1) !- one edge cracked, trans partition
-                ! find the index of the broken edge
-                ibe=ifedg(1)
+        case (1) !- one edge cracked, trans partition
+            ! find the index of the broken edge
+            ibe=ifedg(1)
 
-                ! verify its status variable value
-                if(edgstat(ibe)/=1) then
-                    write(msg_file,*)'transition partition only accepts edgstat=1!'
+            ! verify its status variable value
+            if(edgstat(ibe)/=1) then
+                write(msg_file,*)'transition partition only accepts edgstat=1!'
+                call exit_function
+            end if
+            
+            ! allocate sub element arrays; in this case, 3 tri elements
+            nsub=3
+            if(allocated(elem%subelem)) deallocate(elem%subelem)
+            if(allocated(elem%subcnc)) deallocate(elem%subcnc)
+            if(allocated(subglbcnc)) deallocate(subglbcnc)
+            allocate(elem%subelem(nsub))
+            allocate(elem%subcnc(nsub))
+            allocate(subglbcnc(nsub))
+            do j=1, nsub
+                allocate(elem%subcnc(j)%array(3))
+                allocate(subglbcnc(j)%array(3))
+                elem%subcnc(j)%array=0
+                subglbcnc(j)%array=0
+            end do             
+            
+            ! find the neighbouring edges of this broken edge, in counter-clockwise direction
+            select case(ibe)
+                case (1)
+                    e1=2;e2=3;e3=4
+                case (2)
+                    e1=3;e2=4;e3=1
+                case (3)
+                    e1=4;e2=1;e3=2
+                case (4)
+                    e1=1;e2=2;e3=3
+                case default
+                    write(msg_file,*)'wrong broken edge in tip partition, subcnc'
                     call exit_function
-                end if
-                
-                ! allocate sub element arrays; in this case, 3 tri elements
-                nsub=3
-                allocate(elem%subelem(nsub))
-                allocate(elem%subcnc(nsub))
-                allocate(subglbcnc(nsub))
-                do j=1, nsub
-                    allocate(elem%subcnc(j)%array(3))
-                    allocate(subglbcnc(j)%array(3))
-                    elem%subcnc(j)%array=0
-                    subglbcnc(j)%array=0
-                end do             
-                
-                ! find the neighbouring edges of this broken edge, in counter-clockwise direction
-                select case(ibe)
-                    case (1)
-                        e1=2;e2=3;e3=4
-                    case (2)
-                        e1=3;e2=4;e3=1
-                    case (3)
-                        e1=4;e2=1;e3=2
-                    case (4)
-                        e1=1;e2=2;e3=3
-                    case default
-                        write(msg_file,*)'wrong broken edge in tip partition, subcnc'
-                        call exit_function
-                end select
-                
-                ! find the smaller glb node on the broken edge
-                if(elem%nodecnc(topo(3,ibe))<elem%nodecnc(topo(4,ibe))) then
-                    jnode=topo(3,ibe)
-                else
-                    jnode=topo(4,ibe)
-                end if
-                
-                ! sub elm 1 connec
-                elem%subcnc(1)%array(1)=topo(1,e1)
-                elem%subcnc(1)%array(2)=topo(2,e1)
-                elem%subcnc(1)%array(3)=jnode
-                
-                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
-                
-                ! sub elm 2 connec
-                elem%subcnc(2)%array(1)=topo(1,e2)
-                elem%subcnc(2)%array(2)=topo(2,e2)
-                elem%subcnc(2)%array(3)=jnode  
+            end select
+            
+            ! find the smaller glb node on the broken edge
+            if(elem%nodecnc(topo(3,ibe))<elem%nodecnc(topo(4,ibe))) then
+                jnode=topo(3,ibe)
+            else
+                jnode=topo(4,ibe)
+            end if
+            
+            ! sub elm 1 connec
+            elem%subcnc(1)%array(1)=topo(1,e1)
+            elem%subcnc(1)%array(2)=topo(2,e1)
+            elem%subcnc(1)%array(3)=jnode
+            
+            subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+            
+            ! sub elm 2 connec
+            elem%subcnc(2)%array(1)=topo(1,e2)
+            elem%subcnc(2)%array(2)=topo(2,e2)
+            elem%subcnc(2)%array(3)=jnode  
 
-                subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
-                
-                ! sub elm 3 connec
-                elem%subcnc(3)%array(1)=topo(1,e3)
-                elem%subcnc(3)%array(2)=topo(2,e3)
-                elem%subcnc(3)%array(3)=jnode  
+            subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
+            
+            ! sub elm 3 connec
+            elem%subcnc(3)%array(1)=topo(1,e3)
+            elem%subcnc(3)%array(2)=topo(2,e3)
+            elem%subcnc(3)%array(3)=jnode  
 
-                subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
+            subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
 
-                ! create sub elements
-                call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-                call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
+            ! create sub elements
+            call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+            call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
+            call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
          
 
  
-         case (2) !- two edges cracked
+        case (2) !- two edges cracked
          
             ibe1=min(ifedg(1),ifedg(2))   ! local edge index of 1st broken edge
             ibe2=max(ifedg(1),ifedg(2))   ! local edge index of 2nd broken edge
@@ -870,6 +995,9 @@ module xquad_element_module
                     else
                         nsub=2  ! only two quad
                     end if
+                    if(allocated(elem%subelem)) deallocate(elem%subelem)
+                    if(allocated(elem%subcnc)) deallocate(elem%subcnc)
+                    if(allocated(subglbcnc)) deallocate(subglbcnc)
                     allocate(elem%subelem(nsub))
                     allocate(elem%subcnc(nsub))
                     allocate(subglbcnc(nsub))
@@ -935,6 +1063,9 @@ module xquad_element_module
                     else
                         nsub=4
                     end if
+                    if(allocated(elem%subelem)) deallocate(elem%subelem)
+                    if(allocated(elem%subcnc)) deallocate(elem%subcnc)
+                    if(allocated(subglbcnc)) deallocate(subglbcnc)
                     allocate(elem%subelem(nsub))
                     allocate(elem%subcnc(nsub))
                     allocate(subglbcnc(nsub))
@@ -1013,17 +1144,17 @@ module xquad_element_module
             end select
 
           
-         case(3) !- three edges crack
+        case(3) !- three edges crack
            write(msg_file,*) 'three-edge crack partition not yet supported!'
            nfailedge=2
            goto 10
            
-         case(4) !- four edges crack
+        case(4) !- four edges crack
            write(msg_file,*) 'four-edge crack partition not yet supported!'
            nfailedge=2
            goto 10
            
-         case default
+        case default
            write(msg_file,*) 'WARNING: xquad update subcnc case selection default!'
            
         end select
@@ -1031,7 +1162,7 @@ module xquad_element_module
         
         ! deallocate local array
         
-        deallocate(subglbcnc)
+        if(allocated(subglbcnc)) deallocate(subglbcnc)
 
 
     end subroutine update_subcnc

@@ -215,6 +215,249 @@
 
       return
       end subroutine ddsdde_lamina 
+
+
+
+      subroutine CohesiveLaw(sdv,Dee,sigma,strength,toughness,jump,dmax)
       
+        type(sdv_array),        intent(inout)   :: sdv
+        real(dp),               intent(inout)   :: Dee(:,:), sigma(:)
+        type(interface_strength), intent(in)    :: strength
+        type(interface_toughness),intent(in)    :: toughness
+        real(dp),                 intent(in)    :: jump(:), dmax
+      
+        ! local variables
+        real(dp) :: Dnn0, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
+        & Gn, Gt, Gl, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
+        integer  :: nst, fstat
+
+        ! initialize local variables
+        Dnn0=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
+        Glc=zero;  Gsc=zero;  eta=zero; findex=zero
+        Gn=zero;  Gt=zero; Gl=zero; Gs=zero; bk=zero
+        Gmc=zero; u_eff=zero; T_eff=zero; T0=zero; dm2=zero
+        nst=0; fstat=0
+        
+        ! extract Dnn0 and nst
+        Dnn0=dee(1,1)
+        nst=size(dee(:,1))
+        
+        ! extract current values of failure status variable
+        if(.not.allocated(sdv%i)) then
+            allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
+        end if
+        fstat=sdv%i(1)
+        
+        
+        ! --------------------------------------------------------- !
+        ! if already failed, calculate directly Dee and Sigma and exit
+        ! --------------------------------------------------------- !
+        if(fstat==failed) then    ! already failed
+            ! calculate penalty stiffness
+            dee=dee*(one-dmax)
+            if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
+            ! calculate stress
+            sigma=matmul(dee,jump)
+            ! exit program
+            return
+        end if
+        
+        
+        
+        ! --------------------------------------------------------- !
+        ! the following assumes linear cohesive law
+        ! other types of cohesive law can also be used in the future
+        ! just need to put in a selection criterion and algorithm
+        ! --------------------------------------------------------- ! 
+        ! e.g.: select case (toughness%CLtype)
+        !           case(0)
+        !               linear
+        !           case(1)
+        !               exponential
+        !           ...
+        
+        
+        ! extract damage parameters of last converged iteration
+        if(.not.allocated(sdv%r)) then ! 1st iteration
+            allocate(sdv%r(3))
+            sdv%r=zero
+        end if
+        dm=sdv%r(1)
+        u0=sdv%r(2)
+        uf=sdv%r(3)
+        
+        ! extract toughness parameters
+        Gnc=toughness%Gnc
+        Gtc=toughness%Gtc
+        Glc=toughness%Glc
+        eta=toughness%eta 
+     
+     
+        ! check and update fstat and damage variables
+        
+        ! still intact
+        if(fstat==intact) then
+            ! calculate stress based on jump
+            ! dee is defined based on intact stiffness
+            sigma=matmul(dee,jump)
+            
+            ! go through failure criterion and update fstat
+            call FailureCriterion(sigma,strength,fstat,findex)
+            
+            ! failure onset
+            if(fstat==onset) then
+            ! calculate u0, uf and go to next control
+            
+                ! normal and shear strain energy density
+                Gn=half*max(zero,sigma(1))*max(zero,jump(1))
+                if(nst==2)  then
+                    Gt=half*sigma(2)*jump(2)
+                    Gs=Gt
+                else        
+                    !Gs=half*(sigma(2)*jump(2)+sigma(3)*jump(3))
+                    Gt=half*sigma(2)*jump(2)
+                    Gl=half*sigma(3)*jump(3)
+                    Gs=Gt+Gl
+                end if
+                
+                ! BK ratio
+                bk=Gs/(Gn+Gs)
+                
+                
+                ! effective jump and traction
+                if(nst==2)  then
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
+                else        
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
+                end if
+                T_eff=two*(Gn+Gs)/u_eff
+                
+                ! effective jump and traction at failure onset, taking into acc. of overshoot
+                u0=u_eff/sqrt(findex)
+                T0=T_eff/sqrt(findex)
+                
+                ! mixed mode fracture toughness (BK formula)
+                !Gsc=sqrt(Gtc**2+Glc**2) ! a quadratic avg of the two shear toughness
+                if(Gs>tiny(one)) then
+                    Gsc=Gtc*(Gt/Gs)+Glc*(Gl/Gs)
+                else
+                    Gsc=half*Gtc+half*Glc
+                end if
+                Gmc=Gnc+(Gsc-Gnc)*(bk**eta)
+                
+                ! effective jump at final failure
+                uf=two*Gmc/T0
+                
+                
+            else if(fstat==failed) then
+            ! this is the case where strength is close to zero
+                dm=dmax
+                
+            else ! fstat==intact
+            ! fstat remains intact; dm, u0 and uf remain zero as initialized
+                continue
+            end if
+        end if
+        
+        ! failure started
+        if(fstat==onset) then
+        
+            ! calculate dm
+            if(uf <= u0 + tiny(one)) then ! brittle failure
+                dm=dmax
+            else
+                ! effective jump and traction
+                if(nst==2)  then
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
+                else        
+                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
+                end if
+                ! linear cohesive softening law 
+                if(u_eff > tiny(one)) then
+                    dm2=uf/u_eff*(u_eff-u0)/(uf-u0)
+                    dm=max(dm,dm2) ! must be larger than last equilibrium dm
+                end if
+            end if
+        
+            ! check dm and update fstat
+            if (dm>=dmax) then
+                dm=dmax
+                fstat=failed
+            end if
+        end if
+     
+
+        
+        ! update D matrix
+        dee=dee*(one-dm)
+        if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
+        
+        ! update stress
+        sigma=matmul(dee,jump)
+        
+        ! update sdv
+        sdv%i(1)=fstat
+        sdv%r(1)=dm
+        sdv%r(2)=u0
+        sdv%r(3)=uf
+        
+      end subroutine CohesiveLaw
+      
+      
+      subroutine FailureCriterion(sigma,strength,fstat,findex)
+      
+        real(dp),                   intent(in) :: sigma(:)
+        type(interface_strength),   intent(in) :: strength
+        integer,                   intent(out) :: fstat
+        real(dp), optional,        intent(out) :: findex
+      
+        ! local variables
+        integer     :: nst
+        real(dp)    :: tau_nc, tau_tc, tau_lc, findex2
+        
+        ! initialize variables
+        if(present(findex)) findex=zero                     ! intent (out)
+        tau_nc=zero; tau_tc=zero; tau_lc=zero; findex2=zero ! local
+        nst=0; fstat=0
+        
+        ! extract nst
+        nst=size(sigma)
+      
+        ! extract strength parameters
+
+        tau_nc=strength%tau_nc
+        tau_tc=strength%tau_tc
+        tau_lc=strength%tau_lc
+        
+        ! --------------------------------------------------------- !
+        ! the following assumes quadratic stress criterion
+        ! other criteria can also be used in the future
+        ! just need to put in a selection criterion and algorithm
+        ! --------------------------------------------------------- ! 
+        ! e.g.: select case (strength%FC)
+        !           case(0)
+        !               quad. stress
+        !           case(1)
+        !               max. stress
+        !           ...
+        
+        if(min(tau_nc,tau_tc,tau_lc) > tiny(one)) then
+            if(nst==3) then 
+            findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
+            else
+            findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
+            end if
+            
+            if(findex2>=one) fstat=onset
+        else
+            ! strength close to zero == already failed
+            fstat=failed
+        end if
+        
+        if(present(findex)) findex=findex2
+      
+      end subroutine FailureCriterion
+      
+       
       
     end module lamina_type_module
