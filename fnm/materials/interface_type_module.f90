@@ -191,7 +191,7 @@
             end if
             fstat=sdv%i(1)
             ! check and update fstat
-            if(fstat/=onset) then
+            if(fstat<onset) then
                 ! calculate stress based on jump
                 ! dee is defined based on intact stiffness
                 sigma=matmul(dee,jump)               
@@ -199,7 +199,7 @@
                 call FailureCriterion(sigma,this_mat%strength,fstat)
             end if          
             ! update D matrix accord. to fstat and crack open/close status
-            if(fstat==onset) dee=dee*(one-dmax)
+            if(fstat>=onset) dee=dee*(one-dmax)
             if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! update stress
             if(present(stress)) stress=matmul(dee,jump)

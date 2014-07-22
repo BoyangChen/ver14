@@ -3,6 +3,9 @@
     
     implicit none
     private
+    
+    ! parameters
+    integer, parameter :: mxfailed=10, mxonset=5, fbfailed=20, fbonset=15
 
     type,public :: lamina_modulus
         real(kind=dp) :: E1,E2,G12,G23,nu12,nu23 ! elastic moduli
@@ -144,9 +147,10 @@
 !************************ subroutine ddsdde ************************************************
 !***** returns the tangent stiffness matrix of the material ******************************
 !********************************************************************************************
-      subroutine ddsdde_lamina(this_mat,dee,strain,stress,PlaneStrain,sdv,dfail)
+      subroutine ddsdde_lamina(this_mat,clength,dee,strain,stress,PlaneStrain,sdv,dfail)
 
         type(lamina_type),                        intent(in)    :: this_mat
+        real(kind=dp)                             intent(in)    :: clength  ! characteristic element length
         real(kind=dp),                            intent(out)   :: dee(:,:)
         real(kind=dp),                  optional, intent(out)   :: stress(:)
         real(kind=dp),                  optional, intent(in)    :: strain(:)
@@ -160,10 +164,9 @@
         ! local variables
         real(kind=dp) :: E1,E2,E3,G12,G13,G23,nu12,nu13,nu23,nu21,nu31,nu32,del
         real(kind=dp) :: eps(size(dee(:,1)))  ! local replica of strain
-        real(kind=dp) :: sig(size(dee(:,1)))  ! local replica of stress
-        real(kind=dp) :: clength              ! characteristic element length
-        real(kind=dp) :: dmax                 ! max. damage for smeared crack model
-        integer       :: nst, fstat
+        real(kind=dp) :: sig(size(dee(:,1)))  ! local replica of stress 
+        real(kind=dp) :: df, dmax             ! fibre damage & max. damage for smeared crack model
+        integer       :: nst, fstat, ffstat, mfstat
         
         ! initialize intent(out) variables
         dee=zero; if(present(stress)) stress=zero
@@ -173,12 +176,9 @@
         nu12=zero; nu13=zero; nu23=zero
         nu21=zero; nu31=zero; nu32=zero; del=zero
         eps=zero; sig=zero
-        clength=zero
-        dmax=zero
-        nst=0; fstat=0
+        df=zero; dmax=zero
+        nst=0; fstat=0; ffstat=0; mfstat=0
         
-        ! find no. of strains
-        nst=size(dee(:,1))
         
         if(.not.this_mat%modulus_active) then
             write(msg_file,*) 'lamina material modulus undefined!'
@@ -193,43 +193,7 @@
         G12=this_mat%modulus%G12; G13=G12
         G23=this_mat%modulus%G23
         
-        nu21=E2/E1*nu12; nu31=nu21
-        nu32=E3/E2*nu23
-
-        del= one-nu12*nu21-nu13*nu31-nu23*nu32-two*nu21*nu32*nu13
-        
-        if (nst .eq. 3) then ! 2D problem
-          if (present(PlaneStrain).and.PlaneStrain) then
-            dee(1,1)= E1*(one-nu23*nu32)/del
-            dee(1,2)= E1*(nu21+nu23*nu31)/del
-            dee(2,2)= E2*(one-nu13*nu31)/del
-            dee(2,1)= dee(1,2)
-            dee(3,3)= G12
-          else
-            dee(1,1)= E1/(one-nu12*nu21)
-            dee(1,2)= E1*nu21/(one-nu12*nu21)
-            dee(2,2)= E2/(one-nu12*nu21)
-            dee(2,1)= dee(1,2)
-            dee(3,3)= G12
-          end if
-        else if (nst .eq. 6) then ! 3D problem
-          del = del/E1/E2/E3
-          dee(1,1)= (one-nu23*nu32)/E2/E3/del
-          dee(1,2)= (nu21+nu23*nu31)/E2/E3/del
-          dee(1,3)= (nu31+nu21*nu32)/E2/E3/del
-          dee(2,1)= dee(1,2)
-          dee(2,2)= (one-nu13*nu31)/E1/E3/del
-          dee(2,3)= (nu32+nu12*nu31)/E1/E3/del
-          dee(3,1)= dee(1,3)
-          dee(3,2)= dee(2,3)
-          dee(3,3)= (one-nu12*nu21)/E1/E2/del
-          dee(4,4)= g12
-          dee(5,5)= g13
-          dee(6,6)= g23
-        else
-            write(msg_file,*) 'no. of strains not supported for kdeemat!'
-            call exit_function
-        end if
+        call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee)
 
         
         ! if jump or sdv are not passed in, only linear elasticity can be done
@@ -272,28 +236,36 @@
         ffstat=sdv%i(2) ! fibre failure status
         mfstat=sdv%i(3) ! matrix failure status
         
+        
         ! matrix toughness parameters are not active, do only strength failure criterion
         if(.not.this_mat%fibretoughness_active) then
             write(msg_file,*)'fibre failure must include fibre toughness to ensure robust prediction!'
             call exit_function
         else
-            call FibreCohesiveLaw()
+            sig=matmul(dee,strain)
+            call FibreCohesiveLaw(ffstat,sdv%r,sig,this_mat%strength, &
+        &   this_mat%fibretoughness,strain,clength,dmax)
             ! update sdv
             sdv%i(2)=ffstat
+            ! update ddsdde
+            df=sdv%r(1)
+            subroutine deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            ! update stress
+            sig=matmul(dee,strain)
         end if
 
         ! matrix toughness parameters are not active, do only strength failure criterion
         if(.not.this_mat%matrixtoughness_active) then
+            ! calculate stress based on jump
+            ! dee is defined based on intact stiffness
+            sig=matmul(dee,strain)
             ! check and update fstat
-            if(mfstat/=onset) then
-                ! calculate stress based on jump
-                ! dee is defined based on intact stiffness
-                sig=matmul(dee,strain)               
+            if(mfstat<mxonset) then               
                 ! go through failure criterion and update fstat
                 call MatrixFailureCriterion(sig,this_mat%strength,mfstat)
             end if
             ! update sdv
-            sdv%i(3)=mfstat
+            if(mfstat>=mxonset) sdv%i(3)=mfstat
         else
             ! call MatrixCohesiveLaw()
             write(msg_file,*)'matrix failure smeared crack model not supported! use FNM cohesive subelem instead'
@@ -314,48 +286,115 @@
 
 
 
-
-
-      subroutine CohesiveLaw(sdv,Dee,sigma,strength,toughness,jump,dmax)
+      subroutine deemat(E01,E02,E03,nu012,nu013,nu023,G012,G013,G023,dee,df,dm2,dm3)
       
-        type(sdv_array),        intent(inout)   :: sdv
-        real(dp),               intent(inout)   :: Dee(:,:), sigma(:)
-        type(interface_strength), intent(in)    :: strength
-        type(interface_toughness),intent(in)    :: toughness
-        real(dp),                 intent(in)    :: jump(:), dmax
+      real(dp), intent(in) :: E01,E02,E03,nu012,nu013,nu023,G012,G013,G023
+      real(dp), intent(out) :: dee(:,:)
+      real(dp), optional, intent(in) :: df, dm2, dm3
       
-        ! local variables
-        real(dp) :: Dnn0, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
-        & Gn, Gt, Gl, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
-        integer  :: nst, fstat
-
-        ! initialize local variables
-        Dnn0=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
-        Glc=zero;  Gsc=zero;  eta=zero; findex=zero
-        Gn=zero;  Gt=zero; Gl=zero; Gs=zero; bk=zero
-        Gmc=zero; u_eff=zero; T_eff=zero; T0=zero; dm2=zero
-        nst=0; fstat=0
+      !local var.
+      real(dp) :: E1,E2,E3,nu12,nu13,nu23,G12,G13,G23
+      real(dp) :: nu21, nu31, nu32, del, dm
+      integer  :: nst
+      
+      dee=zero
+      E1=zero; E2=zero; E3=zero
+      G12=zero; G13=zero; G23=zero
+      nu12=zero; nu13=zero; nu23=zero
+      nu21=zero; nu31=zero; nu32=zero
+      del=zero; dm=zero; nst=0
         
-        ! extract Dnn0 and nst
-        Dnn0=dee(1,1)
+        E1=E01; E2=E02; E3=E03
+        G12=G012; G13=G013; G23=G023
+        nu12=nu012; nu13=nu013; nu23=nu023
+        nu21=E2/E1*nu12; nu31=nu21; nu32=E3/E2*nu23
+        
+        
+        if(present(df)) then
+            E1=E1*(one-df)
+            nu12=nu12*(one-df)
+            nu13=nu13*(one-df)
+        end if
+        
+        if(present(dm2)) then
+            E2=E2*(one-dm2)
+            nu21=nu21*(one-dm2)
+            nu23=nu23*(one-dm2)
+            G12=G12*(one-dm2)
+            dm=max(dm,dm2)
+        end if
+        
+        if(present(dm3)) then
+            E3=E3*(one-dm3)
+            nu31=nu31*(one-dm3)
+            nu32=nu32*(one-dm3)
+            G13=G13*(one-dm2)
+            dm=max(dm,dm3)
+        end if
+            
+        G23=G23*(one-dm)
+        
+        
+        del= one-nu12*nu21-nu13*nu31-nu23*nu32-two*nu21*nu32*nu13
+        
+        ! find no. of strains
         nst=size(dee(:,1))
         
-        ! extract current values of failure status variable
-        if(.not.allocated(sdv%i)) then
-            allocate(sdv%i(1)); sdv%i=0 ! 1st iteration
+        if (nst .eq. 3) then ! 2D problem
+          if (present(PlaneStrain).and.PlaneStrain) then
+            dee(1,1)= E1*(one-nu23*nu32)/del
+            dee(1,2)= E1*(nu21+nu23*nu31)/del
+            dee(2,2)= E2*(one-nu13*nu31)/del
+            dee(2,1)= dee(1,2)
+            dee(3,3)= G12
+          else
+            dee(1,1)= E1/(one-nu12*nu21)
+            dee(1,2)= E1*nu21/(one-nu12*nu21)
+            dee(2,2)= E2/(one-nu12*nu21)
+            dee(2,1)= dee(1,2)
+            dee(3,3)= G12
+          end if
+        else if (nst .eq. 6) then ! 3D problem
+          del = del/E1/E2/E3
+          dee(1,1)= (one-nu23*nu32)/E2/E3/del
+          dee(1,2)= (nu21+nu23*nu31)/E2/E3/del
+          dee(1,3)= (nu31+nu21*nu32)/E2/E3/del
+          dee(2,1)= dee(1,2)
+          dee(2,2)= (one-nu13*nu31)/E1/E3/del
+          dee(2,3)= (nu32+nu12*nu31)/E1/E3/del
+          dee(3,1)= dee(1,3)
+          dee(3,2)= dee(2,3)
+          dee(3,3)= (one-nu12*nu21)/E1/E2/del
+          dee(4,4)= g12
+          dee(5,5)= g13
+          dee(6,6)= g23
+        else
+            write(msg_file,*) 'no. of strains not supported for kdeemat!'
+            call exit_function
         end if
-        fstat=sdv%i(1)
+    end subroutine deemat
+
+
+
+
+      subroutine FibreCohesiveLaw(fstat,sdvr,sigma,strength,fibretoughness,strain,clength,dmax)
+      
+        integer,                intent(inout)   :: fstat
+        real(dp), allocatable,  intent(inout)   :: sdvr(:)
+        real(dp),                 intent(in)    :: sigma(:),strain(:), clength, dmax 
+        type(interface_strength), intent(in)    :: strength
+        type(interface_fibretoughness),intent(in) :: fibretoughness
+        
+      
+        ! local variables
+        real(dp) :: GfcT, GfcC, dm, u0, uf, findex, dm2
+        integer  :: nst
         
         
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
         ! --------------------------------------------------------- !
-        if(fstat==failed) then    ! already failed
-            ! calculate penalty stiffness
-            dee=dee*(one-dmax)
-            if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
-            ! calculate stress
-            sigma=matmul(dee,jump)
+        if(fstat==fbfailed) then    ! already failed
             ! exit program
             return
         end if
@@ -374,80 +413,55 @@
         !               exponential
         !           ...
         
+        ! initialize local variables
+        GfcT=zero; GfcC=zero
+        dm=zero; u0=zero; uf=zero; findex=zero; dm2=zero
+        nst=0
         
-        ! extract damage parameters of last converged iteration
-        if(.not.allocated(sdv%r)) then ! 1st iteration
-            allocate(sdv%r(3))
-            sdv%r=zero
-        end if
-        dm=sdv%r(1)
-        u0=sdv%r(2)
-        uf=sdv%r(3)
         
         ! extract toughness parameters
-        Gnc=toughness%Gnc
-        Gtc=toughness%Gtc
-        Glc=toughness%Glc
-        eta=toughness%eta 
+        GfcT=fibretoughness%GfcT
+        GfcC=fibretoughness%GfcC
+
+        ! extract current values of failure status variable
+        if(.not.allocated(sdvr)) then
+            allocate(sdvr(3)); sdvr=zero  ! 1st iteration
+        end if
+        dm=sdvr(1)
+        u0=sdvr(2)
+        uf=sdvr(3) 
+        
+        ! extract nst
+        nst=size(dee(:,1))
      
      
         ! check and update fstat and damage variables
         
         ! still intact
         if(fstat==intact) then
-            ! calculate stress based on jump
-            ! dee is defined based on intact stiffness
-            sigma=matmul(dee,jump)
             
             ! go through failure criterion and update fstat
-            call FailureCriterion(sigma,strength,fstat,findex)
+            call FibreFailureCriterion(sigma,strength,fstat,findex)
             
             ! failure onset
-            if(fstat==onset) then
+            if(fstat==fbonset) then
             ! calculate u0, uf and go to next control
-            
-                ! normal and shear strain energy density
-                Gn=half*max(zero,sigma(1))*max(zero,jump(1))
-                if(nst==2)  then
-                    Gt=half*sigma(2)*jump(2)
-                    Gs=Gt
-                else        
-                    !Gs=half*(sigma(2)*jump(2)+sigma(3)*jump(3))
-                    Gt=half*sigma(2)*jump(2)
-                    Gl=half*sigma(3)*jump(3)
-                    Gs=Gt+Gl
-                end if
                 
-                ! BK ratio
-                bk=Gs/(Gn+Gs)
-                
-                
-                ! effective jump and traction
-                if(nst==2)  then
-                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
-                else        
-                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
-                end if
-                T_eff=two*(Gn+Gs)/u_eff
+                u_eff=abs(strain(1))*clength
+                T_eff=abs(sigma(1))
                 
                 ! effective jump and traction at failure onset, taking into acc. of overshoot
                 u0=u_eff/sqrt(findex)
                 T0=T_eff/sqrt(findex)
                 
-                ! mixed mode fracture toughness (BK formula)
-                !Gsc=sqrt(Gtc**2+Glc**2) ! a quadratic avg of the two shear toughness
-                if(Gs>tiny(one)) then
-                    Gsc=Gtc*(Gt/Gs)+Glc*(Gl/Gs)
-                else
-                    Gsc=half*Gtc+half*Glc
-                end if
-                Gmc=Gnc+(Gsc-Gnc)*(bk**eta)
-                
                 ! effective jump at final failure
-                uf=two*Gmc/T0
+                if(strain(1)>zero) then
+                    uf=two*GfcT/T0
+                else
+                    uf=two*GfcC/T0
+                end if
                 
-                
-            else if(fstat==failed) then
+            else if(fstat==fbfailed) then
             ! this is the case where strength is close to zero
                 dm=dmax
                 
@@ -458,18 +472,14 @@
         end if
         
         ! failure started
-        if(fstat==onset) then
+        if(fstat==fbonset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
                 dm=dmax
             else
                 ! effective jump and traction
-                if(nst==2)  then
-                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2)
-                else        
-                    u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
-                end if
+                u_eff=abs(strain(1))*clength
                 ! linear cohesive softening law 
                 if(u_eff > tiny(one)) then
                     dm2=uf/u_eff*(u_eff-u0)/(uf-u0)
@@ -480,52 +490,109 @@
             ! check dm and update fstat
             if (dm>=dmax) then
                 dm=dmax
-                fstat=failed
+                fstat=fbfailed
             end if
         end if
      
-
         
-        ! update D matrix
-        dee=dee*(one-dm)
-        if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
-        
-        ! update stress
-        sigma=matmul(dee,jump)
         
         ! update sdv
-        sdv%i(1)=fstat
         sdv%r(1)=dm
         sdv%r(2)=u0
         sdv%r(3)=uf
         
-      end subroutine CohesiveLaw
-      
-      
-      subroutine FailureCriterion(sigma,strength,fstat,findex)
+      end subroutine FibreCohesiveLaw
+
+
+
+
+
+      subroutine FibreFailureCriterion(sigma,strength,fstat,findex)
+      ! at the moment, only tensile failure is considered
       
         real(dp),                   intent(in) :: sigma(:)
-        type(interface_strength),   intent(in) :: strength
+        type(lamina_strength),      intent(in) :: strength
         integer,                   intent(out) :: fstat
         real(dp), optional,        intent(out) :: findex
       
+        
+      
         ! local variables
-        integer     :: nst
-        real(dp)    :: tau_nc, tau_tc, tau_lc, findex2
+        real(dp)    :: Xt, Xc ! tensile, compressive strengths
+        real(dp)    :: findex2
+
         
         ! initialize variables
         if(present(findex)) findex=zero                     ! intent (out)
-        tau_nc=zero; tau_tc=zero; tau_lc=zero; findex2=zero ! local
+        Xt=zero; Xc=zero; findex2=zero
+        fstat=0
+        
+      
+        ! extract strength parameters
+        Xt=strength%Xt
+        Xc=strength%Xc
+        
+        
+        ! --------------------------------------------------------- !
+        ! the following assumes max stress criterion
+        ! other criteria can also be used in the future
+        ! just need to put in a selection criterion and algorithm
+        ! --------------------------------------------------------- ! 
+        ! e.g.: select case (strength%FC)
+        !           case(0)
+        !               quad. stress
+        !           case(1)
+        !               max. stress
+        !           ...
+        
+        if(min(Xt,Xc) > tiny(one)) then
+            ! failure index for tensile failure; matrix crack perpendicular to shell plane, no z-dir stress components
+            findex2=max(sigma(1),zero)/Xt + abs(min(sigma(1),zero)/Xc)
+            
+            if(findex2>=one) fstat=fbonset
+        else
+            ! strength close to zero == already failed
+            fstat=fbfailed
+        end if
+        
+        if(present(findex)) findex=findex2
+      
+      end subroutine FibreFailureCriterion
+      
+    
+
+  
+      
+      subroutine MatrixFailureCriterion(sigma,strength,fstat,findex)
+      ! at the moment, only tensile failure is considered
+      
+        real(dp),                   intent(in) :: sigma(:)
+        type(lamina_strength),      intent(in) :: strength
+        integer,                   intent(out) :: fstat
+        real(dp), optional,        intent(out) :: findex
+      
+        
+      
+        ! local variables
+        integer     :: nst
+        real(dp)    :: Yt,Yc,Sl,St ! tensile, compressive, and shear strengths
+        real(dp)    :: findex2
+
+        
+        ! initialize variables
+        if(present(findex)) findex=zero                     ! intent (out)
+        Yt=zero; Yc=zero; Sl=zero; St=zero; findex2=zero
         nst=0; fstat=0
         
         ! extract nst
         nst=size(sigma)
       
         ! extract strength parameters
-
-        tau_nc=strength%tau_nc
-        tau_tc=strength%tau_tc
-        tau_lc=strength%tau_lc
+        Yt=strength%Yt
+        Yc=strength%Yc
+        Sl=strength%Sl
+        St=strength%St
+        
         
         ! --------------------------------------------------------- !
         ! the following assumes quadratic stress criterion
@@ -539,22 +606,23 @@
         !               max. stress
         !           ...
         
-        if(min(tau_nc,tau_tc,tau_lc) > tiny(one)) then
+        if(min(Yt,St,Sl) > tiny(one)) then
+            ! failure index for tensile failure; matrix crack perpendicular to shell plane, no z-dir stress components
             if(nst==3) then 
-            findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2 + (sigma(3)/tau_lc)**2)
+            findex2=sqrt((max(sigma(2),zero)/Yt)**2 + (sigma(3)/Sl)**2)
             else
-            findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
+            findex2=sqrt((max(sigma(2),zero)/Yt)**2 + (sigma(4)/Sl)**2)
             end if
             
-            if(findex2>=one) fstat=onset
+            if(findex2>=one) fstat=mxonset
         else
             ! strength close to zero == already failed
-            fstat=failed
+            fstat=mxonset
         end if
         
         if(present(findex)) findex=findex2
       
-      end subroutine FailureCriterion
+      end subroutine MatrixFailureCriterion
       
        
       
