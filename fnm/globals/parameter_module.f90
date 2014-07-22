@@ -12,6 +12,15 @@
         integer, parameter :: setnamelength=20 ! character length of a set name
         integer, parameter :: dirlength=256 ! character length of a directory name
         
+        ! generic parameter for intact state (elem, edge, material, etc.)
+        integer, parameter :: intact=0
+        
+        ! element status variable values
+        integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfail=5
+        
+        ! edge status variable values
+        integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
+        
         
         real(kind=dp), parameter :: zero=0._dp,one=1._dp,two=2._dp, &
       three=3._dp,four=4._dp,five=5._dp,six=6._dp,seven=7._dp,      &

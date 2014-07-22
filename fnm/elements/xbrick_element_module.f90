@@ -1,4 +1,4 @@
-module xquad_element_module
+module xbrick_element_module
     use parameter_module
     use toolkit_module                  ! global tools for element integration
     use lib_edge_module                 ! global edge library
@@ -10,11 +10,12 @@ module xquad_element_module
     implicit none
     private
 
-    integer,parameter :: ndim=2, nndrl=4, nedge=4, nndfl=2*nedge, nnode=nndrl+nndfl, ndof=ndim*nnode
+    integer,parameter :: ndim=3, nndrl=8, nedge=8, nndfl=2*nedge, nnode=nndrl+nndfl, ndof=ndim*nnode
     ! Topology: nodes on each edge; 4 nodes per edge, 1-2 are end nodes, 3-4 are fl. nodes; assigned in lcl node numbers
-    integer,parameter :: topo(4,nedge)=reshape([1,2,5,6,2,3,7,8,3,4,9,10,4,1,11,12],[4,nedge]) 
+    integer,parameter :: topo(4,nedge)=reshape([1,2,9,10,2,3,11,12,3,4,13,14,4,1,15,16, &
+                                              & 5,6,17,18,6,7,19,20,7,8,21,22,8,5,23,24],[4,nedge])
 
-    type, public :: xquad_element             ! breakable quadrilateral
+    type, public :: xbrick_element             ! breakable brickrilateral
         private
         
         integer :: curr_status=0        ! 0 means intact
@@ -29,26 +30,26 @@ module xquad_element_module
         type(sub2d_element), allocatable :: subelem(:)
         type(int_alloc_array), allocatable :: subcnc(:)      ! sub_elem connec to parent elem nodes
         
-    end type xquad_element
+    end type xbrick_element
   
     interface empty
-        module procedure empty_xquad_element
+        module procedure empty_xbrick_element
     end interface
   
     interface prepare
-        module procedure prepare_xquad_element
+        module procedure prepare_xbrick_element
     end interface
     
     !~interface precrack
-    !~    module procedure precrack_xquad_element
+    !~    module procedure precrack_xbrick_element
     !~end interface
     
     interface integrate
-        module procedure integrate_xquad_element
+        module procedure integrate_xbrick_element
     end interface
     
     interface extract
-        module procedure extract_xquad_element
+        module procedure extract_xbrick_element
     end interface
 
 
@@ -64,9 +65,9 @@ module xquad_element_module
 
 
     ! empty a breakable quadrilateral
-    subroutine empty_xquad_element(elem)
+    subroutine empty_xbrick_element(elem)
   
-        type(xquad_element),intent(out) :: elem
+        type(xbrick_element),intent(out) :: elem
         
         elem%curr_status=0
         elem%key=0 
@@ -80,15 +81,15 @@ module xquad_element_module
         if(allocated(elem%subelem)) deallocate(elem%subelem)
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
 
-    end subroutine empty_xquad_element
+    end subroutine empty_xbrick_element
   
   
   
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xquad_element(elem,key,bulkmat,cohmat,theta,nodecnc,edgecnc)
+    subroutine prepare_xbrick_element(elem,key,bulkmat,cohmat,theta,nodecnc,edgecnc)
     
-        type(xquad_element),    intent(inout)   :: elem
+        type(xbrick_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: matkey
         real(dp),               intent(in)      :: theta
@@ -102,12 +103,12 @@ module xquad_element_module
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
     
-    end subroutine prepare_xquad_element
+    end subroutine prepare_xbrick_element
     
     
-    subroutine extract_xquad_element(elem,curr_status,key,bulkmat,cohmat,theta,nodecnc,edgecnc,subelem,subcnc)
+    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,theta,nodecnc,edgecnc,subelem,subcnc)
     
-        type(xquad_element),                      intent(in)  :: elem
+        type(xbrick_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: bulkmat
@@ -148,16 +149,16 @@ module xquad_element_module
             end if
         end if
     
-    end subroutine extract_xquad_element
+    end subroutine extract_xbrick_element
 
 
 
 
 
 
-    subroutine integrate_xquad_element(elem, K_matrix, F_vector)
+    subroutine integrate_xbrick_element(elem, K_matrix, F_vector)
     
-        type(xquad_element),intent(inout)       :: elem 
+        type(xbrick_element),intent(inout)       :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
     
     
@@ -190,17 +191,17 @@ module xquad_element_module
         !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
 
 
-        ! if elem is still intact after checking edge status (no broken edges), assign 1 quad subelem if not yet done
+        ! if elem is still intact after checking edge status (no broken edges), assign 1 brick subelem if not yet done
         if(elem%curr_status==intact) then 
             if(.not.allocated(elem%subelem)) then 
                 allocate(elem%subelem(1))
                 allocate(elem%subcnc(1))
-                allocate(elem%subcnc(1)%array(4))   ! quad elem
+                allocate(elem%subcnc(1)%array(nndrl))   ! brick elem
                 ! sub elm 1 connec
-                elem%subcnc(1)%array=[1,2,3,4]
+                elem%subcnc(1)%array=[(i, i=1,nndrl)]
                 subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                 ! create sub elements
-                call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+                call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
             end if
         end if 
         
@@ -248,7 +249,7 @@ module xquad_element_module
             end do
             
         else
-            write(msg_file,*)'unsupported elem curr status value in xquad!'
+            write(msg_file,*)'unsupported elem curr status value in xbrick!'
             call exit_function
         end if
         
@@ -262,7 +263,7 @@ module xquad_element_module
         if(allocated(Fi)) deallocate(Fi)
     
  
-    end subroutine integrate_xquad_element
+    end subroutine integrate_xbrick_element
     
     
     
@@ -274,7 +275,7 @@ module xquad_element_module
 
     
     ! passed-in variables
-    type(xquad_element), intent(inout) :: elem
+    type(xbrick_element), intent(inout) :: elem
 
 
     ! extracted variables, from glb libraries
@@ -288,7 +289,7 @@ module xquad_element_module
     integer :: nfailedge        ! no. of failed edges in the element
     integer :: ifedg(nedge)     ! index of failed edges in the element
     integer :: elstat           ! local copy of elem curr status
-    integer :: jbe1,jbe2, jnode ! indices of 2 broken edges, and a variable to hold a glb node index
+    integer :: jbe1,jbe2,jbe3,jbe4, jnode ! indices of broken edges, and a variable to hold a glb node index
     integer :: iscross          ! indicator of line intersection; >0 if two lines intersect
     integer :: i, j, l, k       ! counters
       
@@ -312,7 +313,7 @@ module xquad_element_module
         
         edgstat=0; 
         nfailedge=0; ifedg=0; elstat=0
-        jbe1=0; jbe2=0; jnode=0
+        jbe1=0; jbe2=0; jbe3=0; jbe4=0; jnode=0
         iscross=0
         i=0; j=0; l=0; k=0
         
@@ -358,7 +359,7 @@ module xquad_element_module
             ! no edge failed/damaged, do nothing
             continue
             
-        else if(nfailedge==1) then 
+        else if(nfailedge==2 .and. (ifedg(2)-ifedg(1))==nedge/2) then 
         ! could be 1st time wake elm, tip elm, ref elm and trans elm
         ! update the edge status, crack tip coords and elstat accordingly
         
@@ -371,10 +372,12 @@ module xquad_element_module
               ! another edge must be partitioned to form a ref/tip/wake elem
               ! find the other edge to be partitioned
                 
-                ! first, find the index of the broken edge
-                jbe1=ifedg(1)
+                ! first, find the index of the broken edges
+                jbe1=ifedg(1); jbe2=ifedg(2)
                 
-                ! find the first (or the second also can) fl. node on this edge 
+                !**** the partitioning of xbrick elem is entirely based on the bottom four edges ****
+                
+                ! find the first (or the second also can) fl. node on the bottom broken edge 
                 jnode=topo(3,jbe1)
                 
                 ! store x,y values of this node in xp1, yp1 (legacy format)
@@ -410,43 +413,64 @@ module xquad_element_module
                 end do
                 
                 ! update nfailedge & ifedg
-                nfailedge=2     ! no. of broken edge is now 2
-                ifedg(2)=i  ! index of the 2nd broken edge is i
+                nfailedge=3         ! no. of broken edge is now 3
+                ifedg(nfailedge)=i  ! index of the 3rd broken edge is i
                 
-                ! store it in jbe2 (safer)
-                jbe2=i 
+                ! store it in jbe3 (safer)
+                jbe3=i
                 
                 ! update the two fl. node coords on this edge
-                jnode=topo(3,jbe2)
-                coord(jnode)%array=[xct,yct]
-                jnode=topo(4,jbe2)               
-                coord(jnode)%array=[xct,yct]
+                jnode=topo(3,jbe3)
+                coord(jnode)%array(1:2)=[xct,yct]
+                jnode=topo(4,jbe3)               
+                coord(jnode)%array(1:2)=[xct,yct]
                 
                 ! update edge status variables
                 if(edgstat(jbe1)==egref) then ! tip elem end, refinement elem. start (1st time)
                     elstat=elref               
                     ! change 2nd broken edge status to 1 (trans elem start)
-                    edgstat(jbe2)=egtrans
+                    edgstat(jbe3)=egtrans
              
                 else if(edgstat(jbe1)==3) then ! wake elem end, tip elem start (1st time)
                     elstat=eltip
                     ! change 2nd broken edge status to 2 (refinement start)
-                    edgstat(jbe2)=egref
+                    edgstat(jbe3)=egref
                
                 else if(edgstat(jbe1)>=4) then ! wake elem start (1st time)
                     elstat=elwake !wake elem               
                     ! change 2nd broken edge status to 3 (tip elem start)
-                    edgstat(jbe2)=egtip
+                    edgstat(jbe3)=egtip
                     
                 else ! unknown edge status
                     write(msg_file,*)'unknown edge status!'
                     call exit_function
-                end if        
+                end if
+
+                !***** project var. values of the bottom broken edges to the top ones *****
+                
+                nfailedge=4                 ! no. of broken edge is now 4
+                ifedg(nfailedge)=jbe3+nedge/2  ! index of the 4th broken edge is i
+                
+                ! store it in jbe2 (safer)
+                jbe4=jbe3+nedge/2
+                
+                ! update the two fl. node coords on this edge
+                jnode=topo(3,jbe4)
+                coord(jnode)%array(1:2)=[xct,yct]
+                jnode=topo(4,jbe4)               
+                coord(jnode)%array(1:2)=[xct,yct]
+
+                ! update edge status var. value
+                edgstat(jbe4)=edgstat(jbe3)
+        
             endif
                 
-        else if(nfailedge==2) then 
+        else if(nfailedge==4 .and. (ifedg(3)-ifedg(1))==nedge/2 .and. (ifedg(4)-ifedg(2))==nedge/2) then
         ! could be cracked, wake, tip, refinement elem
         ! only update the elstat, not the edge status, nor the crack tip coords
+        
+            !**** the partitioning of xbrick elem is entirely based on the bottom four edges ****
+            
             jbe1=ifedg(1)
             jbe2=ifedg(2)
             if(edgstat(jbe1)<=egref .and. edgstat(jbe2)<=egref) then
@@ -468,18 +492,10 @@ module xquad_element_module
                 call exit_function
             end if
           
-        else if(nfailedge>2) then
-        ! not yet supported  
-        
-            write(msg_file,*)'more than 2 broken edges not yet supported!'
-          
-            ! partition only according to the first two broken edges
-            nfailedge=2
-            goto 10
           
         else
         
-            write(msg_file,*)'unknown no. of nfailedge!'
+            write(msg_file,*)'unsupported edge status partition in xbrick!'
             call exit_function
           
         end if
@@ -545,7 +561,7 @@ module xquad_element_module
     subroutine failure_criterion_parition(elem)
 
     ! passed in variables
-    type(xquad_element) :: elem
+    type(xbrick_element) :: elem
   
     ! extracted variables, from glb libraries
     integer :: edgstat(nedge)               ! status variable array of element edges
@@ -647,14 +663,14 @@ module xquad_element_module
         !~        case('tri')
         !~            call extract(elem%subelem(i),tri=subtri)
         !~            call extract(subtri(1),ig_point=subigpt)
-        !~        case('quad')
-        !~            call extract(elem%subelem(i),quad=subquad)
-        !~            call extract(subquad(1),ig_point=subigpt)
+        !~        case('brick')
+        !~            call extract(elem%subelem(i),brick=subbrick)
+        !~            call extract(subbrick(1),ig_point=subigpt)
         !~        case('coh2d')
         !~            call extract(elem%subelem(i),coh2d=subcoh2d)
         !~            call extract(subcoh2d(1),ig_point=subigpt)
         !~        case default
-        !~            write(msg_file,*)'unsupported sub elem type in xquad'
+        !~            write(msg_file,*)'unsupported sub elem type in xbrick'
         !~            call exit_function
         !~    end select
         !~    ! check if any intg point has reached failure onset
@@ -707,8 +723,20 @@ module xquad_element_module
                         xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
                         xelm(2,edg(4,i))=yct
                      endif
-                     if(nfailedge.eq.2) exit ! found 2 broken edges already
+                     if(nfailedge==2) exit ! found 2 broken edges already
                 end do
+                
+                !***** project edge status variables to top edges *****
+                
+                nfailedge=4
+                ifedg(3)=ifedg(1)+nedge/2
+                ifedg(4)=ifedg(2)+nedge/2
+                edgstat(ifedg(3))=edgstat(ifedg(1))
+                edgstat(ifedg(4))=edgstat(ifedg(2))
+                xelm(1:2,edg(3,ifedg(3)))=xelm(1:2,edg(3,ifedg(1)))
+                xelm(1:2,edg(4,ifedg(3)))=xelm(1:2,edg(4,ifedg(1)))
+                xelm(1:2,edg(3,ifedg(4)))=xelm(1:2,edg(3,ifedg(2)))
+                xelm(1:2,edg(4,ifedg(4)))=xelm(1:2,edg(4,ifedg(2)))
               
             else ! element already partitioned
                 !---------- find no. of broken edges -------------------------
@@ -721,14 +749,14 @@ module xquad_element_module
                 !-------------------------------------------------------------
                 ! find (xp1,yp1), (xp2,yp2)
                 if (elstat .eq. eltrans) then ! transition elm, already has an edge partitioned
-                    if(nfailedge .ne. 1) then 
-                         write(msg_file,*)'inconsistency in kplyfail,elstat=1!'
+                    if(nfailedge/=2) then 
+                         write(msg_file,*)'inconsistency in xbrick failure criterion partition, elstat=1!'
                          call exit_function
                     end if
-                    j=ifedg(1)
-
                     ! update edgstat(j) & fnode(jfnd)
-                    edgstat(j)=cohcrack ! cohesive crack
+                    edgstat(ifedg(1:2))=cohcrack ! cohesive crack
+                    
+                    j=ifedg(1)
 
                     ! find xp1, yp1
                     xp1=xelm(1,edg(3,j))           
@@ -759,21 +787,27 @@ module xquad_element_module
                             xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
                             xelm(2,edg(4,i))=yct
                         end if
-                        if(nfailedge .eq. 2) exit ! found 2 broken edges already
-                    end do                    
+                        if(nfailedge .eq. 3) exit ! found 2 broken edges already
+                    end do
+                    
+                    !***** project edge status variables to top edges *****
+                    
+                    nfailedge=4
+                    ifedg(4)=ifedg(3)+nedge/2
+                    edgstat(ifedg(4))=cohcrack
+                    xelm(1:2,edg(3,ifedg(4)))=xelm(1:2,edg(3,ifedg(3)))
+                    xelm(1:2,edg(4,ifedg(4)))=xelm(1:2,edg(4,ifedg(3)))
+                    
                 else if (elstat.gt.eltrans .and. elstat.lt.elfail) then 
                 ! element already has two edges partitioned; just update edge status var to coh crack status
-                    if(nfailedge.lt.2) then 
+                    if(nfailedge/=4) then 
                          write(msg_file,*)'inconsistency in kplyfail,elstat>1!'
                          call exit_function
                     end if
-                    nfailedge=2 ! ignore more than 2 broken edges at the moment
-                    ! update first edge status var & fl. node status var
-                    j=ifedg(1)
-                    edgstat(j)=cohcrack ! cohesive crack 
-                    ! update second edge status var & fl. node status var
-                    j=ifedg(2)
-                    edgstat(j)=cohcrack ! cohesive crack            
+                    nfailedge=4 ! ignore more than 2 broken edges at the moment
+                    ! update edge status var
+                    edgstat(ifedg(1:4))=cohcrack ! cohesive crack 
+           
                 else
                     write(msg_file,*) 'unsupported elstat value for failure!'
                     call exit_function          
@@ -840,7 +874,7 @@ module xquad_element_module
     subroutine update_subcnc(elem,edgstat,ifedg,nfailedge)
     
     ! passed-in variables
-    type(xquad_element),    intent(inout)   :: elem
+    type(xbrick_element),    intent(inout)   :: elem
     integer,                intent(in)      :: edgstat(:), ifedg(:), nfailedge
 
 
@@ -872,17 +906,17 @@ module xquad_element_module
             continue
             
             
-        case (1) !- one edge cracked, trans partition
+        case (2) !- one edge cracked, trans partition
             ! find the index of the broken edge
             ibe=ifedg(1)
 
             ! verify its status variable value
             if(edgstat(ibe)/=egtrans) then
-                write(msg_file,*)'transition partition only accepts edgstat=1!'
+                write(msg_file,*)'transition partition only accepts edgstat=egtrans!'
                 call exit_function
             end if
             
-            ! allocate sub element arrays; in this case, 3 tri elements
+            ! allocate sub element arrays; in this case, 3 wedge elements
             nsub=3
             if(allocated(elem%subelem)) deallocate(elem%subelem)
             if(allocated(elem%subcnc)) deallocate(elem%subcnc)
@@ -891,8 +925,8 @@ module xquad_element_module
             allocate(elem%subcnc(nsub))
             allocate(subglbcnc(nsub))
             do j=1, nsub
-                allocate(elem%subcnc(j)%array(3))
-                allocate(subglbcnc(j)%array(3))
+                allocate(elem%subcnc(j)%array(6))
+                allocate(subglbcnc(j)%array(6))
                 elem%subcnc(j)%array=0
                 subglbcnc(j)%array=0
             end do             
@@ -924,12 +958,16 @@ module xquad_element_module
             elem%subcnc(1)%array(2)=topo(2,e1)
             elem%subcnc(1)%array(3)=jnode
             
+            elem%subcnc(1)%array(4:6)=elem%subcnc(1)%array(1:3)+nnode/2 ! upper surf nodes
+            
             subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
             
             ! sub elm 2 connec
             elem%subcnc(2)%array(1)=topo(1,e2)
             elem%subcnc(2)%array(2)=topo(2,e2)
-            elem%subcnc(2)%array(3)=jnode  
+            elem%subcnc(2)%array(3)=jnode 
+
+            elem%subcnc(2)%array(4:6)=elem%subcnc(2)%array(1:3)+nnode/2 ! upper surf nodes
 
             subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
             
@@ -937,17 +975,19 @@ module xquad_element_module
             elem%subcnc(3)%array(1)=topo(1,e3)
             elem%subcnc(3)%array(2)=topo(2,e3)
             elem%subcnc(3)%array(3)=jnode  
+            
+            elem%subcnc(3)%array(4:6)=elem%subcnc(3)%array(1:3)+nnode/2 ! upper surf nodes
 
             subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
 
             ! create sub elements
-            call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-            call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-            call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
+            call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+            call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
+            call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
          
 
  
-        case (2) !- two edges cracked
+        case (4) !- two edges cracked
          
             ibe1=min(ifedg(1),ifedg(2))   ! local edge index of 1st broken edge
             ibe2=max(ifedg(1),ifedg(2))   ! local edge index of 2nd broken edge
@@ -984,18 +1024,18 @@ module xquad_element_module
                         e1=3; e2=4; e3=1; e4=2
                     end if    
                 case default
-                        write(msg_file,*)'wrong broken edge in update subcnc xquad'
+                        write(msg_file,*)'wrong broken edge in update subcnc xbrick'
                         call exit_function
             end select
             
             
             select case(nbulk)
                 case(2)
-                ! two quad bulk subdomains
+                ! two brick bulk subdomains
                     if(iscoh) then
-                        nsub=3  ! two quad and one coh2d
+                        nsub=3  ! two brick and one coh2d
                     else
-                        nsub=2  ! only two quad
+                        nsub=2  ! only two brick
                     end if
                     if(allocated(elem%subelem)) deallocate(elem%subelem)
                     if(allocated(elem%subcnc)) deallocate(elem%subcnc)
@@ -1004,8 +1044,8 @@ module xquad_element_module
                     allocate(elem%subcnc(nsub))
                     allocate(subglbcnc(nsub))
                     do j=1, nsub
-                        allocate(elem%subcnc(j)%array(4))
-                        allocate(subglbcnc(j)%array(4))
+                        allocate(elem%subcnc(j)%array(8))
+                        allocate(subglbcnc(j)%array(8))
                         elem%subcnc(j)%array=0
                         subglbcnc(j)%array=0
                     end do
@@ -1030,6 +1070,8 @@ module xquad_element_module
                     elem%subcnc(1)%array(3)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(1)%array(3)=jnode3
                     elem%subcnc(1)%array(4)=topo(2,e3)
                     
+                    elem%subcnc(1)%array(5:8)=elem%subcnc(1)%array(1:4)+nnode/2
+                    
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     
                     ! sub elm 2 connec
@@ -1037,24 +1079,33 @@ module xquad_element_module
                     elem%subcnc(2)%array(2)=topo(2,e1)
                     elem%subcnc(2)%array(3)=topo(1,e3)
                     elem%subcnc(2)%array(4)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(2)%array(4)=jnode3
+                    
+                    elem%subcnc(2)%array(5:8)=elem%subcnc(2)%array(1:4)+nnode/2
 
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                    call prepare(elem%subelem(2),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
+                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+                    call prepare(elem%subelem(2),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
                     
                     if(iscoh) then
                     
                     ! sub elm 3 connec
                     elem%subcnc(3)%array(1)=topo(4,e3) if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(1)=jnode3
                     elem%subcnc(3)%array(2)=topo(3,e1) if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(2)=jnode1
-                    elem%subcnc(3)%array(3)=topo(4,e1) if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(3)=jnode1
-                    elem%subcnc(3)%array(4)=topo(3,e3) if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(4)=jnode3
+                    
+                    elem%subcnc(3)%array(3)=elem%subcnc(3)%array(2)+nnode/2
+                    elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nnode/2
+                    
+                    elem%subcnc(3)%array(5)=topo(3,e3) if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(6)=jnode3
+                    elem%subcnc(3)%array(6)=topo(4,e1) if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(5)=jnode1
+                    
+                    elem%subcnc(3)%array(7)=elem%subcnc(3)%array(6)+nnode/2
+                    elem%subcnc(3)%array(8)=elem%subcnc(3)%array(5)+nnode/2
                     
                     subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
                     
-                    call prepare(elem%subelem(3),eltype='coh2d', matkey=elem%cohmat, glbcnc=subglbcnc(3)%array)
+                    call prepare(elem%subelem(3),eltype='coh3d8', matkey=elem%cohmat, glbcnc=subglbcnc(3)%array)
                     
                     end if
                     
@@ -1072,14 +1123,14 @@ module xquad_element_module
                     allocate(elem%subcnc(nsub))
                     allocate(subglbcnc(nsub))
                     do j=1, 4   ! bulk elem cnc
-                        allocate(elem%subcnc(j)%array(3))
-                        allocate(subglbcnc(j)%array(3))
+                        allocate(elem%subcnc(j)%array(6))
+                        allocate(subglbcnc(j)%array(6))
                         elem%subcnc(j)%array=0
                         subglbcnc(j)%array=0
                     end do
                     if(iscoh) then
-                        allocate(elem%subcnc(5)%array(4))
-                        allocate(subglbcnc(5)%array(4))
+                        allocate(elem%subcnc(5)%array(8))
+                        allocate(subglbcnc(5)%array(8))
                         elem%subcnc(5)%array=0
                         subglbcnc(5)%array=0
                     end if
@@ -1101,7 +1152,9 @@ module xquad_element_module
                     ! sub elm 1 connec
                     elem%subcnc(1)%array(1)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(1)%array(1)=jnode1
                     elem%subcnc(1)%array(2)=topo(1,e2)
-                    elem%subcnc(1)%array(3)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(1)%array(3)=jnode2                    
+                    elem%subcnc(1)%array(3)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(1)%array(3)=jnode2
+
+                    elem%subcnc(1)%array(4:6)=elem%subcnc(1)%array(1:3)+nnode/2 ! upper surf nodes
                     
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     
@@ -1110,6 +1163,8 @@ module xquad_element_module
                     elem%subcnc(2)%array(2)=topo(1,e3)
                     elem%subcnc(2)%array(3)=topo(2,e3)
                     
+                    elem%subcnc(2)%array(4:6)=elem%subcnc(2)%array(1:3)+nnode/2 ! upper surf nodes
+                    
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
                     ! sub elm 3 connec
@@ -1117,53 +1172,64 @@ module xquad_element_module
                     elem%subcnc(3)%array(2)=topo(2,e4)
                     elem%subcnc(3)%array(3)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(3)=jnode1
                     
+                    elem%subcnc(3)%array(4:6)=elem%subcnc(3)%array(1:3)+nnode/2 ! upper surf nodes
+                    
                     subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
                     
                     ! sub elm 4 connec
                     elem%subcnc(4)%array(1)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(4)%array(1)=jnode1
                     elem%subcnc(4)%array(2)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(4)%array(2)=jnode2
-                    elem%subcnc(4)%array(3)=topo(2,e3) 
+                    elem%subcnc(4)%array(3)=topo(2,e3)
+
+                    elem%subcnc(4)%array(4:6)=elem%subcnc(4)%array(1:3)+nnode/2 ! upper surf nodes
                     
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                    call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-                    call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
-                    call prepare(elem%subelem(4),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array, theta=elem%theta)
+                    call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+                    call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
+                    call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
+                    call prepare(elem%subelem(4),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array, theta=elem%theta)
                     
                     if(iscoh) then
                     
                     ! sub elm 5 connec
                     elem%subcnc(5)%array(1)=topo(4,e1) if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(1)=jnode1
                     elem%subcnc(5)%array(2)=topo(3,e2) if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(2)=jnode2
-                    elem%subcnc(5)%array(3)=topo(4,e2) if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(3)=jnode2
-                    elem%subcnc(5)%array(4)=topo(3,e1) if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(4)=jnode1
+                    
+                    elem%subcnc(5)%array(3)=elem%subcnc(5)%array(2)+nnode/2
+                    elem%subcnc(5)%array(4)=elem%subcnc(5)%array(1)+nnode/2
+                    
+                    elem%subcnc(5)%array(5)=topo(3,e1) if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(4)=jnode1
+                    elem%subcnc(5)%array(6)=topo(4,e2) if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(3)=jnode2   
+                    
+                    elem%subcnc(5)%array(7)=elem%subcnc(5)%array(6)+nnode/2
+                    elem%subcnc(5)%array(8)=elem%subcnc(5)%array(5)+nnode/2
                     
                     subglbcnc(5)%array(:)=elem%nodecnc(elem%subcnc(5)%array(:))
                     
-                    call prepare(elem%subelem(5),eltype='coh2d', matkey=elem%cohmat, glbcnc=subglbcnc(5)%array)
+                    call prepare(elem%subelem(5),eltype='coh3d8', matkey=elem%cohmat, glbcnc=subglbcnc(5)%array)
                     
                     end if
                     
                 case default
-                    write(msg_file,*)'wrong nbulk in update subcnc xquad'
+                    write(msg_file,*)'wrong nbulk in update subcnc xbrick'
                     call exit_function
             end select
 
           
-        case(3) !- three edges crack
-           write(msg_file,*) 'three-edge crack partition not yet supported!'
-           nfailedge=2
-           goto 10
-           
-        case(4) !- four edges crack
-           write(msg_file,*) 'four-edge crack partition not yet supported!'
-           nfailedge=2
-           goto 10
+        !~case(3) !- three edges crack
+        !~   write(msg_file,*) 'three-edge crack partition not yet supported!'
+        !~   nfailedge=2
+        !~   goto 10
+        !~   
+        !~case(4) !- four edges crack
+        !~   write(msg_file,*) 'four-edge crack partition not yet supported!'
+        !~   nfailedge=2
+        !~   goto 10
            
         case default
-           write(msg_file,*) 'WARNING: xquad update subcnc case selection default!'
+           write(msg_file,*) 'WARNING: xbrick update subcnc case selection default!'
            
         end select
         
@@ -1186,4 +1252,4 @@ module xquad_element_module
   
   
   
-end module xquad_element_module
+end module xbrick_element_module

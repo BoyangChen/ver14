@@ -6,7 +6,7 @@
     
     
     ! parameters
-    integer, parameter :: failed=10, onset=5, intact=0
+    integer, parameter :: failed=10, onset=5
 
 
     type,public :: interface_modulus

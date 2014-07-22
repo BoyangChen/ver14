@@ -12,19 +12,24 @@
         real(kind=dp) :: Xt,Xc,Yt,Yc,Sl,St ! tensile, compressive, and shear strengths
     end type
     
-    type,public :: lamina_toughness
-        real(kind=dp) :: GfcT, GfcC ! fibre fracture toughness tensile and compressive
+    type,public :: lamina_matrixtoughness
         real(kind=dp) :: GmcI, GmcII ! matrix fracture toughness mode I and II 
         real(kind=dp) :: eta ! mixed-mode law constant
+    end type
+    
+    type,public :: lamina_fibretoughness
+        real(kind=dp) :: GfcT, GfcC ! fibre fracture toughness tensile and compressive
     end type
 
     type,public :: lamina_type
         type(lamina_modulus) :: modulus
         type(lamina_strength) :: strength
-        type(lamina_toughness) :: toughness
+        type(lamina_matrixtoughness) :: matrixtoughness
+        type(lamina_fibretoughness) :: fibretoughness
         logical :: modulus_active=.false.
         logical :: strength_active=.false.
-        logical :: toughness_active=.false.
+        logical :: matrixtoughness_active=.false.
+        logical :: fibretoughness_active=.false.
     end type
     
     
@@ -61,22 +66,26 @@
         
       	this_lamina%modulus=lamina_modulus(zero,zero,zero,zero,zero,zero)
         this_lamina%strength=lamina_strength(zero,zero,zero,zero,zero,zero)
-        this_lamina%toughness=lamina_toughness(zero,zero,zero,zero,zero)
+        this_lamina%matrixtoughness=lamina_matrixtoughness(zero,zero,zero)
+        this_lamina%fibretoughness=lamina_fibretoughness(zero,zero)
         
         this_lamina%modulus_active=.false.
         this_lamina%strength_active=.false.
-        this_lamina%toughness_active=.false.
+        this_lamina%matrixtoughness_active=.false.
+        this_lamina%fibretoughness_active=.false.
+
 
       end subroutine empty_lamina
  
 
 
-      subroutine update_lamina(this_lamina,modulus,strength,toughness)
+      subroutine update_lamina(this_lamina,modulus,strength,matrixtoughness,fibretoughness)
       
       	type(lamina_type),intent(inout) :: this_lamina
         type(lamina_modulus),optional,intent(in) :: modulus
         type(lamina_strength),optional,intent(in) :: strength
-        type(lamina_toughness),optional,intent(in) :: toughness
+        type(lamina_matrixtoughness),optional,intent(in) :: matrixtoughness
+        type(lamina_fibretoughness),optional,intent(in) :: fibretoughness
         
          
         if(present(modulus)) then
@@ -89,23 +98,30 @@
                 this_lamina%strength_active=.true.
         end if
         
-        if(present(toughness)) then
-                this_lamina%toughness=toughness
-                this_lamina%toughness_active=.true.
+        if(present(matrixtoughness)) then
+                this_lamina%matrixtoughness=matrixtoughness
+                this_lamina%matrixtoughness_active=.true.
+        end if
+        
+        if(present(fibretoughness)) then
+                this_lamina%fibretoughness=fibretoughness
+                this_lamina%fibretoughness_active=.true.
         end if
 
       end subroutine update_lamina  
       
       
       
-      subroutine extract_lamina(this_lamina,modulus,strength,toughness, &
-      & modulus_active,strength_active,toughness_active)
+      subroutine extract_lamina(this_lamina,modulus,strength,matrixtoughness,fibretoughness, &
+      & modulus_active,strength_active,matrixtoughness_active,fibretoughness_active)
       
       	type(lamina_type),intent(in) :: this_lamina
         type(lamina_modulus),optional,intent(out) :: modulus
         type(lamina_strength),optional,intent(out) :: strength
-        type(lamina_toughness),optional,intent(out) :: toughness
-        logical,optional,intent(out) :: modulus_active,strength_active,toughness_active
+        type(lamina_matrixtoughness),optional,intent(out) :: matrixtoughness
+        type(lamina_fibretoughness),optional,intent(out) :: fibretoughness
+        logical,optional,intent(out) :: modulus_active,strength_active
+        logical,optional,intent(out) :: matrixtoughness_active,fibretoughness_active
         
          
         if(present(modulus)) modulus=this_lamina%modulus
@@ -114,8 +130,11 @@
         if(present(strength)) strength=this_lamina%strength
         if(present(strength_active)) strength_active=this_lamina%strength_active
                
-        if(present(toughness)) toughness=this_lamina%toughness
-        if(present(toughness_active)) toughness_active=this_lamina%toughness_active
+        if(present(matrixtoughness)) matrixtoughness=this_lamina%matrixtoughness
+        if(present(matrixtoughness_active)) matrixtoughness_active=this_lamina%matrixtoughness_active
+        
+        if(present(fibretoughness)) fibretoughness=this_lamina%fibretoughness
+        if(present(fibretoughness_active)) fibretoughness_active=this_lamina%fibretoughness_active
 
       end subroutine extract_lamina 
 
@@ -125,7 +144,7 @@
 !************************ subroutine ddsdde ************************************************
 !***** returns the tangent stiffness matrix of the material ******************************
 !********************************************************************************************
-      subroutine ddsdde_lamina(this_mat,dee,strain,stress,PlaneStrain,sdv)
+      subroutine ddsdde_lamina(this_mat,dee,strain,stress,PlaneStrain,sdv,dfail)
 
         type(lamina_type),                        intent(in)    :: this_mat
         real(kind=dp),                            intent(out)   :: dee(:,:)
@@ -134,12 +153,17 @@
         logical,                        optional, intent(in)    :: PlaneStrain
         
         type(sdv_array),                optional, intent(inout) :: sdv
+        real(kind=dp),                  optional,   intent(in)  :: dfail
         
         
         
         ! local variables
         real(kind=dp) :: E1,E2,E3,G12,G13,G23,nu12,nu13,nu23,nu21,nu31,nu32,del
-        integer       :: nst
+        real(kind=dp) :: eps(size(dee(:,1)))  ! local replica of strain
+        real(kind=dp) :: sig(size(dee(:,1)))  ! local replica of stress
+        real(kind=dp) :: clength              ! characteristic element length
+        real(kind=dp) :: dmax                 ! max. damage for smeared crack model
+        integer       :: nst, fstat
         
         ! initialize intent(out) variables
         dee=zero; if(present(stress)) stress=zero
@@ -148,7 +172,10 @@
         G12=zero; G13=zero; G23=zero 
         nu12=zero; nu13=zero; nu23=zero
         nu21=zero; nu31=zero; nu32=zero; del=zero
-        nst=0 
+        eps=zero; sig=zero
+        clength=zero
+        dmax=zero
+        nst=0; fstat=0
         
         ! find no. of strains
         nst=size(dee(:,1))
@@ -157,10 +184,6 @@
             write(msg_file,*) 'lamina material modulus undefined!'
             call exit_function
         end if
-        
-        if(this_mat%strength_active) write(msg_file,*) 'lamina failure criterion not yet supported!'
-        
-        if(this_mat%toughness_active) write(msg_file,*) 'lamina damage evolution not yet supported!'
         
         ! calculate the linear elasticity stiffness matrix
         E1=this_mat%modulus%E1
@@ -209,12 +232,87 @@
         end if
 
         
-        if(present(strain).and.present(stress)) stress=matmul(dee,strain)
+        ! if jump or sdv are not passed in, only linear elasticity can be done
+        if((.not.present(strain)) .or. (.not.present(sdv))) then
+            write(msg_file,*) 'WARNING: jump and sdv are not present in interface!'
+            write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.' 
+            return ! exit the program
+        end if
         
+       
+        ! if strength is not present, give a warning and do linear elasticity with stress
+        if(.not.this_mat%strength_active) then
+            write(msg_file,*) 'WARNING: strength parameters are not present in interface!'
+            write(msg_file,*) 'Only linear elastic stiffness matrix and stress can be calculated.' 
+            ! update stress
+            if(present(stress)) stress=matmul(dee,strain)
+            return ! exit the program
+        end if
         
 
-      return
+
+        ! --------------------------------------------------------- !
+        ! -- reaching here, strain, sdv and strength are present -- !
+        ! -- failure criterion can be done                          !
+        ! --------------------------------------------------------- !
+
+             
+        ! extract max. degradation at total failure
+        if(present(dfail))  then
+            dmax=dfail ! input parameter, valued at the coh. elem.
+        else                
+            dmax=one
+        end if
+        
+        ! extract current values of failure status variable
+        if(.not.allocated(sdv%i)) then 
+            allocate(sdv%i(3)); sdv%i=0 ! 1st iteration
+        end if
+        fstat=sdv%i(1)  ! generic failure status
+        ffstat=sdv%i(2) ! fibre failure status
+        mfstat=sdv%i(3) ! matrix failure status
+        
+        ! matrix toughness parameters are not active, do only strength failure criterion
+        if(.not.this_mat%fibretoughness_active) then
+            write(msg_file,*)'fibre failure must include fibre toughness to ensure robust prediction!'
+            call exit_function
+        else
+            call FibreCohesiveLaw()
+            ! update sdv
+            sdv%i(2)=ffstat
+        end if
+
+        ! matrix toughness parameters are not active, do only strength failure criterion
+        if(.not.this_mat%matrixtoughness_active) then
+            ! check and update fstat
+            if(mfstat/=onset) then
+                ! calculate stress based on jump
+                ! dee is defined based on intact stiffness
+                sig=matmul(dee,strain)               
+                ! go through failure criterion and update fstat
+                call MatrixFailureCriterion(sig,this_mat%strength,mfstat)
+            end if
+            ! update sdv
+            sdv%i(3)=mfstat
+        else
+            ! call MatrixCohesiveLaw()
+            write(msg_file,*)'matrix failure smeared crack model not supported! use FNM cohesive subelem instead'
+            call exit_function
+        end if
+        
+        ! update stress
+        if(present(stress)) stress=sig
+        
+        ! update fstat
+        fstat=max(ffstat,mfstat)
+        sdv%i(1)=fstat
+        
+        ! exit program
+        return
       end subroutine ddsdde_lamina 
+
+
+
 
 
 
