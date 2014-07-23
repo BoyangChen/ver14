@@ -14,6 +14,8 @@
         type,public :: sub3d_element
             private ! encapsulate components of this type
             
+            integer                         :: curr_status=0
+            
             character(len=eltypelength)     :: eltype=''    ! can be all types of 2D elements
             integer                         :: matkey=0     ! material index in glb material array
             real(kind=dp)                   :: theta=zero   ! fibre orientation (lamina)
@@ -70,6 +72,7 @@
         
             type(sub3d_element), intent(out) :: elem
             
+            elem%curr_status=0
             elem%eltype=''    ! can be all types of 2D elements
             elem%matkey=0     ! material index in glb material array
             elem%theta=zero   ! fibre orientation (lamina)
@@ -180,12 +183,12 @@
         
         
         
-        subroutine extract_sub3d_element(elem,eltype,matkey,theta,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
+        subroutine extract_sub3d_element(elem,eltype,curr_status,matkey,theta,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
         
             type(sub3d_element), intent(in) :: elem
             
             character(len=eltypelength),  intent(out),optional    :: eltype       ! can be all types of 2D elements
-            integer,                    intent(out),optional    :: matkey       ! material index in glb material array
+            integer,                    intent(out),optional    :: curr_status,matkey       ! material index in glb material array
             real(kind=dp),              intent(out),optional    :: theta        ! fibre orientation (lamina)
             
             integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
@@ -202,6 +205,7 @@
                        
             
             if(present(eltype)) eltype=elem%eltype
+            if(present(curr_status)) curr_status=elem%curr_status
             if(present(matkey)) matkey=elem%matkey
             if(present(theta))  theta=elem%theta
             
@@ -284,10 +288,10 @@
             
             ! local variables
             !real(dp), allocatable ::  xi(:), xe(:), ue(:), xm(:), um(:), coords(:,:)
-            integer :: i,j,l
+            integer :: i,j,l, elstat
             logical :: gauss
             
-            i=0; j=0; l=0
+            i=0; j=0; l=0; elstat=0
             gauss=.false.
             
             if(present(cohgauss)) gauss=cohgauss
@@ -303,6 +307,9 @@
                     
                     call integrate(elem%wedge(1),Kmatrix,Fvector)
                     
+                    call extract(elem%wedge(1),curr_status=elstat)
+                    elem%curr_status=elstat
+                    
                 case('brick')
                     if(.not.allocated(elem%brick)) then
                         allocate(elem%brick(1))
@@ -311,6 +318,9 @@
                     end if
                     
                     call integrate(elem%brick(1),Kmatrix,Fvector)
+                    
+                    call extract(elem%brick(1),curr_status=elstat)
+                    elem%curr_status=elstat
                     
                 case('coh3d6')
                     if(.not.allocated(elem%coh3d6)) then 
@@ -336,6 +346,9 @@
                         call integrate(elem%coh3d6(1),Kmatrix,Fvector,gauss)
                     end if
                     
+                    call extract(elem%coh3d6(1),curr_status=elstat)
+                    elem%curr_status=elstat
+                    
                 case('coh3d8')
                     if(.not.allocated(elem%coh3d8)) then 
                         allocate(elem%coh3d8(1))
@@ -359,6 +372,9 @@
                     else
                         call integrate(elem%coh3d8(1),Kmatrix,Fvector,gauss)
                     end if
+                    
+                    call extract(elem%coh3d8(1),curr_status=elstat)
+                    elem%curr_status=elstat
                     
                     
                 case default

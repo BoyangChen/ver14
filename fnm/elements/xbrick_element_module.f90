@@ -603,6 +603,7 @@ module xbrick_element_module
     !
     ! --------------------------------------------------------------------!
     
+        if(elem%curr_status==elfail) return ! elem already failed, no need to proceed
     
         ! initialize local variables
         
@@ -656,39 +657,6 @@ module xbrick_element_module
             if(subelstat>intact) failed=.true.
             if(failed) exit
         end do
-        !~do i=1, size(elem%subelem)
-        !~    ! extract subelem integration point array accord. to subelem type
-        !~    call extract(elem%subelem(i),eltype=subtype)
-        !~    select case(subtype)
-        !~        case('tri')
-        !~            call extract(elem%subelem(i),tri=subtri)
-        !~            call extract(subtri(1),ig_point=subigpt)
-        !~        case('brick')
-        !~            call extract(elem%subelem(i),brick=subbrick)
-        !~            call extract(subbrick(1),ig_point=subigpt)
-        !~        case('coh2d')
-        !~            call extract(elem%subelem(i),coh2d=subcoh2d)
-        !~            call extract(subcoh2d(1),ig_point=subigpt)
-        !~        case default
-        !~            write(msg_file,*)'unsupported sub elem type in xbrick'
-        !~            call exit_function
-        !~    end select
-        !~    ! check if any intg point has reached failure onset
-        !~    do j=1, size(subigpnt)
-        !~        call extract(subigpt(j),sdv=subsdv)
-        !~        ! sdv(1) is the backup storage of equil. version of sdv
-        !~        ! 1st integer sdv is the failure status in this code
-        !~        fstat=subsdv(2)%i(1) 
-        !~        if(fstat>0) then
-        !~            failed=.true.
-        !~            exit
-        !~        end if
-        !~        if(failed) exit
-        !~    end do
-        !~    if(failed) exit
-        !~end do
-
-
         
             
         if(failed) then

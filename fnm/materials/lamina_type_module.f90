@@ -5,7 +5,7 @@
     private
     
     ! parameters
-    integer, parameter :: mxfailed=10, mxonset=5, fbfailed=20, fbonset=15
+    integer, parameter :: mfailed=10, mfonset=5, ffailed=20, ffonset=15
 
     type,public :: lamina_modulus
         real(kind=dp) :: E1,E2,G12,G23,nu12,nu23 ! elastic moduli
@@ -198,7 +198,7 @@
         
         ! if jump or sdv are not passed in, only linear elasticity can be done
         if((.not.present(strain)) .or. (.not.present(sdv))) then
-            write(msg_file,*) 'WARNING: jump and sdv are not present in interface!'
+            write(msg_file,*) 'WARNING: strain and sdv are not present in lamina type!'
             write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.' 
             return ! exit the program
         end if
@@ -206,7 +206,7 @@
        
         ! if strength is not present, give a warning and do linear elasticity with stress
         if(.not.this_mat%strength_active) then
-            write(msg_file,*) 'WARNING: strength parameters are not present in interface!'
+            write(msg_file,*) 'WARNING: strength parameters are not present in lamina type!'
             write(msg_file,*) 'Only linear elastic stiffness matrix and stress can be calculated.' 
             ! update stress
             if(present(stress)) stress=matmul(dee,strain)
@@ -260,12 +260,12 @@
             ! dee is defined based on intact stiffness
             sig=matmul(dee,strain)
             ! check and update fstat
-            if(mfstat<mxonset) then               
+            if(mfstat<mfonset) then               
                 ! go through failure criterion and update fstat
                 call MatrixFailureCriterion(sig,this_mat%strength,mfstat)
             end if
             ! update sdv
-            if(mfstat>=mxonset) sdv%i(3)=mfstat
+            if(mfstat>=mfonset) sdv%i(3)=mfstat
         else
             ! call MatrixCohesiveLaw()
             write(msg_file,*)'matrix failure smeared crack model not supported! use FNM cohesive subelem instead'
@@ -382,8 +382,8 @@
         integer,                intent(inout)   :: fstat
         real(dp), allocatable,  intent(inout)   :: sdvr(:)
         real(dp),                 intent(in)    :: sigma(:),strain(:), clength, dmax 
-        type(interface_strength), intent(in)    :: strength
-        type(interface_fibretoughness),intent(in) :: fibretoughness
+        type(lamina_strength), intent(in)       :: strength
+        type(lamina_fibretoughness),intent(in)  :: fibretoughness
         
       
         ! local variables
@@ -394,7 +394,7 @@
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
         ! --------------------------------------------------------- !
-        if(fstat==fbfailed) then    ! already failed
+        if(fstat==ffailed) then    ! already failed
             ! exit program
             return
         end if
@@ -444,7 +444,7 @@
             call FibreFailureCriterion(sigma,strength,fstat,findex)
             
             ! failure onset
-            if(fstat==fbonset) then
+            if(fstat==ffonset) then
             ! calculate u0, uf and go to next control
                 
                 u_eff=abs(strain(1))*clength
@@ -461,7 +461,7 @@
                     uf=two*GfcC/T0
                 end if
                 
-            else if(fstat==fbfailed) then
+            else if(fstat==ffailed) then
             ! this is the case where strength is close to zero
                 dm=dmax
                 
@@ -472,7 +472,7 @@
         end if
         
         ! failure started
-        if(fstat==fbonset) then
+        if(fstat==ffonset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
@@ -490,7 +490,7 @@
             ! check dm and update fstat
             if (dm>=dmax) then
                 dm=dmax
-                fstat=fbfailed
+                fstat=ffailed
             end if
         end if
      
@@ -549,10 +549,10 @@
             ! failure index for tensile failure; matrix crack perpendicular to shell plane, no z-dir stress components
             findex2=max(sigma(1),zero)/Xt + abs(min(sigma(1),zero)/Xc)
             
-            if(findex2>=one) fstat=fbonset
+            if(findex2>=one) fstat=ffonset
         else
             ! strength close to zero == already failed
-            fstat=fbfailed
+            fstat=ffailed
         end if
         
         if(present(findex)) findex=findex2
@@ -614,10 +614,10 @@
             findex2=sqrt((max(sigma(2),zero)/Yt)**2 + (sigma(4)/Sl)**2)
             end if
             
-            if(findex2>=one) fstat=mxonset
+            if(findex2>=one) fstat=mfonset
         else
             ! strength close to zero == already failed
-            fstat=mxonset
+            fstat=mfonset
         end if
         
         if(present(findex)) findex=findex2

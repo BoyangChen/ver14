@@ -6,11 +6,12 @@
     private
     
     integer, parameter :: ndim=3, nst=6, nnode=6, nig=2, ndof=ndim*nnode ! constants for type wedge_element 
-    
+    real(dp),parameter :: dfail=one                                      ! max. degradation at final failure 
     
     type, public :: wedge_element 
         private
         
+        integer :: curr_status=0
         integer :: key=0 ! glb index of this element
         integer :: connec(nnode)=0 ! node indices in their global arrays
         integer :: matkey=0 ! material index in the global material arrays
@@ -62,6 +63,7 @@
         integer :: i
         i=0
         
+        elem%curr_status=0
         elem%key=0
         elem%connec=0
         elem%matkey=0
@@ -105,15 +107,17 @@
     
     
     
-    subroutine extract_wedge_element(elem,key,connec,matkey,theta,ig_point,sdv)
+    subroutine extract_wedge_element(elem,curr_status,key,connec,matkey,theta,ig_point,sdv)
     
         type(wedge_element), intent(in) :: elem
         
-        integer,                              optional, intent(out) :: key, matkey
+        integer,                              optional, intent(out) :: curr_status, key, matkey
         real(kind=dp),                        optional, intent(out) :: theta
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
+        
+        if(present(curr_status)) curr_status=elem%curr_status
         
         if(present(key)) key=elem%key
         
@@ -152,6 +156,7 @@
     use toolkit_module                  ! global tools for element integration
     use lib_mat_module                  ! global material library
     use lib_node_module                 ! global node library
+    use glb_clock_module                ! global analysis progress (curr. step, inc, time, dtime)
     
         type(wedge_element),intent(inout)       :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
@@ -164,6 +169,13 @@
         character(len=matnamelength) :: matname
         character(len=mattypelength) :: mattype
         integer :: matkey
+        
+        ! - variables extracted from element isdv
+        integer         :: nstep, ninc                  ! step and increment no. of the last iteration, stored in the element
+        logical         :: last_converged               ! true if last iteration has converged: a new increment/step has started
+        
+        ! - variables extracted from intg point sdvs
+        type(sdv_array),  allocatable   :: ig_sdv(:)
         
         ! variables defined locally
         real(kind=dp)   :: igxi(ndim,nig),igwt(nig) ! ig point natural coords and weights
@@ -178,8 +190,10 @@
         real(kind=dp)   :: btd(ndof,nst),btdb(ndof,ndof) ! b'*d & b'*d*b
         real(kind=dp)   :: tmpx(ndim),tmpu(ndim),tmpstrain(nst),tmpstress(nst) ! temp. x, strain & stress arrays for intg pnts      
         real(kind=dp),allocatable :: xj(:),uj(:)! nodal vars extracted from glb lib_node array
+        real(kind=dp),allocatable :: vec(:,:)
+        real(kind=dp)   :: vecf(2), c, s, clength
         
-        integer :: i,j,kig
+        integer :: i,j,kig,igstat
         
         ! initialize variables
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
@@ -226,6 +240,37 @@
         
         ! extract orientation from element
         theta=elem%theta
+        
+        ! calculate approximate clength
+        vecf=zero; c=zero; s=zero; clength=zero
+        allocate(vec(2,2)); vec=zero
+        vec(1:2,1)=coord(1:2,3)-coord(1:2,1) ! diagonal vector 1
+        vec(1:2,2)=coord(1:2,4)-coord(1:2,2) ! diagonal vector 2 
+        c=cos(pi*theta/halfcirc)
+        s=sin(pi*theta/halfcirc)
+        vecf=[c,s]
+        clength=max(dot_product(vecf,vec(:,1)),dot_product(vecf,vec(:,2))) 
+
+
+        ! - extract isdv values from element and assign to nstep and ninc
+        if(.not.allocated(elem%sdv)) then   ! 1st iteration
+            allocate(elem%sdv(1))
+            allocate(elem%sdv(1)%i(2))      ! allocate integer sdv array
+            elem%sdv(1)%i(1) = curr_step    ! store current step & increment in the integer sdv array
+            elem%sdv(1)%i(2) = curr_inc
+        end if
+        nstep        = elem%sdv(1)%i(1)     ! extract the step & increment no. of the last iteration
+        ninc         = elem%sdv(1)%i(2)
+        
+        
+        ! check if last iteration has converged, and if so, update logical var. 
+        ! and store new step & iteration values
+        if(nstep.ne.curr_step .or. ninc.ne.curr_inc) then
+            last_converged=.true.
+            elem%sdv(1)%i(1) = curr_step    ! update the current step & increment no.
+            elem%sdv(1)%i(2) = curr_inc
+        end if
+        
         
         ! update ig point xi and weight
         call init_ig(igxi,igwt)
@@ -277,6 +322,24 @@
             if(theta/=zero) tmpstrain=lcl_strain(tmpstrain,theta)
             
             
+            ! - extract sdvs from integration points; ig_sdv automatically deallocated when passed in
+            call extract(elem%ig_point(kig),sdv=ig_sdv)
+            
+            ! allocate ig_sdv arrays for 1st iteration of analysis
+            if(.not.allocated(ig_sdv)) then
+            ! allocate 2 sets of sdv arrays, 1 for converged sdvs and 1 for iterating sdvs
+                allocate(ig_sdv(2))
+            end if
+            
+            ! update converged sdvs (sdv1) with iterating sdvs (sdv2) when last iteration has converged
+            ! and revalue iterating sdvs (sdv2) to the last converged sdvs (sdv1) if otherwise
+            if(last_converged) then
+                ig_sdv(1)=ig_sdv(2)
+            else               
+                ig_sdv(2)=ig_sdv(1)
+            end if
+            
+            
             ! get D matrix dee accord. to material properties, and update intg point stresses
             select case (mattype)
                 case ('isotropic')
@@ -295,12 +358,13 @@
                     ! check if failure analysis is needed (check if strength parameters are present)
                     call extract(lib_lamina(matkey),strength_active=failure)
                     
-                    if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
-                    & wedge_element type lamina material; only linear elastic stiffness matrix is integrated."
-                    
-                
-                    ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress)
+                    if(failure) then
+                        ! calculate D matrix, update tmpstress and sdv
+                        call ddsdde(lib_lamina(matkey),clength,dee,strain=tmpstrain,stress=tmpstress,sdv=ig_sdv(2),dfail=dfail)
+                    else
+                        ! calculate D matrix, update tmpstress
+                        call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress)
+                    end if
                     
                 case default
                     write(msg_file,*) 'material type not supported for tri element!'
@@ -324,11 +388,20 @@
             
             
             ! update ig point arrays
-            call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=tmpstrain,stress=tmpstress)
+            call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=tmpstrain,stress=tmpstress,sdv=ig_sdv)
+            
+            ! update elem curr status variable
+            igstat=0
+            if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
+            elem%curr_status=max(elem%curr_status,igstat)
             
        	end do !-looped over all int points. ig=nig
         
         F_vector=matmul(K_matrix,u) 
+        
+        
+        ! deallocate local dynamic arrays
+        if(allocated(vec)) deallocate(vec)
         
         
     

@@ -12,6 +12,7 @@
     type, public :: coh3d6_element 
         private
         
+        integer :: curr_status=0
         integer :: key=0                            ! glb index of this element
         integer :: connec(nnode)=0                  ! node indices in their global arrays
         integer :: matkey=0                         ! material index in the global material arrays
@@ -62,6 +63,7 @@
         integer :: i
         i=0
         
+        elem%curr_status=0
         elem%key=0
         elem%connec=0
         elem%matkey=0
@@ -103,14 +105,16 @@
     
     
     
-    subroutine extract_coh3d6_element(elem,key,connec,matkey,ig_point,sdv)
+    subroutine extract_coh3d6_element(elem,curr_status,key,connec,matkey,ig_point,sdv)
     
         type(coh3d6_element), intent(in) :: elem
         
-        integer,                              optional, intent(out) :: key, matkey
+        integer,                              optional, intent(out) :: curr_status,key, matkey
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
+        
+        if(present(curr_status)) curr_status=elem%curr_status
         
         if(present(key)) key=elem%key
         
@@ -207,7 +211,7 @@
         real(kind=dp)   :: QN(ndim,ndof),DQN(ndim,ndof)         ! [Q]*[N], [D]*[Q]*[N]
         real(kind=dp)   :: NtQt(ndof,ndim),NtQtDQN(ndof,ndof)   ! [N']*[Q'], [N']*[Q']*[D]*[Q]*[N] 
         real(kind=dp)   :: NtQtTau(ndof)                        ! [N']*[Q']*{Tau}
-        integer         :: i,j,k,kig
+        integer         :: i,j,k,kig,igstat
       
         
         
@@ -462,6 +466,11 @@
             
             ! update element ig point arrays
             call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=delta,stress=Tau,sdv=ig_sdv)
+            
+            ! update elem curr status variable
+            igstat=0
+            if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
+            elem%curr_status=max(elem%curr_status,igstat)
             
             
        	end do !-looped over all int points. ig=nig
