@@ -82,7 +82,7 @@
  
 
 
-      subroutine update_lamina(this_lamina,modulus,strength,matrixtoughness,fibretoughness)
+      subroutine update_lamina(this_lamina,modulus,strength,fibretoughness,matrixtoughness)
       
       	type(lamina_type),intent(inout) :: this_lamina
         type(lamina_modulus),optional,intent(in) :: modulus
@@ -150,7 +150,7 @@
       subroutine ddsdde_lamina(this_mat,clength,dee,strain,stress,PlaneStrain,sdv,dfail)
 
         type(lamina_type),                        intent(in)    :: this_mat
-        real(kind=dp)                             intent(in)    :: clength  ! characteristic element length
+        real(kind=dp),                  optional, intent(in)    :: clength  ! characteristic element length
         real(kind=dp),                            intent(out)   :: dee(:,:)
         real(kind=dp),                  optional, intent(out)   :: stress(:)
         real(kind=dp),                  optional, intent(in)    :: strain(:)
@@ -249,28 +249,29 @@
             sdv%i(2)=ffstat
             ! update ddsdde
             df=sdv%r(1)
-            subroutine deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
             ! update stress
             sig=matmul(dee,strain)
         end if
 
-        ! matrix toughness parameters are not active, do only strength failure criterion
-        if(.not.this_mat%matrixtoughness_active) then
-            ! calculate stress based on jump
-            ! dee is defined based on intact stiffness
-            sig=matmul(dee,strain)
-            ! check and update fstat
-            if(mfstat<mfonset) then               
-                ! go through failure criterion and update fstat
-                call MatrixFailureCriterion(sig,this_mat%strength,mfstat)
-            end if
-            ! update sdv
-            if(mfstat>=mfonset) sdv%i(3)=mfstat
-        else
-            ! call MatrixCohesiveLaw()
-            write(msg_file,*)'matrix failure smeared crack model not supported! use FNM cohesive subelem instead'
-            call exit_function
+        ! do only strength failure criterion
+        if(this_mat%matrixtoughness_active) then
+            write(msg_file,*)'matrix failure smeared crack model not supported! &
+            & only failure criterion is assessed; use FNM cohesive subelem instead for matrix cracking'
         end if
+
+        ! calculate stress based on jump
+        ! dee is defined based on intact stiffness
+        sig=matmul(dee,strain)
+        ! check and update fstat
+        if(mfstat<mfonset) then               
+            ! go through failure criterion and update fstat
+            call MatrixFailureCriterion(sig,this_mat%strength,mfstat)
+        end if
+        ! update sdv
+        if(mfstat>=mfonset) sdv%i(3)=mfstat
+        
+        
         
         ! update stress
         if(present(stress)) stress=sig
@@ -286,11 +287,12 @@
 
 
 
-      subroutine deemat(E01,E02,E03,nu012,nu013,nu023,G012,G013,G023,dee,df,dm2,dm3)
+      subroutine deemat(E01,E02,E03,nu012,nu013,nu023,G012,G013,G023,dee,df,dm2,dm3,planestrain)
       
       real(dp), intent(in) :: E01,E02,E03,nu012,nu013,nu023,G012,G013,G023
       real(dp), intent(out) :: dee(:,:)
       real(dp), optional, intent(in) :: df, dm2, dm3
+      logical,  optional, intent(in) :: planestrain
       
       !local var.
       real(dp) :: E1,E2,E3,nu12,nu13,nu23,G12,G13,G23
@@ -387,7 +389,7 @@
         
       
         ! local variables
-        real(dp) :: GfcT, GfcC, dm, u0, uf, findex, dm2
+        real(dp) :: GfcT, GfcC, dm, u0, uf, T0, u_eff, T_eff, findex, dm2
         integer  :: nst
         
         
@@ -415,7 +417,8 @@
         
         ! initialize local variables
         GfcT=zero; GfcC=zero
-        dm=zero; u0=zero; uf=zero; findex=zero; dm2=zero
+        dm=zero; u0=zero; uf=zero; T0=zero; findex=zero; dm2=zero
+        u_eff=zero; T_eff=zero
         nst=0
         
         
@@ -432,7 +435,7 @@
         uf=sdvr(3) 
         
         ! extract nst
-        nst=size(dee(:,1))
+        nst=size(strain)
      
      
         ! check and update fstat and damage variables
@@ -497,9 +500,9 @@
         
         
         ! update sdv
-        sdv%r(1)=dm
-        sdv%r(2)=u0
-        sdv%r(3)=uf
+        sdvr(1)=dm
+        sdvr(2)=u0
+        sdvr(3)=uf
         
       end subroutine FibreCohesiveLaw
 

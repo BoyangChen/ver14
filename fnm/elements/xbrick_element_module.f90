@@ -4,7 +4,7 @@ module xbrick_element_module
     use lib_edge_module                 ! global edge library
     use lib_node_module                 ! global node library
     use lib_mat_module                  ! global material library
-    use sub2d_element_module
+    use sub3d_element_module
   
   
     implicit none
@@ -91,7 +91,7 @@ module xbrick_element_module
     
         type(xbrick_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
-        integer,                intent(in)      :: matkey
+        integer,                intent(in)      :: bulkmat, cohmat
         real(dp),               intent(in)      :: theta
         integer,                intent(in)      :: nodecnc(nnode)
         integer,                intent(in)      :: edgecnc(nedge)
@@ -177,7 +177,7 @@ module xbrick_element_module
         i=0; j=0; l=0
         elstat=0
 
-        
+        print*,elem%curr_status
 
         !---------------------------------------------------------------------!
         !               update sub element definitions
@@ -197,6 +197,8 @@ module xbrick_element_module
                 allocate(elem%subelem(1))
                 allocate(elem%subcnc(1))
                 allocate(elem%subcnc(1)%array(nndrl))   ! brick elem
+                allocate(subglbcnc(1))
+                allocate(subglbcnc(1)%array(nndrl))
                 ! sub elm 1 connec
                 elem%subcnc(1)%array=[(i, i=1,nndrl)]
                 subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
@@ -218,6 +220,8 @@ module xbrick_element_module
         if(elem%curr_status<elfail) then
             ! store current status value
             elstat=elem%curr_status
+            
+            !print*,elem%curr_status
               
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
@@ -227,6 +231,8 @@ module xbrick_element_module
  
             !***** check failure criterion *****
             call failure_criterion_partition(elem)
+            
+            !print*,elem%curr_status
             
             if(elem%curr_status/=elstat) then
             ! elem status changed, elem failed, partition changed, reintegrate subelems
@@ -500,41 +506,35 @@ module xbrick_element_module
           
         end if
              
+
+!-----------------------------------------------------------------------!
+!                   UPDATE INTERFACE
+!               update global libraries
+!-----------------------------------------------------------------------!
             
 !       update element curr_status and sub-element cnc matrices
 
         if(elstat>elem%curr_status) then
             elem%curr_status=elstat                       
             call update_subcnc(elem,edgstat,ifedg,nfailedge)
-        end if
-
-
-
-
-
-
-
-!-----------------------------------------------------------------------!
-!                   UPDATE INTERFACE
-!               update global libraries
-!-----------------------------------------------------------------------!
-
-        ! update glb edge array, only the broken edges' status variables
-        lib_edge(elem%edgecnc(ifedg(:)))=edgstat(ifedg(:))
         
-        ! update glb node array, only the broken edges' fl. node coord
-        do i=1, nfailedge
-            j=ifedg(i)          ! local index of broken edge
-            
-            l=topo(3,j)         ! elem lcl index of broken edge fl. node 1
-            k=elem%nodecnc(l)   ! global index of broken edge fl. node 1
-            call update(lib_node(k),x=coord(l)%array)
-            
-            l=topo(4,j)         ! elem lcl index of broken edge fl. node 2
-            k=elem%nodecnc(l)   ! global index of broken edge fl. node 2
-            call update(lib_node(k),x=coord(l)%array)
-        end do
 
+            ! update glb edge array, only the broken edges' status variables
+            lib_edge(elem%edgecnc(ifedg(:)))=edgstat(ifedg(:))
+            
+            ! update glb node array, only the broken edges' fl. node coord
+            do i=1, nfailedge
+                j=ifedg(i)          ! local index of broken edge
+                
+                l=topo(3,j)         ! elem lcl index of broken edge fl. node 1
+                k=elem%nodecnc(l)   ! global index of broken edge fl. node 1
+                call update(lib_node(k),x=coord(l)%array)
+                
+                l=topo(4,j)         ! elem lcl index of broken edge fl. node 2
+                k=elem%nodecnc(l)   ! global index of broken edge fl. node 2
+                call update(lib_node(k),x=coord(l)%array)
+            end do
+        end if
 
 
 
@@ -542,8 +542,6 @@ module xbrick_element_module
 
 !       deallocate local dynamic arrays
 
-        if(allocated(edgstat))  deallocate(edgstat)
-        if(allocated(ifedg))    deallocate(ifedg)
     
     
     end subroutine edge_status_partition
@@ -558,7 +556,7 @@ module xbrick_element_module
 !******************* subroutine kplyfail ****************************************************
 !*********** quadratic stress failure criteria and element partition criterion **************
 !********************************************************************************************
-    subroutine failure_criterion_parition(elem)
+    subroutine failure_criterion_partition(elem)
 
     ! passed in variables
     type(xbrick_element) :: elem
@@ -640,12 +638,14 @@ module xbrick_element_module
         ! extract nodal coords from glb node library
         do i=1, nnode
             call extract(lib_node(elem%nodecnc(i)),x=coord(i)%array)
-            xelm(:,i)=coord(i)%array(:)
+            if(allocated(coord(i)%array)) xelm(:,i)=coord(i)%array(:)
         end do
         
         edg=topo
 
         theta=elem%theta
+        
+        elstat=elem%curr_status
 
 
 !-----------------------------------------------------------------------!
@@ -787,51 +787,46 @@ module xbrick_element_module
           
             ! update the elstat to failed status value
             elstat=elfail
+                        
+
+    !       update element curr_status and sub-element cnc matrices
+
+            elem%curr_status=elstat                       
+            call update_subcnc(elem,edgstat,ifedg,nfailedge)
+
+
+    !-----------------------------------------------------------------------!
+    !                   UPDATE INTERFACE
+    !               update global libraries
+    !-----------------------------------------------------------------------!
+
+            ! update glb edge array, only the broken edges' status variables
+            lib_edge(elem%edgecnc(ifedg(1:nfailedge)))=edgstat(ifedg(1:nfailedge))
             
-            
+            ! update glb node array, only the broken edges' fl. node coord
+            do i=1, nfailedge
+                j=ifedg(i)          ! local index of broken edge
+                
+                l=edg(3,j)          ! elem lcl index of broken edge fl. node 1
+                coord(l)%array(:)=xelm(:,l)
+                k=elem%nodecnc(l)   ! global index of broken edge fl. node 1
+                call update(lib_node(k),x=coord(l)%array)
+                
+                l=edg(4,j)          ! elem lcl index of broken edge fl. node 2
+                coord(l)%array(:)=xelm(:,l)
+                k=elem%nodecnc(l)   ! global index of broken edge fl. node 2
+                call update(lib_node(k),x=coord(l)%array)
+            end do
+
+
+
         end if
-
-
-
-!       update element curr_status and sub-element cnc matrices
-
-        elem%curr_status=elstat                       
-        call update_subcnc(elem,edgstat,ifedg,nfailedge)
-
-
-
-
-!-----------------------------------------------------------------------!
-!                   UPDATE INTERFACE
-!               update global libraries
-!-----------------------------------------------------------------------!
-
-        ! update glb edge array, only the broken edges' status variables
-        lib_edge(elem%edgecnc(ifedg(:)))=edgstat(ifedg(:))
-        
-        ! update glb node array, only the broken edges' fl. node coord
-        do i=1, nfailedge
-            j=ifedg(i)          ! local index of broken edge
-            
-            l=edg(3,j)          ! elem lcl index of broken edge fl. node 1
-            coord(l)%array(:)=xelm(:,l)
-            k=elem%nodecnc(l)   ! global index of broken edge fl. node 1
-            call update(lib_node(k),x=coord(l)%array)
-            
-            l=edg(4,j)          ! elem lcl index of broken edge fl. node 2
-            coord(l)%array(:)=xelm(:,l)
-            k=elem%nodecnc(l)   ! global index of broken edge fl. node 2
-            call update(lib_node(k),x=coord(l)%array)
-        end do
-
 
         ! deallocate local arrays
         
-        if(allocated(edgstat)) deallocate(edgstat)
-        if(allocated(ifedg)) deallocate(ifedg)
         
       return  
-      end subroutine failure_criterion_parition
+      end subroutine failure_criterion_partition
 
 
 
@@ -926,7 +921,8 @@ module xbrick_element_module
             elem%subcnc(1)%array(2)=topo(2,e1)
             elem%subcnc(1)%array(3)=jnode
             
-            elem%subcnc(1)%array(4:6)=elem%subcnc(1)%array(1:3)+nnode/2 ! upper surf nodes
+            elem%subcnc(1)%array(4:5)=elem%subcnc(1)%array(1:2)+nndrl/2 ! upper surf nodes
+            elem%subcnc(1)%array(6)=elem%subcnc(1)%array(3)+nndfl/2
             
             subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
             
@@ -935,7 +931,8 @@ module xbrick_element_module
             elem%subcnc(2)%array(2)=topo(2,e2)
             elem%subcnc(2)%array(3)=jnode 
 
-            elem%subcnc(2)%array(4:6)=elem%subcnc(2)%array(1:3)+nnode/2 ! upper surf nodes
+            elem%subcnc(2)%array(4:5)=elem%subcnc(2)%array(1:2)+nndrl/2 ! upper surf nodes
+            elem%subcnc(2)%array(6)=elem%subcnc(2)%array(3)+nndfl/2 
 
             subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
             
@@ -944,7 +941,8 @@ module xbrick_element_module
             elem%subcnc(3)%array(2)=topo(2,e3)
             elem%subcnc(3)%array(3)=jnode  
             
-            elem%subcnc(3)%array(4:6)=elem%subcnc(3)%array(1:3)+nnode/2 ! upper surf nodes
+            elem%subcnc(3)%array(4:5)=elem%subcnc(3)%array(1:2)+nndrl/2 ! upper surf nodes
+            elem%subcnc(3)%array(6)=elem%subcnc(3)%array(3)+nndfl/2
 
             subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
 
@@ -960,6 +958,7 @@ module xbrick_element_module
             ibe1=min(ifedg(1),ifedg(2))   ! local edge index of 1st broken edge
             ibe2=max(ifedg(1),ifedg(2))   ! local edge index of 2nd broken edge
             if(edgstat(ibe1)==cohcrack .or. edgstat(ibe2)==cohcrack) iscoh=.true.
+            print*,ibe1,ibe2
             
             ! determine partition based on the indices of the two broken edges
             !   partition: no. of bulk sub domains
@@ -1038,7 +1037,10 @@ module xbrick_element_module
                     elem%subcnc(1)%array(3)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(1)%array(3)=jnode3
                     elem%subcnc(1)%array(4)=topo(2,e3)
                     
-                    elem%subcnc(1)%array(5:8)=elem%subcnc(1)%array(1:4)+nnode/2
+                    elem%subcnc(1)%array(5)=elem%subcnc(1)%array(1)+nndrl/2
+                    elem%subcnc(1)%array(6)=elem%subcnc(1)%array(2)+nndfl/2
+                    elem%subcnc(1)%array(7)=elem%subcnc(1)%array(3)+nndfl/2
+                    elem%subcnc(1)%array(8)=elem%subcnc(1)%array(4)+nndrl/2
                     
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     
@@ -1048,7 +1050,10 @@ module xbrick_element_module
                     elem%subcnc(2)%array(3)=topo(1,e3)
                     elem%subcnc(2)%array(4)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(2)%array(4)=jnode3
                     
-                    elem%subcnc(2)%array(5:8)=elem%subcnc(2)%array(1:4)+nnode/2
+                    elem%subcnc(2)%array(5)=elem%subcnc(2)%array(1)+nndfl/2
+                    elem%subcnc(2)%array(6)=elem%subcnc(2)%array(2)+nndrl/2
+                    elem%subcnc(2)%array(7)=elem%subcnc(2)%array(3)+nndrl/2
+                    elem%subcnc(2)%array(8)=elem%subcnc(2)%array(4)+nndfl/2
 
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
@@ -1059,17 +1064,17 @@ module xbrick_element_module
                     if(iscoh) then
                     
                     ! sub elm 3 connec
-                    elem%subcnc(3)%array(1)=topo(4,e3) if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(1)=jnode3
-                    elem%subcnc(3)%array(2)=topo(3,e1) if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(2)=jnode1
+                    elem%subcnc(3)%array(1)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(1)=jnode3
+                    elem%subcnc(3)%array(2)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(2)=jnode1
                     
-                    elem%subcnc(3)%array(3)=elem%subcnc(3)%array(2)+nnode/2
-                    elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nnode/2
+                    elem%subcnc(3)%array(3)=elem%subcnc(3)%array(2)+nndfl/2
+                    elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nndfl/2
                     
-                    elem%subcnc(3)%array(5)=topo(3,e3) if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(6)=jnode3
-                    elem%subcnc(3)%array(6)=topo(4,e1) if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(5)=jnode1
+                    elem%subcnc(3)%array(5)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(6)=jnode3
+                    elem%subcnc(3)%array(6)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(5)=jnode1
                     
-                    elem%subcnc(3)%array(7)=elem%subcnc(3)%array(6)+nnode/2
-                    elem%subcnc(3)%array(8)=elem%subcnc(3)%array(5)+nnode/2
+                    elem%subcnc(3)%array(7)=elem%subcnc(3)%array(6)+nndfl/2
+                    elem%subcnc(3)%array(8)=elem%subcnc(3)%array(5)+nndfl/2
                     
                     subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
                     
@@ -1122,7 +1127,9 @@ module xbrick_element_module
                     elem%subcnc(1)%array(2)=topo(1,e2)
                     elem%subcnc(1)%array(3)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(1)%array(3)=jnode2
 
-                    elem%subcnc(1)%array(4:6)=elem%subcnc(1)%array(1:3)+nnode/2 ! upper surf nodes
+                    elem%subcnc(1)%array(4)=elem%subcnc(1)%array(1)+nndfl/2 ! upper surf nodes
+                    elem%subcnc(1)%array(5)=elem%subcnc(1)%array(2)+nndrl/2
+                    elem%subcnc(1)%array(6)=elem%subcnc(1)%array(3)+nndfl/2
                     
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     
@@ -1131,7 +1138,9 @@ module xbrick_element_module
                     elem%subcnc(2)%array(2)=topo(1,e3)
                     elem%subcnc(2)%array(3)=topo(2,e3)
                     
-                    elem%subcnc(2)%array(4:6)=elem%subcnc(2)%array(1:3)+nnode/2 ! upper surf nodes
+                    elem%subcnc(2)%array(4)=elem%subcnc(2)%array(1)+nndfl/2 ! upper surf nodes
+                    elem%subcnc(2)%array(5)=elem%subcnc(2)%array(2)+nndrl/2
+                    elem%subcnc(2)%array(6)=elem%subcnc(2)%array(3)+nndrl/2
                     
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
@@ -1140,7 +1149,9 @@ module xbrick_element_module
                     elem%subcnc(3)%array(2)=topo(2,e4)
                     elem%subcnc(3)%array(3)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(3)=jnode1
                     
-                    elem%subcnc(3)%array(4:6)=elem%subcnc(3)%array(1:3)+nnode/2 ! upper surf nodes
+                    elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nndrl/2 ! upper surf nodes
+                    elem%subcnc(3)%array(5)=elem%subcnc(3)%array(2)+nndrl/2
+                    elem%subcnc(3)%array(6)=elem%subcnc(3)%array(3)+nndfl/2
                     
                     subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
                     
@@ -1149,7 +1160,9 @@ module xbrick_element_module
                     elem%subcnc(4)%array(2)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(4)%array(2)=jnode2
                     elem%subcnc(4)%array(3)=topo(2,e3)
 
-                    elem%subcnc(4)%array(4:6)=elem%subcnc(4)%array(1:3)+nnode/2 ! upper surf nodes
+                    elem%subcnc(4)%array(4)=elem%subcnc(4)%array(1)+nndfl/2 ! upper surf nodes
+                    elem%subcnc(4)%array(5)=elem%subcnc(4)%array(2)+nndfl/2
+                    elem%subcnc(4)%array(6)=elem%subcnc(4)%array(3)+nndrl/2
                     
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
                     
@@ -1162,17 +1175,17 @@ module xbrick_element_module
                     if(iscoh) then
                     
                     ! sub elm 5 connec
-                    elem%subcnc(5)%array(1)=topo(4,e1) if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(1)=jnode1
-                    elem%subcnc(5)%array(2)=topo(3,e2) if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(2)=jnode2
+                    elem%subcnc(5)%array(1)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(1)=jnode1
+                    elem%subcnc(5)%array(2)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(2)=jnode2
                     
-                    elem%subcnc(5)%array(3)=elem%subcnc(5)%array(2)+nnode/2
-                    elem%subcnc(5)%array(4)=elem%subcnc(5)%array(1)+nnode/2
+                    elem%subcnc(5)%array(3)=elem%subcnc(5)%array(2)+nndfl/2
+                    elem%subcnc(5)%array(4)=elem%subcnc(5)%array(1)+nndfl/2
                     
-                    elem%subcnc(5)%array(5)=topo(3,e1) if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(4)=jnode1
-                    elem%subcnc(5)%array(6)=topo(4,e2) if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(3)=jnode2   
+                    elem%subcnc(5)%array(5)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(4)=jnode1
+                    elem%subcnc(5)%array(6)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(3)=jnode2   
                     
-                    elem%subcnc(5)%array(7)=elem%subcnc(5)%array(6)+nnode/2
-                    elem%subcnc(5)%array(8)=elem%subcnc(5)%array(5)+nnode/2
+                    elem%subcnc(5)%array(7)=elem%subcnc(5)%array(6)+nndfl/2
+                    elem%subcnc(5)%array(8)=elem%subcnc(5)%array(5)+nndfl/2
                     
                     subglbcnc(5)%array(:)=elem%nodecnc(elem%subcnc(5)%array(:))
                     

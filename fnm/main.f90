@@ -3,6 +3,7 @@
     include 'globals/integration_point_module.f90'  ! used in elem and output modules
     include 'globals/toolkit_module.f90'            ! used in elem and precrack modules
     include 'libraries/lib_node_module.f90'
+    include 'libraries/lib_edge_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
     include 'outputs/output_module.f90'
@@ -12,6 +13,7 @@
         use glb_clock_module
         use lib_mat_module
         use lib_node_module
+        use lib_edge_module
         use lib_elem_module
         use output_module
 
@@ -38,10 +40,10 @@
         type(nodeset),allocatable :: ndset(:)
 
         ! output directory name
-        character(len=dirlength)  :: workdir, outdir
+        character(len=dirlength)  :: workdir
 
         integer :: i,jl,ml,nl,jr,mr,nr,nnode,ndof,nelem
-        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8,nsub2d,nsub3d
+        integer :: ntri,nquad,nwedge,nbrick,ncoh2d,ncoh3d6,ncoh3d8,nxbrick
         integer :: kinc, ninc, nndset
         real(dp):: ux, uy, uz, vx, vy, vz
 
@@ -56,7 +58,8 @@
         jr=0; mr=0; nr=0
         nnode=0; ndof=0
         nelem=0; ntri=0; nquad=0; nwedge=0; nbrick=0
-        ncoh2d=0; ncoh3d6=0; ncoh3d8=0; nsub2d=0; nsub3d=0
+        ncoh2d=0; ncoh3d6=0; ncoh3d8=0
+        nxbrick=0
         nndset=0; kinc=0; ninc=0
         ux=zero; uy=zero; uz=zero
         vx=zero; vy=zero; vz=zero
@@ -66,6 +69,7 @@
 
         call initialize_glb_clock
         call initialize_lib_node
+        call initialize_lib_edge
         call initialize_lib_elem
         call initialize_lib_mat
 
@@ -78,8 +82,11 @@
 !        ndset(1)=nodeset(setname='bottom',setnode=[1,2])
 !        ndset(2)=nodeset(setname='top',setnode=[3,4])
 
-        ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
-        ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
+        !~ndset(1)=nodeset(setname='bottom',setnode=[1,2,3,4,5,6])
+        !~ndset(2)=nodeset(setname='top',setnode=[7,8,9,10,11,12])
+
+        ndset(1)=nodeset(setname='left', setnode=[1,3,5,7,9,11])
+        ndset(2)=nodeset(setname='right',setnode=[2,4,6,8,10,12])
 
 
         ! obtain the current working directory and specify output directory
@@ -88,9 +95,9 @@
 
 
         ! set loading rates and increments
-        !vx=-0.01_dp/sqrt(two)
-        vy=-0.01_dp/sqrt(two)
-        vz=0.01_dp/sqrt(two)
+        vx=0.001_dp
+        !vy=0.01_dp/sqrt(two)
+        !vz=0.01_dp/sqrt(two)
         ninc=10
 
 
@@ -169,20 +176,12 @@
                 end do
             end if
 
-            if(allocated(lib_sub2d)) then
-                nsub2d=size(lib_sub2d)
-                do i=1,nsub2d
-                    call integrate(lib_sub2d(i),Ki,Fi)
+            if(allocated(lib_xbrick)) then
+                nxbrick=size(lib_xbrick)
+                do i=1,nxbrick
+                    call integrate(lib_xbrick(i),Ki,Fi)
                 end do
             end if
-
-            if(allocated(lib_sub3d)) then
-                nsub3d=size(lib_sub3d)
-                do i=1,nsub3d
-                    call integrate(lib_sub3d(i),Ki,Fi)
-                end do
-            end if
-
 
             !print*,outdir
             call output(1,kinc,outdir)

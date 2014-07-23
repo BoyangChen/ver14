@@ -73,10 +73,11 @@
         
         call update(lib_iso(1), isotropic_modulus(E=100.0_dp, nu=zero))
         
-        call update(lib_lamina(1), lamina_modulus(1000.0_dp,100.0_dp,40.0_dp,50.0_dp,zero,zero))
+        call update(lib_lamina(1), lamina_modulus(161000.0_dp,11400.0_dp,5170.0_dp,3980.0_dp,0.32_dp,0.43_dp), &
+        & lamina_strength(2800.0_dp,1500.0_dp,60.0_dp,128.0_dp,90.0_dp,90.0_dp), lamina_fibretoughness(100.0_dp,100.0_dp))
     
-        call update(lib_interface(1), interface_modulus(100.0_dp,100.0_dp,100.0_dp), &
-        & interface_strength(5.0_dp,10.0_dp,10.0_dp), interface_toughness(0.25_dp,one,one,eta=two))
+        call update(lib_interface(1), interface_modulus(1000000.0_dp,500000.0_dp,500000.0_dp), &
+        & interface_strength(60.0_dp,90.0_dp,90.0_dp), interface_toughness(0.25_dp,1.0_dp,1.0_dp,eta=2.0_dp))
     
     end subroutine initialize_lib_mat
     

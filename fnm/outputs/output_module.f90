@@ -81,7 +81,7 @@
         type(sdv_array),allocatable :: fsdv(:)  ! failure variables extracted from ig point sdv array
         
         ! counters
-        integer                     :: i, j, l
+        integer                     :: i, j, l, m, n
 
       
       
@@ -107,7 +107,7 @@
         x3d=zero; disp3d=zero
         sigtsr=zero; epstsr=zero
         fvar=zero
-        i=0; j=0; l=0
+        i=0; j=0; l=0; m=0; n=0
         
         ! obtain nnode value from glb libraries
         nnode=size(lib_node)
@@ -185,7 +185,6 @@
         ! get no. of elems of each type
         if(allocated(lib_tri))      ntri=size(lib_tri) ! no. of tri elem in the mesh
         if(allocated(lib_quad))     nquad=size(lib_quad)
-        !~if(allocated(lib_tetra))  ntetra=size(lib_tetra)
         if(allocated(lib_wedge))    nwedge=size(lib_wedge)
         if(allocated(lib_brick))    nbrick=size(lib_brick)
         if(allocated(lib_coh2d))    ncoh2d=size(lib_coh2d)
@@ -194,8 +193,8 @@
         
         if(allocated(lib_xbrick)) then
             nxbrick=size(lib_xbrick)
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)
                 do j=1,nsub3d
                     call extract(sub3d(j),eltype=subtype)
@@ -217,7 +216,7 @@
         ! .... and other elem types ....
         
         ! total no. of elems
-        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d+ncoh3d6+ncoh3d8+nsub2d+nsub3d
+        nelem=ntri+nquad+ntetra+nwedge+nbrick+ncoh2d+ncoh3d6+ncoh3d8+nsubwedge+nsubbrick+nsubcoh3d6+nsubcoh3d8
         
         ! calculate total no. of nodes to print; each row has 1+elnode no. of indices to print
         nsize=ntri*(1+3)+nquad*(1+4)+ntetra*(1+4)+nwedge*(1+6)+nbrick*(1+8) &
@@ -245,16 +244,7 @@
                 write(outunit,*) 4,connec(1),connec(2),connec(3),connec(4) 
             end do
         end if
-        !~
-        !~if(ntetra > 0) then
-        !~    do i=1,ntetra ! write each element's connec individually
-        !~        call extract(lib_tetra(i),connec=connec) ! extract connec from lib_tri
-        !~        ! print connec in vtk; note that in vtk node no. starts from 0
-        !~        connec=connec-1
-        !~        write(outunit,*) 4,connec(1),connec(2),connec(3),connec(4)
-        !~    end do
-        !~end if
-        !~
+
         if(nwedge > 0) then
             do i=1,nwedge ! write each element's connec individually
                 call extract(lib_wedge(i),connec=connec) ! extract connec from lib_tri
@@ -305,8 +295,8 @@
         
         
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)
                 if(nsub3d > 0) then
                     do i=1,nsub3d ! write each element's connec individually
@@ -382,8 +372,8 @@
         
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)     
                 if (nsub3d > 0) then
                     do i=1,nsub3d
@@ -606,8 +596,8 @@
         
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)        
                 if (nsub3d > 0) then
                     do i=1,nsub3d
@@ -875,8 +865,8 @@
 
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)        
                 if (nsub3d > 0) then
                     do i=1,nsub3d
@@ -1112,8 +1102,8 @@
 
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)
                 if (nsub3d > 0) then
                     do i=1,nsub3d
@@ -1310,8 +1300,8 @@
 
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)
                 if (nsub3d > 0) then
                     do i=1,nsub3d
@@ -1511,8 +1501,8 @@
 
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)
                 if (nsub3d > 0) then
                     do i=1,nsub3d
@@ -1711,12 +1701,12 @@
 
 
         if(nxbrick > 0) then
-            do i=1,nxbrick
-                call extract(lib_xbrick(i),subelem=sub3d)
+            do m=1,nxbrick
+                call extract(lib_xbrick(m),subelem=sub3d)
                 nsub3d=size(sub3d)
                 if (nsub3d > 0) then
                     do i=1,nsub3d
-                        call extract(lib_sub3d(i),eltype=subtype)
+                        call extract(sub3d(i),eltype=subtype)
                         select case(subtype)
                             case('wedge')
                                 call extract(sub3d(i),wedge=subwedge)

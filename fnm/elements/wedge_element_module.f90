@@ -169,6 +169,8 @@
         character(len=matnamelength) :: matname
         character(len=mattypelength) :: mattype
         integer :: matkey
+        ! - glb clock step and increment no. extracted from glb clock module
+        integer         :: curr_step, curr_inc
         
         ! - variables extracted from element isdv
         integer         :: nstep, ninc                  ! step and increment no. of the last iteration, stored in the element
@@ -204,6 +206,7 @@
             call empty(node(i))
         end do
         call empty(mat)
+        curr_step=0; curr_inc=0
         
         igxi=zero; igwt=zero
         coords=zero; theta=zero; u=zero
@@ -237,6 +240,9 @@
         mat=lib_mat(elem%matkey)
         call extract(mat,matname,mattype,matkey)
         
+        ! - extract curr step and inc values from glb clock module
+        call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
+        
         
         ! extract orientation from element
         theta=elem%theta
@@ -244,8 +250,8 @@
         ! calculate approximate clength
         vecf=zero; c=zero; s=zero; clength=zero
         allocate(vec(2,2)); vec=zero
-        vec(1:2,1)=coord(1:2,3)-coord(1:2,1) ! diagonal vector 1
-        vec(1:2,2)=coord(1:2,4)-coord(1:2,2) ! diagonal vector 2 
+        vec(1:2,1)=coords(1:2,3)-coords(1:2,1) ! diagonal vector 1
+        vec(1:2,2)=coords(1:2,3)-coords(1:2,2) ! diagonal vector 2 
         c=cos(pi*theta/halfcirc)
         s=sin(pi*theta/halfcirc)
         vecf=[c,s]
@@ -363,7 +369,7 @@
                         call ddsdde(lib_lamina(matkey),clength,dee,strain=tmpstrain,stress=tmpstress,sdv=ig_sdv(2),dfail=dfail)
                     else
                         ! calculate D matrix, update tmpstress
-                        call ddsdde(lib_lamina(matkey),dee,strain=tmpstrain,stress=tmpstress)
+                        call ddsdde(lib_lamina(matkey),dee=dee,strain=tmpstrain,stress=tmpstress)
                     end if
                     
                 case default

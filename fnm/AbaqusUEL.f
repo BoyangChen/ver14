@@ -11,6 +11,7 @@
     include 'globals/integration_point_module.f90'  ! used in elem and output modules
     include 'globals/toolkit_module.f90'            ! used in elem and precrack modules
     include 'libraries/lib_node_module.f90'
+    include 'libraries/lib_edge_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
     include 'outputs/output_module.f90'
@@ -25,6 +26,7 @@
     use glb_clock_module
     use lib_mat_module
     use lib_node_module
+    use lib_edge_module
     use lib_elem_module
     use output_module
 
@@ -47,6 +49,7 @@
             ! initialize global clock and libraries
             call initialize_glb_clock
             call initialize_lib_node
+            call initialize_lib_edge
             call initialize_lib_elem
             call initialize_lib_mat 
              
@@ -125,7 +128,10 @@
     ! create this element, here assuming to be xbrick element, in the future, a generic
     ! xelem should be created which contains all x element types, just like in the case
     ! of sub elements
-    type(xbrick_element)    :: elem
+    type(element)               :: elem
+    character(len=elnamelength) :: elname
+    character(len=eltypelength) :: eltype
+    integer                     :: elkey
     
     ! nodal cnc of this elem
     integer, allocatable    :: cnc(:)
@@ -142,10 +148,23 @@
     !---------------------------------------------------------------------------------!
     
     ! extract this element definition from glb library, using the element key jelem
-    elem=lib_xbrick(jelem)
+    elem=lib_elem(jelem)
     
-    ! extract nodal cnc from this elem
-    call extract(elem,nodecnc=cnc)
+    ! extract elname, eltype and elkey
+    call extract(elem,elname,eltype,elkey)
+    
+    ! extract nodal cnc based on element type
+    select case(eltype)
+        case('xbrick')
+            ! extract nodal cnc from this elem
+            call extract(lib_xbrick(elkey),nodecnc=cnc)
+        case('coh3d8')
+            ! extract nodal cnc from this elem
+            call extract(lib_coh3d8(elkey),nodecnc=cnc)
+        case default
+            write(msg_file,*)'unsupported element type'
+            call exit_function
+    end select
     
     ! extract nodal values from passed in variables
     do j=1, nnode
@@ -165,12 +184,18 @@
     
     
     !---------------------------------------------------------------------------------!
-    !           Actual FNM calculation (only one line...)
+    !           Actual FNM calculation
     !---------------------------------------------------------------------------------!
-    
     ! integrate this element
-    call integrate(elem,Kmat,Fvec)
-    
+    select case(eltype)
+        case('xbrick')
+            call integrate(lib_xbrick(elkey),Kmat,Fvec)
+        case('coh3d8')
+            call integrate(lib_coh3d8(elkey),Kmat,Fvec)
+        case default
+            write(msg_file,*)'unsupported element type'
+            call exit_function
+    end select  
     
     
     
