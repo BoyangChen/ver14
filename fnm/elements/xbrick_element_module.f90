@@ -15,7 +15,7 @@ module xbrick_element_module
     integer,parameter :: topo(4,nedge)=reshape([1,2,9,10,2,3,11,12,3,4,13,14,4,1,15,16, &
                                               & 5,6,17,18,6,7,19,20,7,8,21,22,8,5,23,24],[4,nedge])
 
-    type, public :: xbrick_element             ! breakable brickrilateral
+    type, public :: xbrick_element             ! breakable brick
         private
         
         integer :: curr_status=0        ! 0 means intact
@@ -27,7 +27,7 @@ module xbrick_element_module
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
         
-        type(sub2d_element), allocatable :: subelem(:)
+        type(sub3d_element), allocatable :: subelem(:)
         type(int_alloc_array), allocatable :: subcnc(:)      ! sub_elem connec to parent elem nodes
         
     end type xbrick_element
@@ -116,7 +116,7 @@ module xbrick_element_module
         real(dp),                       optional, intent(out) :: theta
         integer,            allocatable,optional, intent(out) :: nodecnc(:)
         integer,            allocatable,optional, intent(out) :: edgecnc(:)
-        type(sub2d_element),allocatable,optional, intent(out) :: subelem(:)
+        type(sub3d_element),allocatable,optional, intent(out) :: subelem(:)
         type(int_alloc_array),allocatable,optional,intent(out):: subcnc(:)
 
         if(present(curr_status)) curr_status=elem%curr_status

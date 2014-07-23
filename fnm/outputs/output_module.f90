@@ -7,7 +7,11 @@
       implicit none
       private
       
-      public :: output
+      ! define global variable for output directory
+      character(len=dirlength), save :: outdir
+      
+      
+      public :: outdir, output
       
       
       contains
@@ -33,6 +37,7 @@
         integer                     :: ntri, nquad, ntetra, nwedge, nbrick, ncoh2d, ncoh3d6, ncoh3d8
         integer                     :: nsub2d, nsubtri, nsubquad, nsubcoh2d
         integer                     :: nsub3d, nsubwedge, nsubbrick, nsubcoh3d6, nsubcoh3d8
+        integer                     :: nxbrick
         
         ! sub element type variable
         character(len=eltypelength) :: subtype
@@ -60,6 +65,8 @@
         type(coh2d_element),allocatable :: subcoh2d(:)
         type(coh3d6_element),allocatable :: subcoh3d6(:)
         type(coh3d8_element),allocatable :: subcoh3d8(:)
+        type(sub2d_element),allocatable :: sub2d(:)
+        type(sub3d_element),allocatable :: sub3d(:)
         
         
         ! integration points
@@ -95,6 +102,7 @@
         ncoh2d=0; ncoh3d6=0; ncoh3d8=0
         nsub2d=0; nsubtri=0; nsubquad=0; nsubcoh2d=0
         nsub3d=0; nsubwedge=0; nsubbrick=0; nsubcoh3d6=0; nsubcoh3d8=0
+        nxbrick=0
         nsize=0; elnode=0
         x3d=zero; disp3d=zero
         sigtsr=zero; epstsr=zero
@@ -184,39 +192,26 @@
         if(allocated(lib_coh3d6))   ncoh3d6=size(lib_coh3d6)
         if(allocated(lib_coh3d8))   ncoh3d8=size(lib_coh3d8)
         
-        if(allocated(lib_sub2d)) then 
-            nsub2d=size(lib_sub2d)
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)
-                    case('tri')
-                        nsubtri=nsubtri+1
-                    case('quad')
-                        nsubquad=nsubquad+1
-                    case('coh2d')
-                        nsubcoh2d=nsubcoh2d+1
-                    case default
-                        continue
-                end select
-            end do
-        end if
-        
-        if(allocated(lib_sub3d)) then 
-            nsub3d=size(lib_sub3d)
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)
-                    case('wedge')
-                        nsubwedge=nsubwedge+1
-                    case('brick')
-                        nsubbrick=nsubbrick+1
-                    case('coh3d6')
-                        nsubcoh3d6=nsubcoh3d6+1
-                    case('coh3d8')
-                        nsubcoh3d8=nsubcoh3d8+1
-                    case default
-                        continue
-                end select
+        if(allocated(lib_xbrick)) then
+            nxbrick=size(lib_xbrick)
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)
+                do j=1,nsub3d
+                    call extract(sub3d(j),eltype=subtype)
+                    select case(subtype)
+                        case('wedge')
+                            nsubwedge=nsubwedge+1
+                        case('brick')
+                            nsubbrick=nsubbrick+1
+                        case('coh3d6')
+                            nsubcoh3d6=nsubcoh3d6+1
+                        case('coh3d8')
+                            nsubcoh3d8=nsubcoh3d8+1
+                        case default
+                            continue
+                    end select
+                end do
             end do
         end if
         ! .... and other elem types ....
@@ -306,34 +301,27 @@
         end if
         
         
-        ! ------ write sub elements ---------
+        ! ------ write x elements ---------
         
-        if(nsub2d > 0) then
-            do i=1,nsub2d ! write each element's connec individually
-                call extract(lib_sub2d(i),glbcnc=connec) ! extract connec
-                ! print connec in vtk; note that in vtk node no. starts from 0
-                connec=connec-1
-                write(outunit,fmatcnc,advance="no") size(connec)
-                do j=1,size(connec)
-                    write(outunit,fmatcnc,advance="no") connec(j)
-                end do
-                write(outunit,'(a)')''
+        
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)
+                if(nsub3d > 0) then
+                    do i=1,nsub3d ! write each element's connec individually
+                        call extract(sub3d(i),glbcnc=connec) ! extract connec
+                        ! print connec in vtk; note that in vtk node no. starts from 0
+                        connec=connec-1
+                        write(outunit,fmatcnc,advance="no") size(connec)
+                        do j=1,size(connec)
+                            write(outunit,fmatcnc,advance="no") connec(j)
+                        end do
+                        write(outunit,'(a)')''
+                    end do
+                end if
             end do
         end if
-        
-        if(nsub3d > 0) then
-            do i=1,nsub3d ! write each element's connec individually
-                call extract(lib_sub3d(i),glbcnc=connec) ! extract connec
-                ! print connec in vtk; note that in vtk node no. starts from 0
-                connec=connec-1
-                write(outunit,fmatcnc,advance="no") size(connec)
-                do j=1,size(connec)
-                    write(outunit,fmatcnc,advance="no") connec(j)
-                end do
-                write(outunit,'(a)')''
-            end do
-        end if
-        
         
         write(outunit,'(a)')''
 
@@ -392,37 +380,28 @@
             end do 
         end if
         
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)
-                    case('tri')
-                        write(outunit,'(i2)') 5 ! 5 for tri
-                    case('quad')
-                        write(outunit,'(i2)') 9 ! 9 for quad
-                    case('coh2d')
-                        write(outunit,'(i2)') 9 ! 9 for coh2d
-                    case default
-                        continue
-                end select    
-            end do
-        end if
-     
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)
-                    case('wedge')
-                        write(outunit,'(i2)') 13 ! 13 for wedge
-                    case('brick')
-                        write(outunit,'(i2)') 12 ! 12 for brick
-                    case('coh3d6')
-                        write(outunit,'(i2)') 13 ! 13 for coh3d6
-                    case('coh3d8')
-                        write(outunit,'(i2)') 12 ! 12 for coh3d8
-                    case default
-                        continue
-                end select    
+
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)     
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(sub3d(i),eltype=subtype)
+                        select case(subtype)
+                            case('wedge')
+                                write(outunit,'(i2)') 13 ! 13 for wedge
+                            case('brick')
+                                write(outunit,'(i2)') 12 ! 12 for brick
+                            case('coh3d6')
+                                write(outunit,'(i2)') 13 ! 13 for coh3d6
+                            case('coh3d8')
+                                write(outunit,'(i2)') 12 ! 12 for coh3d8
+                            case default
+                                continue
+                        end select    
+                    end do
+                end if
             end do
         end if
      
@@ -625,171 +604,110 @@
         end if
         
         
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)                
-                    case('tri')
-                        ! extract tri sub elem
-                        call extract(lib_sub2d(i),tri=subtri)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subtri(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)                   
-                            sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                            sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                            sigtsr(1,2)=sigtsr(1,2)+sig(3)
-                            sigtsr(2,1)=sigtsr(2,1)+sig(3)                         
-                        end do 
-                        ! average stress in the element
-                        sigtsr=sigtsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element
-                        
-                    case('quad')
-                        ! extract quad sub elem
-                        call extract(lib_sub2d(i),quad=subquad)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subquad(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)                   
-                            sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                            sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                            sigtsr(1,2)=sigtsr(1,2)+sig(3)
-                            sigtsr(2,1)=sigtsr(2,1)+sig(3)                         
-                        end do 
-                        ! average stress in the element
-                        sigtsr=sigtsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-    
-                    case('coh2d')
-                        ! extract quad sub elem
-                        call extract(lib_sub2d(i),coh2d=subcoh2d)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subcoh2d(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)  
-                            !epstsr(1,1)
-                            sigtsr(2,2)=sigtsr(2,2)+sig(1)
-                            sigtsr(1,2)=sigtsr(1,2)+sig(2)
-                            sigtsr(2,1)=sigtsr(2,1)+sig(2)                           
-                        end do 
-                        ! average strain in the element
-                        sigtsr=sigtsr/size(igpnt)
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-   
-                    case default
-                        continue                       
-                end select    
-            end do   
+
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)        
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(sub3d(i),eltype=subtype)
+                        select case(subtype)                
+                            case('wedge')
+                                ! extract wedge sub elem
+                                call extract(sub3d(i),wedge=subwedge)
+                                sigtsr=zero ! empty sig & eps tensor for reuse
+                                call extract(subwedge(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),stress=sig)                   
+                                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                    sigtsr(3,2)=sigtsr(3,2)+sig(6)
+                                end do 
+                                ! average stress in the element
+                                sigtsr=sigtsr/size(igpnt)  
+                                do l=1,3
+                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element
+                                
+                            case('brick')
+                                ! extract brick sub elem
+                                call extract(sub3d(i),brick=subbrick)
+                                sigtsr=zero ! empty sig & eps tensor for reuse
+                                call extract(subbrick(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),stress=sig)                   
+                                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                    sigtsr(3,2)=sigtsr(3,2)+sig(6)
+                                end do 
+                                ! average stress in the element
+                                sigtsr=sigtsr/size(igpnt)  
+                                do l=1,3
+                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element 
+            
+                            case('coh3d6')
+                                ! extract coh3d6 sub elem
+                                call extract(sub3d(i),coh3d6=subcoh3d6)
+                                sigtsr=zero ! empty sig & eps tensor for reuse
+                                call extract(subcoh3d6(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),stress=sig)  
+                                    sigtsr(3,3)=sigtsr(3,3)+sig(1)
+                                    sigtsr(1,3)=sigtsr(1,3)+sig(2)
+                                    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
+                                    sigtsr(2,3)=sigtsr(2,3)+sig(3)
+                                    sigtsr(3,2)=sigtsr(3,2)+sig(3)
+                                end do 
+                                ! average strain in the element
+                                sigtsr=sigtsr/size(igpnt)
+                                do l=1,3
+                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element 
+                                
+                            case('coh3d8')
+                                ! extract coh3d8 sub elem
+                                call extract(sub3d(i),coh3d8=subcoh3d8)
+                                sigtsr=zero ! empty sig & eps tensor for reuse
+                                call extract(subcoh3d8(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),stress=sig)  
+                                    sigtsr(3,3)=sigtsr(3,3)+sig(1)
+                                    sigtsr(1,3)=sigtsr(1,3)+sig(2)
+                                    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
+                                    sigtsr(2,3)=sigtsr(2,3)+sig(3)
+                                    sigtsr(3,2)=sigtsr(3,2)+sig(3)
+                                end do 
+                                ! average strain in the element
+                                sigtsr=sigtsr/size(igpnt)
+                                do l=1,3
+                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element
+           
+                            case default
+                                continue                       
+                        end select    
+                    end do   
+                end if
+            end do
         end if
-        
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)                
-                    case('wedge')
-                        ! extract wedge sub elem
-                        call extract(lib_sub3d(i),wedge=subwedge)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subwedge(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)                   
-                            sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                            sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                            sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                            sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                            sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                            sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                            sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                            sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                            sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                        end do 
-                        ! average stress in the element
-                        sigtsr=sigtsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element
-                        
-                    case('brick')
-                        ! extract brick sub elem
-                        call extract(lib_sub3d(i),brick=subbrick)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subbrick(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)                   
-                            sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                            sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                            sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                            sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                            sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                            sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                            sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                            sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                            sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                        end do 
-                        ! average stress in the element
-                        sigtsr=sigtsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-    
-                    case('coh3d6')
-                        ! extract coh3d6 sub elem
-                        call extract(lib_sub3d(i),coh3d6=subcoh3d6)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subcoh3d6(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)  
-                            sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                            sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                            sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                            sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                            sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                        end do 
-                        ! average strain in the element
-                        sigtsr=sigtsr/size(igpnt)
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-                        
-                    case('coh3d8')
-                        ! extract coh3d8 sub elem
-                        call extract(lib_sub3d(i),coh3d8=subcoh3d8)
-                        sigtsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subcoh3d8(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),stress=sig)  
-                            sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                            sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                            sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                            sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                            sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                        end do 
-                        ! average strain in the element
-                        sigtsr=sigtsr/size(igpnt)
-                        do l=1,3
-                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element
-   
-                    case default
-                        continue                       
-                end select    
-            end do   
-        end if
-        
         
         
                
@@ -954,171 +872,111 @@
             end do 
         end if
 
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)                
-                    case('tri')
-                        ! extract tri sub elem
-                        call extract(lib_sub2d(i),tri=subtri)
-                        epstsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subtri(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)                   
-                            epstsr(1,1)=epstsr(1,1)+eps(1)
-                            epstsr(2,2)=epstsr(2,2)+eps(2)
-                            epstsr(1,2)=epstsr(1,2)+eps(3)
-                            epstsr(2,1)=epstsr(2,1)+eps(3)                         
-                        end do 
-                        ! average stress in the element
-                        epstsr=epstsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element
-                        
-                    case('quad')
-                        ! extract quad sub elem
-                        call extract(lib_sub2d(i),quad=subquad)
-                        epstsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subquad(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)                   
-                            epstsr(1,1)=epstsr(1,1)+eps(1)
-                            epstsr(2,2)=epstsr(2,2)+eps(2)
-                            epstsr(1,2)=epstsr(1,2)+eps(3)
-                            epstsr(2,1)=epstsr(2,1)+eps(3)                         
-                        end do 
-                        ! average stress in the element
-                        epstsr=epstsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-    
-                    case('coh2d')
-                        ! extract quad sub elem
-                        call extract(lib_sub2d(i),coh2d=subcoh2d)
-                        epstsr=zero ! empty sig & eps tensor for reuse
-                        call extract(subcoh2d(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)  
-                            !epstsr(1,1)
-                            epstsr(2,2)=epstsr(2,2)+eps(1)
-                            epstsr(1,2)=epstsr(1,2)+eps(2)
-                            epstsr(2,1)=epstsr(2,1)+eps(2)                           
-                        end do 
-                        ! average strain in the element
-                        epstsr=epstsr/size(igpnt)
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-   
-                    case default
-                        continue                       
-                end select    
-            end do   
+
+
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)        
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(sub3d(i),eltype=subtype)
+                        select case(subtype)                
+                            case('wedge')
+                                ! extract wedge sub elem
+                                call extract(sub3d(i),wedge=subwedge)
+                                epstsr=zero ! empty eps & eps tensor for reuse
+                                call extract(subwedge(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),strain=eps)                   
+                                    epstsr(1,1)=epstsr(1,1)+eps(1)
+                                    epstsr(2,2)=epstsr(2,2)+eps(2)
+                                    epstsr(3,3)=epstsr(3,3)+eps(3)
+                                    epstsr(1,2)=epstsr(1,2)+eps(4)
+                                    epstsr(1,3)=epstsr(1,3)+eps(5)
+                                    epstsr(2,3)=epstsr(2,3)+eps(6)
+                                    epstsr(2,1)=epstsr(2,1)+eps(4)
+                                    epstsr(3,1)=epstsr(3,1)+eps(5)
+                                    epstsr(3,2)=epstsr(3,2)+eps(6)
+                                end do 
+                                ! average strain in the element
+                                epstsr=epstsr/size(igpnt)  
+                                do l=1,3
+                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element
+                                
+                            case('brick')
+                                ! extract brick sub elem
+                                call extract(sub3d(i),brick=subbrick)
+                                epstsr=zero ! empty eps & eps tensor for reuse
+                                call extract(subbrick(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),strain=eps)                   
+                                    epstsr(1,1)=epstsr(1,1)+eps(1)
+                                    epstsr(2,2)=epstsr(2,2)+eps(2)
+                                    epstsr(3,3)=epstsr(3,3)+eps(3)
+                                    epstsr(1,2)=epstsr(1,2)+eps(4)
+                                    epstsr(1,3)=epstsr(1,3)+eps(5)
+                                    epstsr(2,3)=epstsr(2,3)+eps(6)
+                                    epstsr(2,1)=epstsr(2,1)+eps(4)
+                                    epstsr(3,1)=epstsr(3,1)+eps(5)
+                                    epstsr(3,2)=epstsr(3,2)+eps(6)
+                                end do 
+                                ! average strain in the element
+                                epstsr=epstsr/size(igpnt)  
+                                do l=1,3
+                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element 
+            
+                            case('coh3d6')
+                                ! extract coh3d6 sub elem
+                                call extract(sub3d(i),coh3d6=subcoh3d6)
+                                epstsr=zero ! empty eps & eps tensor for reuse
+                                call extract(subcoh3d6(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),strain=eps)  
+                                    epstsr(3,3)=epstsr(3,3)+eps(1)
+                                    epstsr(1,3)=epstsr(1,3)+eps(2)
+                                    epstsr(3,1)=epstsr(3,1)+eps(2) 
+                                    epstsr(2,3)=epstsr(2,3)+eps(3)
+                                    epstsr(3,2)=epstsr(3,2)+eps(3)
+                                end do 
+                                ! average strain in the element
+                                epstsr=epstsr/size(igpnt)
+                                do l=1,3
+                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element 
+                                
+                            case('coh3d8')
+                                ! extract coh3d8 sub elem
+                                call extract(sub3d(i),coh3d8=subcoh3d8)
+                                epstsr=zero ! empty eps & eps tensor for reuse
+                                call extract(subcoh3d8(1),ig_point=igpnt)
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),strain=eps)  
+                                    epstsr(3,3)=epstsr(3,3)+eps(1)
+                                    epstsr(1,3)=epstsr(1,3)+eps(2)
+                                    epstsr(3,1)=epstsr(3,1)+eps(2) 
+                                    epstsr(2,3)=epstsr(2,3)+eps(3)
+                                    epstsr(3,2)=epstsr(3,2)+eps(3)
+                                end do 
+                                ! average strain in the element
+                                epstsr=epstsr/size(igpnt)
+                                do l=1,3
+                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                end do
+                                write(outunit,'(a)')'' ! separate from next element
+           
+                            case default
+                                continue                       
+                        end select    
+                    end do   
+                end if
+            end do
         end if
-        
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)                
-                    case('wedge')
-                        ! extract wedge sub elem
-                        call extract(lib_sub3d(i),wedge=subwedge)
-                        epstsr=zero ! empty eps & eps tensor for reuse
-                        call extract(subwedge(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)                   
-                            epstsr(1,1)=epstsr(1,1)+eps(1)
-                            epstsr(2,2)=epstsr(2,2)+eps(2)
-                            epstsr(3,3)=epstsr(3,3)+eps(3)
-                            epstsr(1,2)=epstsr(1,2)+eps(4)
-                            epstsr(1,3)=epstsr(1,3)+eps(5)
-                            epstsr(2,3)=epstsr(2,3)+eps(6)
-                            epstsr(2,1)=epstsr(2,1)+eps(4)
-                            epstsr(3,1)=epstsr(3,1)+eps(5)
-                            epstsr(3,2)=epstsr(3,2)+eps(6)
-                        end do 
-                        ! average strain in the element
-                        epstsr=epstsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element
-                        
-                    case('brick')
-                        ! extract brick sub elem
-                        call extract(lib_sub3d(i),brick=subbrick)
-                        epstsr=zero ! empty eps & eps tensor for reuse
-                        call extract(subbrick(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)                   
-                            epstsr(1,1)=epstsr(1,1)+eps(1)
-                            epstsr(2,2)=epstsr(2,2)+eps(2)
-                            epstsr(3,3)=epstsr(3,3)+eps(3)
-                            epstsr(1,2)=epstsr(1,2)+eps(4)
-                            epstsr(1,3)=epstsr(1,3)+eps(5)
-                            epstsr(2,3)=epstsr(2,3)+eps(6)
-                            epstsr(2,1)=epstsr(2,1)+eps(4)
-                            epstsr(3,1)=epstsr(3,1)+eps(5)
-                            epstsr(3,2)=epstsr(3,2)+eps(6)
-                        end do 
-                        ! average strain in the element
-                        epstsr=epstsr/size(igpnt)  
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-    
-                    case('coh3d6')
-                        ! extract coh3d6 sub elem
-                        call extract(lib_sub3d(i),coh3d6=subcoh3d6)
-                        epstsr=zero ! empty eps & eps tensor for reuse
-                        call extract(subcoh3d6(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)  
-                            epstsr(3,3)=epstsr(3,3)+eps(1)
-                            epstsr(1,3)=epstsr(1,3)+eps(2)
-                            epstsr(3,1)=epstsr(3,1)+eps(2) 
-                            epstsr(2,3)=epstsr(2,3)+eps(3)
-                            epstsr(3,2)=epstsr(3,2)+eps(3)
-                        end do 
-                        ! average strain in the element
-                        epstsr=epstsr/size(igpnt)
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element 
-                        
-                    case('coh3d8')
-                        ! extract coh3d8 sub elem
-                        call extract(lib_sub3d(i),coh3d8=subcoh3d8)
-                        epstsr=zero ! empty eps & eps tensor for reuse
-                        call extract(subcoh3d8(1),ig_point=igpnt)
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),strain=eps)  
-                            epstsr(3,3)=epstsr(3,3)+eps(1)
-                            epstsr(1,3)=epstsr(1,3)+eps(2)
-                            epstsr(3,1)=epstsr(3,1)+eps(2) 
-                            epstsr(2,3)=epstsr(2,3)+eps(3)
-                            epstsr(3,2)=epstsr(3,2)+eps(3)
-                        end do 
-                        ! average strain in the element
-                        epstsr=epstsr/size(igpnt)
-                        do l=1,3
-                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                        end do
-                        write(outunit,'(a)')'' ! separate from next element
-   
-                    case default
-                        continue                       
-                end select    
-            end do   
-        end if
-        
 
 
 
@@ -1251,108 +1109,69 @@
         end if
         
 
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)
-                    case('tri')
-                        call extract(lib_sub2d(i),tri=subtri)
-                        call extract(subtri(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('quad')
-                        call extract(lib_sub2d(i),quad=subquad)
-                        call extract(subquad(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh2d')
-                        call extract(lib_sub2d(i),coh2d=subcoh2d)
-                        call extract(subcoh2d(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
-            end do
-        end if
 
 
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)
-                    case('wedge')
-                        call extract(lib_sub3d(i),wedge=subwedge)
-                        call extract(subwedge(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('brick')
-                        call extract(lib_sub3d(i),brick=subbrick)
-                        call extract(subbrick(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d6')
-                        call extract(lib_sub3d(i),coh3d6=subcoh3d6)
-                        call extract(subcoh3d6(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d8')
-                        call extract(lib_sub3d(i),coh3d8=subcoh3d8)
-                        call extract(subcoh3d8(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(sub3d(i),eltype=subtype)
+                        select case(subtype)
+                            case('wedge')
+                                call extract(sub3d(i),wedge=subwedge)
+                                call extract(subwedge(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('brick')
+                                call extract(sub3d(i),brick=subbrick)
+                                call extract(subbrick(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d6')
+                                call extract(sub3d(i),coh3d6=subcoh3d6)
+                                call extract(subcoh3d6(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d8')
+                                call extract(sub3d(i),coh3d8=subcoh3d8)
+                                call extract(subcoh3d8(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case default
+                                continue
+                        end select    
+                    end do
+                end if
             end do
         end if
 
@@ -1488,111 +1307,71 @@
         end if
         
 
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)
-                    case('tri')
-                        call extract(lib_sub2d(i),tri=subtri)
-                        call extract(subtri(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('quad')
-                        call extract(lib_sub2d(i),quad=subquad)
-                        call extract(subquad(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh2d')
-                        call extract(lib_sub2d(i),coh2d=subcoh2d)
-                        call extract(subcoh2d(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
+
+
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(sub3d(i),eltype=subtype)
+                        select case(subtype)
+                            case('wedge')
+                                call extract(sub3d(i),wedge=subwedge)
+                                call extract(subwedge(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('brick')
+                                call extract(sub3d(i),brick=subbrick)
+                                call extract(subbrick(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d6')
+                                call extract(sub3d(i),coh3d6=subcoh3d6)
+                                call extract(subcoh3d6(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d8')
+                                call extract(sub3d(i),coh3d8=subcoh3d8)
+                                call extract(subcoh3d8(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case default
+                                continue
+                        end select    
+                    end do
+                end if
             end do
         end if
-
-
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)
-                    case('wedge')
-                        call extract(lib_sub3d(i),wedge=subwedge)
-                        call extract(subwedge(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('brick')
-                        call extract(lib_sub3d(i),brick=subbrick)
-                        call extract(subbrick(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d6')
-                        call extract(lib_sub3d(i),coh3d6=subcoh3d6)
-                        call extract(subcoh3d6(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d8')
-                        call extract(lib_sub3d(i),coh3d8=subcoh3d8)
-                        call extract(subcoh3d8(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
-            end do
-        end if
-
 
 
 
@@ -1729,111 +1508,71 @@
         end if
         
 
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)
-                    case('tri')
-                        call extract(lib_sub2d(i),tri=subtri)
-                        call extract(subtri(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('quad')
-                        call extract(lib_sub2d(i),quad=subquad)
-                        call extract(subquad(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh2d')
-                        call extract(lib_sub2d(i),coh2d=subcoh2d)
-                        call extract(subcoh2d(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
+
+
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(sub3d(i),eltype=subtype)
+                        select case(subtype)
+                            case('wedge')
+                                call extract(sub3d(i),wedge=subwedge)
+                                call extract(subwedge(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('brick')
+                                call extract(sub3d(i),brick=subbrick)
+                                call extract(subbrick(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d6')
+                                call extract(sub3d(i),coh3d6=subcoh3d6)
+                                call extract(subcoh3d6(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d8')
+                                call extract(sub3d(i),coh3d8=subcoh3d8)
+                                call extract(subcoh3d8(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case default
+                                continue
+                        end select    
+                    end do
+                end if
             end do
         end if
-
-
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)
-                    case('wedge')
-                        call extract(lib_sub3d(i),wedge=subwedge)
-                        call extract(subwedge(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('brick')
-                        call extract(lib_sub3d(i),brick=subbrick)
-                        call extract(subbrick(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d6')
-                        call extract(lib_sub3d(i),coh3d6=subcoh3d6)
-                        call extract(subcoh3d6(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d8')
-                        call extract(lib_sub3d(i),coh3d8=subcoh3d8)
-                        call extract(subcoh3d8(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(2)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
-            end do
-        end if
-
 
 
 
@@ -1969,108 +1708,69 @@
         end if
         
 
-        if (nsub2d > 0) then
-            do i=1,nsub2d
-                call extract(lib_sub2d(i),eltype=subtype)
-                select case(subtype)
-                    case('tri')
-                        call extract(lib_sub2d(i),tri=subtri)
-                        call extract(subtri(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('quad')
-                        call extract(lib_sub2d(i),quad=subquad)
-                        call extract(subquad(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh2d')
-                        call extract(lib_sub2d(i),coh2d=subcoh2d)
-                        call extract(subcoh2d(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
-            end do
-        end if
 
 
-        if (nsub3d > 0) then
-            do i=1,nsub3d
-                call extract(lib_sub3d(i),eltype=subtype)
-                select case(subtype)
-                    case('wedge')
-                        call extract(lib_sub3d(i),wedge=subwedge)
-                        call extract(subwedge(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('brick')
-                        call extract(lib_sub3d(i),brick=subbrick)
-                        call extract(subbrick(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d6')
-                        call extract(lib_sub3d(i),coh3d6=subcoh3d6)
-                        call extract(subcoh3d6(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case('coh3d8')
-                        call extract(lib_sub3d(i),coh3d8=subcoh3d8)
-                        call extract(subcoh3d8(1),ig_point=igpnt)
-                        fvar=zero
-                        do j=1,size(igpnt)
-                            call extract(igpnt(j),sdv=fsdv)
-                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
-                        end do 
-                        ! average strain in the element
-                        fvar=fvar/size(igpnt)
-                        write(outunit,*) fvar
-                        
-                    case default
-                        continue
-                end select    
+        if(nxbrick > 0) then
+            do i=1,nxbrick
+                call extract(lib_xbrick(i),subelem=sub3d)
+                nsub3d=size(sub3d)
+                if (nsub3d > 0) then
+                    do i=1,nsub3d
+                        call extract(lib_sub3d(i),eltype=subtype)
+                        select case(subtype)
+                            case('wedge')
+                                call extract(sub3d(i),wedge=subwedge)
+                                call extract(subwedge(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('brick')
+                                call extract(sub3d(i),brick=subbrick)
+                                call extract(subbrick(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d6')
+                                call extract(sub3d(i),coh3d6=subcoh3d6)
+                                call extract(subcoh3d6(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case('coh3d8')
+                                call extract(sub3d(i),coh3d8=subcoh3d8)
+                                call extract(subcoh3d8(1),ig_point=igpnt)
+                                fvar=zero
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(3)
+                                end do 
+                                ! average strain in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                            case default
+                                continue
+                        end select    
+                    end do
+                end if
             end do
         end if
 
