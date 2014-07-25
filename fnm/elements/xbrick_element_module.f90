@@ -300,8 +300,8 @@ module xbrick_element_module
     integer :: i, j, l, k       ! counters
       
     real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
-    real(dp) :: x1, y1, x2, y2          ! (x,y) of node 1 and node 2 of an element edge
-    real(dp) :: xct, yct                ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
+    real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
+    real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
     
     ! --------------------------------------------------------------------!
     !       *** workings of edgstat, nfailedge, ifedg ***
@@ -326,10 +326,10 @@ module xbrick_element_module
         xp1=zero; yp1=zero
         xp2=zero; yp2=zero
 
-        x1=zero; y1=zero
-        x2=zero; y2=zero
+        x1=zero; y1=zero; z1=zero
+        x2=zero; y2=zero; z2=zero
         
-        xct=zero; yct=zero
+        xct=zero; yct=zero; zct=zero
 
 
 !-----------------------------------------------------------------------!
@@ -402,11 +402,13 @@ module xbrick_element_module
                     jnode=topo(1,i)  
                     x1=coord(jnode)%array(1)
                     y1=coord(jnode)%array(2)
+                    z1=coord(jnode)%array(3)
                     
                     ! extract end node 2 coords of edge i
                     jnode=topo(2,i)
                     x2=coord(jnode)%array(1)
                     y2=coord(jnode)%array(2)
+                    z2=coord(jnode)%array(3)
 
                     ! zero cross status and intersection coords for reuse
                     iscross=0
@@ -426,10 +428,12 @@ module xbrick_element_module
                 jbe3=i
                 
                 ! update the two fl. node coords on this edge
+                zct=half*(z1+z2) ! z1 should be the same as z2
                 jnode=topo(3,jbe3)
-                coord(jnode)%array(1:2)=[xct,yct]
+                coord(jnode)%array=[xct,yct,zct]
                 jnode=topo(4,jbe3)               
-                coord(jnode)%array(1:2)=[xct,yct]
+                coord(jnode)%array=[xct,yct,zct]
+                
                 
                 ! update edge status variables
                 if(edgstat(jbe1)==egref) then ! tip elem end, refinement elem. start (1st time)
@@ -437,12 +441,12 @@ module xbrick_element_module
                     ! change 2nd broken edge status to 1 (trans elem start)
                     edgstat(jbe3)=egtrans
              
-                else if(edgstat(jbe1)==3) then ! wake elem end, tip elem start (1st time)
+                else if(edgstat(jbe1)==egtip) then ! wake elem end, tip elem start (1st time)
                     elstat=eltip
                     ! change 2nd broken edge status to 2 (refinement start)
                     edgstat(jbe3)=egref
                
-                else if(edgstat(jbe1)>=4) then ! wake elem start (1st time)
+                else if(edgstat(jbe1)>=cohcrack) then ! wake elem start (1st time)
                     elstat=elwake !wake elem               
                     ! change 2nd broken edge status to 3 (tip elem start)
                     edgstat(jbe3)=egtip
@@ -461,10 +465,14 @@ module xbrick_element_module
                 jbe4=jbe3+nedge/2
                 
                 ! update the two fl. node coords on this edge
+                jnode=topo(1,jbe4); z1=coord(jnode)%array(3)
+                jnode=topo(2,jbe4); z2=coord(jnode)%array(3)
+                zct=half*(z1+z2) ! z1 should be the same as z2
+                
                 jnode=topo(3,jbe4)
-                coord(jnode)%array(1:2)=[xct,yct]
+                coord(jnode)%array=[xct,yct,zct]
                 jnode=topo(4,jbe4)               
-                coord(jnode)%array(1:2)=[xct,yct]
+                coord(jnode)%array=[xct,yct,zct]
 
                 ! update edge status var. value
                 edgstat(jbe4)=edgstat(jbe3)
@@ -520,7 +528,7 @@ module xbrick_element_module
         
 
             ! update glb edge array, only the broken edges' status variables
-            lib_edge(elem%edgecnc(ifedg(:)))=edgstat(ifedg(:))
+            lib_edge(elem%edgecnc(ifedg(1:nfailedge)))=edgstat(ifedg(1:nfailedge))
             
             ! update glb node array, only the broken edges' fl. node coord
             do i=1, nfailedge
@@ -585,8 +593,8 @@ module xbrick_element_module
     
       
     real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
-    real(dp) :: x1, y1, x2, y2          ! (x,y) of node 1 and node 2 of an element edge
-    real(dp) :: xct, yct                ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
+    real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
+    real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
     real(dp) :: xo, yo                  ! (x,y) of element centroid
     
     
@@ -618,10 +626,10 @@ module xbrick_element_module
         xp1=zero; yp1=zero
         xp2=zero; yp2=zero
 
-        x1=zero; y1=zero
-        x2=zero; y2=zero
+        x1=zero; y1=zero; z1=zero
+        x2=zero; y2=zero; z2=zero
         
-        xct=zero; yct=zero
+        xct=zero; yct=zero; zct=zero
         
         xo=zero; yo=zero
         
@@ -676,8 +684,10 @@ module xbrick_element_module
                     ! tip corods of edge i
                     x1=xelm(1,edg(1,i))
                     y1=xelm(2,edg(1,i))
+                    z1=xelm(3,edg(1,i))
                     x2=xelm(1,edg(2,i))
                     y2=xelm(2,edg(2,i))
+                    z2=xelm(3,edg(2,i))
                     iscross=0
                     xct=zero
                     yct=zero
@@ -686,10 +696,9 @@ module xbrick_element_module
                         edgstat(i)=cohcrack  ! edge i cracked
                         nfailedge=nfailedge+1
                         ifedg(nfailedge)=i   ! store failed edge indices
-                        xelm(1,edg(3,i))=xct ! store c tip coords on edge i fl. nd 1
-                        xelm(2,edg(3,i))=yct
-                        xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
-                        xelm(2,edg(4,i))=yct
+                        zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                        xelm(:,edg(3,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 1
+                        xelm(:,edg(4,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 2
                      endif
                      if(nfailedge==2) exit ! found 2 broken edges already
                 end do
@@ -705,6 +714,11 @@ module xbrick_element_module
                 xelm(1:2,edg(4,ifedg(3)))=xelm(1:2,edg(4,ifedg(1)))
                 xelm(1:2,edg(3,ifedg(4)))=xelm(1:2,edg(3,ifedg(2)))
                 xelm(1:2,edg(4,ifedg(4)))=xelm(1:2,edg(4,ifedg(2)))
+                
+                xelm(3,edg(3,ifedg(3)))=half*(xelm(3,edg(1,ifedg(3)))+xelm(3,edg(2,ifedg(3))))
+                xelm(3,edg(4,ifedg(3)))=half*(xelm(3,edg(1,ifedg(3)))+xelm(3,edg(2,ifedg(3))))
+                xelm(3,edg(3,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
+                xelm(3,edg(4,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
               
             else ! element already partitioned
                 !---------- find no. of broken edges -------------------------
@@ -740,8 +754,10 @@ module xbrick_element_module
                         ! tip corods of edge i
                         x1=xelm(1,edg(1,i))
                         y1=xelm(2,edg(1,i))
+                        z1=xelm(3,edg(1,i))
                         x2=xelm(1,edg(2,i))
                         y2=xelm(2,edg(2,i))
+                        z2=xelm(3,edg(2,i))
                         iscross=0
                         xct=zero
                         yct=zero
@@ -750,10 +766,9 @@ module xbrick_element_module
                             edgstat(i)=cohcrack  ! edge i cracked
                             nfailedge=nfailedge+1
                             ifedg(nfailedge)=i   ! 2nd broken edge index is i
-                            xelm(1,edg(3,i))=xct ! store c tip coords on edge i fl. nd 1
-                            xelm(2,edg(3,i))=yct
-                            xelm(1,edg(4,i))=xct ! store c tip coords on edge i fl. nd 2
-                            xelm(2,edg(4,i))=yct
+                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                            xelm(:,edg(3,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 1
+                            xelm(:,edg(4,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 2
                         end if
                         if(nfailedge .eq. 3) exit ! found 2 broken edges already
                     end do
@@ -765,6 +780,8 @@ module xbrick_element_module
                     edgstat(ifedg(4))=cohcrack
                     xelm(1:2,edg(3,ifedg(4)))=xelm(1:2,edg(3,ifedg(3)))
                     xelm(1:2,edg(4,ifedg(4)))=xelm(1:2,edg(4,ifedg(3)))
+                    xelm(3,edg(3,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
+                    xelm(3,edg(4,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
                     
                 else if (elstat.gt.eltrans .and. elstat.lt.elfail) then 
                 ! element already has two edges partitioned; just update edge status var to coh crack status
@@ -955,8 +972,10 @@ module xbrick_element_module
  
         case (4) !- two edges cracked
          
-            ibe1=min(ifedg(1),ifedg(2))   ! local edge index of 1st broken edge
-            ibe2=max(ifedg(1),ifedg(2))   ! local edge index of 2nd broken edge
+            ibe1=min(ifedg(1),ifedg(2),ifedg(3),ifedg(4))   ! local edge index of 1st broken edge
+            do i=1, 4
+                if(ifedg(i)<=nedge/2) ibe2=max(ibe2,ifedg(i))! local edge index of 2nd broken edge
+            end do  
             if(edgstat(ibe1)==cohcrack .or. edgstat(ibe2)==cohcrack) iscoh=.true.
             print*,ibe1,ibe2
             

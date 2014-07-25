@@ -500,7 +500,7 @@ module xquad_element_module
             call update_subcnc(elem,edgstat,ifedg,nfailedge)
 
             ! update glb edge array, only the broken edges' status variables
-            lib_edge(elem%edgecnc(ifedg(:)))=edgstat(ifedg(:))
+            lib_edge(elem%edgecnc(ifedg(1:nfailedge)))=edgstat(ifedg(1:nfailedge))
 
             ! update glb node array, only the broken edges' fl. node coord
             do i=1, nfailedge
