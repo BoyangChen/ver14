@@ -3,6 +3,108 @@
 ####### Preprocessing for 3D linear brick FNM elmt #############
 ################################################################
 
+import math
+
+#***************************************************************
+#****************** Define useful classes **********************
+#***************************************************************
+
+class lamina_modulus:
+
+    def __init__(self, E1, E2, G12, G23, nu12, nu23):
+        self.E1 = E1
+        self.E2 = E2
+        self.G12 = G12
+        self.G23 = G23
+        self.nu12 = nu12
+        self.nu23 = nu23
+
+class lamina_strength:
+
+    def __init__(self, Xt, Xc, Yt, Yc, Sl, St):
+        self.Xt=Xt
+        self.Xc=Xc
+        self.Yt=Yt
+        self.Yc=Yc
+        self.Sl=Sl
+        self.St=St
+
+class lamina_matrixtoughness:
+
+    def __init__(self, GmcI, GmcII, eta):
+        self.GmcI=GmcI
+        self.GmcII=GmcII
+        self.eta=eta
+
+class lamina_fibretoughness:
+
+    def __init__(self, GfcT, GfcC):
+        self.GfcT=GfcT
+        self.GfcC=GfcC
+
+class lamina:
+
+    def __init__(self, modulus, strength, matrixtoughness, fibretoughness):
+        self.modulus = modulus
+        self.strength=strength
+        self.matrixtoughness=matrixtoughness
+        self.fibretoughness=fibretoughness
+
+
+class interface_modulus:
+
+    def __init__(self, Dnn, Dtt, Dll):
+        self.Dnn=Dnn
+        self.Dtt=Dtt
+        self.Dll=Dll
+
+class interface_strength:
+
+    def __init__(self, tau_nc, tau_tc, tau_lc):
+        self.tau_nc=tau_nc
+        self.tau_tc=tau_tc
+        self.tau_lc=tau_lc
+
+class interface_toughness:
+
+    def __init__(self, Gnc, Gtc, Glc, eta):
+        self.Gnc=Gnc
+        self.Gtc=Gtc
+        self.Glc=Glc
+        self.eta=eta
+
+class interface:
+
+    def __init__(self, modulus, strength, toughness):
+        self.modulus = modulus
+        self.strength=strength
+        self.toughness=toughness
+
+
+class node:
+
+    def __init__(self, x, y, z):
+        self.x=x
+        self.y=y
+        self.z=z
+
+
+class edge:
+
+    def __init__(self, node1, node2, node3, node4):
+        self.node1=node1
+        self.node2=node2
+        self.node3=node3
+        self.node4=node4
+
+
+class element:
+
+    def __init__(self, nodes, edges):
+        self.nodes=nodes
+        self.edges=edges
+
+
 
 #***************************************************************
 #****************** Define useful variables ********************
@@ -37,26 +139,56 @@ outfreq=1      # output frequency for SDVs in .dat file
 #***************************************************************
 
 nmat=2
-mname=['','']
-mtype=['','']
+niso=0
+nlamina=1
+ninterface=1
+mname=["'bulkmat'","'cohmat'"]
+mtype=["'lamina'","'interface'"]
+mkey=[1,1]
 
-# props array
-#props=zeros(nprops)
-#props(1)=100000.0 #E1
-#props(2)=10000.0 #E2
-#props(3)=10000.0 #E3
-#props(4)=5000.0 # G12
-#props(5)=5000.0 # G23
-#props(6)=5000.0 # G13
-#props(7)=0.3 # nu12
-#props(8)=0.3 # nu23
-#props(9)=0.3 # nu13
-#props(10)=0.0 # theta, orientation of the ply
-#props(11)=60.0 # Yt
-#props(12)=90.0 # S
-#props(13)=0.2 # Gnc
-#props(14)=1.0 # Gsc
-#props(15)=2.0 # Eta (BK law)
+matlam=[lamina( lamina_modulus(\
+                                        E1=161000., 
+                                        E2=11400., 
+                                        G12=5170., 
+                                        G23=3980., 
+                                        nu12=0.34, 
+                                        nu23=0.43   
+                               ),
+                lamina_strength(\
+                                        Xt=2806., 
+                                        Xc=1400., 
+                                        Yt=60., 
+                                        Yc=185., 
+                                        Sl=90., 
+                                        St=90.     
+                                ),
+                lamina_matrixtoughness(\
+                                        GmcI=0.2, 
+                                        GmcII=1., 
+                                        eta=1.
+                                       ),
+                lamina_fibretoughness(\
+                                        GfcT=100., 
+                                        GfcC=100.   
+                                     )      )]
+
+matcoh=[interface(   interface_modulus(\
+                                        Dnn=1000000., 
+                                        Dtt=1000000., 
+                                        Dll=1000000.
+                                     ),
+                    interface_strength(\
+                                        tau_nc=60., 
+                                        tau_tc=90., 
+                                        tau_lc=90.
+                                      ),
+                    interface_toughness(\
+                                        Gnc=0.293, 
+                                        Gtc=0.631, 
+                                        Glc=0.631, 
+                                        eta=1.
+                                       )    )]
+
 
 
 #***************************************************************
@@ -105,9 +237,67 @@ lib_mat.write('    subroutine initialize_lib_mat()                            \n
 lib_mat.write('                                                               \n')
 lib_mat.write('        integer :: i=0, nmat=0, niso=0, nlamina=0, ninterface=0\n')
 
+lib_mat.write('        nmat='+str(nmat)+'                                            \n')
+lib_mat.write('        niso='+str(niso)+'                                            \n')
+lib_mat.write('        nlamina='+str(nlamina)+'                                      \n')
+lib_mat.write('        ninterface='+str(ninterface)+'                                \n')
+lib_mat.write('        if(nmat>0) allocate(lib_mat(nmat))                       \n')
+lib_mat.write('        if(niso>0) allocate(lib_iso(niso))                       \n')
+lib_mat.write('        if(nlamina>0) allocate(lib_lamina(nlamina))              \n')
+lib_mat.write('        if(ninterface>0) allocate(lib_interface(ninterface))     \n')
+
+if(nmat>0):
+    for i in range(nmat):
+        lib_mat.write('        call update(lib_mat('+str(i+1)+'),matname='+mname[i]+',mattype='+mtype[i]+',matkey='+str(mkey[i])+')\n')
 
 
 
+if(nlamina>0):
+    for i in range(nlamina):
+        lib_mat.write('        call update(lib_lamina('+str(i+1)+'), & \n')
+        lib_mat.write('      & lamina_modulus(& \n') 
+        lib_mat.write('      & E1='                +str(matlam[i].modulus.E1)+               '_dp,& \n')
+        lib_mat.write('      & E2='                +str(matlam[i].modulus.E2)+               '_dp,& \n')
+        lib_mat.write('      & G12='                +str(matlam[i].modulus.G12)+              '_dp,& \n')
+        lib_mat.write('      & G23='                +str(matlam[i].modulus.G23)+              '_dp,& \n')
+        lib_mat.write('      & nu12='                +str(matlam[i].modulus.nu12)+             '_dp,& \n')
+        lib_mat.write('      & nu23='                +str(matlam[i].modulus.nu23)+            '_dp),& \n')
+        lib_mat.write('      & lamina_strength(& \n')
+        lib_mat.write('      & Xt='                +str(matlam[i].strength.Xt)+             '_dp,& \n')
+        lib_mat.write('      & Xc='                +str(matlam[i].strength.Xc)+              '_dp,& \n')
+        lib_mat.write('      & Yt='                +str(matlam[i].strength.Yt)+              '_dp,& \n')
+        lib_mat.write('      & Yc='                +str(matlam[i].strength.Yc)+              '_dp,& \n')
+        lib_mat.write('      & Sl='                +str(matlam[i].strength.Sl)+              '_dp,& \n')
+        lib_mat.write('      & St='                +str(matlam[i].strength.St)+             '_dp),& \n')
+        lib_mat.write('      & lamina_matrixtoughness(& \n') 
+        lib_mat.write('      & GmcI='                         +str(matlam[i].matrixtoughness.GmcI)+     '_dp,& \n')
+        lib_mat.write('      & GmcII='                         +str(matlam[i].matrixtoughness.GmcII)+    '_dp,& \n')
+        lib_mat.write('      & eta='                         +str(matlam[i].matrixtoughness.eta)+     '_dp),& \n')
+        lib_mat.write('      & lamina_fibretoughness(& \n')  
+        lib_mat.write('      & GfcT='                         +str(matlam[i].fibretoughness.GfcT)+      '_dp,& \n')
+        lib_mat.write('      & GfcC='                         +str(matlam[i].fibretoughness.GfcC)+      '_dp)) \n')
+        lib_mat.write('\n')
+
+
+
+
+if(ninterface>0):
+    for i in range(ninterface):
+        lib_mat.write('        call update(lib_interface('+str(i+1)+'), & \n')
+        lib_mat.write('      & interface_modulus(& \n')
+        lib_mat.write('      & Dnn='                   +str(matcoh[i].modulus.Dnn)+          '_dp,& \n')
+        lib_mat.write('      & Dtt='                   +str(matcoh[i].modulus.Dtt)+          '_dp,& \n')
+        lib_mat.write('      & Dll='                   +str(matcoh[i].modulus.Dll)+         '_dp),& \n')
+        lib_mat.write('      & interface_strength(& \n')
+        lib_mat.write('      & tau_nc='                    +str(matcoh[i].strength.tau_nc)+     '_dp,& \n')
+        lib_mat.write('      & tau_tc='                    +str(matcoh[i].strength.tau_tc)+     '_dp,& \n')
+        lib_mat.write('      & tau_lc='                    +str(matcoh[i].strength.tau_lc)+    '_dp),& \n')
+        lib_mat.write('      & interface_toughness(& \n')
+        lib_mat.write('      & Gnc='                     +str(matcoh[i].toughness.Gnc)+      '_dp,& \n')
+        lib_mat.write('      & Gtc='                     +str(matcoh[i].toughness.Gtc)+      '_dp,& \n')
+        lib_mat.write('      & Glc='                     +str(matcoh[i].toughness.Glc)+      '_dp,& \n')
+        lib_mat.write('      & eta='                     +str(matcoh[i].toughness.eta)+      '_dp)) \n')
+        lib_mat.write('\n')
 
 
 
