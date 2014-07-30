@@ -107,8 +107,13 @@ class element:
 
 
 #***************************************************************
-#****************** Define useful variables ********************
+#   define input files
 #***************************************************************
+
+jobname='Patch1'
+
+abqinputfile=jobname+'.inp'         # abaqus input file
+fnminputfile='fnm-'+jobname+'.inp'  # fnm uel input file
 
 
 
@@ -116,11 +121,11 @@ class element:
 #   define element information
 #***************************************************************
 
-filename='Patch1' #filename
+
 
 elmname=3080   # just a random name, must be consistent with uel.f
-ndim=3         # dimension
-rnode=8        #original no. of (real)nodes in the element. (here, 8 for linear brick elmt)
+ndim=2         # dimension
+rnode=8        # original no. of (real)nodes in the element. (here, 8 for linear brick elmt)
 nintfc=0       # no. of interfaces btw ply-blocks
 int_fnode=0    # no. of internal f. nodes
 nprops=0       # no. of input material properties used in uel code
@@ -138,6 +143,7 @@ outfreq=1      # output frequency for SDVs in .dat file
 #   define material information
 #***************************************************************
 
+# material section info
 nmat=2
 niso=0
 nlamina=1
@@ -146,6 +152,7 @@ mname=["'bulkmat'","'cohmat'"]
 mtype=["'lamina'","'interface'"]
 mkey=[1,1]
 
+# lamina material properties
 matlam=[lamina( lamina_modulus(\
                                         E1=161000., 
                                         E2=11400., 
@@ -172,6 +179,7 @@ matlam=[lamina( lamina_modulus(\
                                         GfcC=100.   
                                      )      )]
 
+# cohesive material properties
 matcoh=[interface(   interface_modulus(\
                                         Dnn=1000000., 
                                         Dtt=1000000., 
@@ -188,6 +196,9 @@ matcoh=[interface(   interface_modulus(\
                                         Glc=0.631, 
                                         eta=1.
                                        )    )]
+
+
+
 
 
 
@@ -246,12 +257,13 @@ lib_mat.write('        if(niso>0) allocate(lib_iso(niso))                       
 lib_mat.write('        if(nlamina>0) allocate(lib_lamina(nlamina))              \n')
 lib_mat.write('        if(ninterface>0) allocate(lib_interface(ninterface))     \n')
 
+# write material section info
 if(nmat>0):
     for i in range(nmat):
         lib_mat.write('        call update(lib_mat('+str(i+1)+'),matname='+mname[i]+',mattype='+mtype[i]+',matkey='+str(mkey[i])+')\n')
 
 
-
+# write lamina material properties
 if(nlamina>0):
     for i in range(nlamina):
         lib_mat.write('        call update(lib_lamina('+str(i+1)+'), & \n')
@@ -280,7 +292,7 @@ if(nlamina>0):
 
 
 
-
+# write interface material properties
 if(ninterface>0):
     for i in range(ninterface):
         lib_mat.write('        call update(lib_interface('+str(i+1)+'), & \n')
@@ -436,42 +448,63 @@ lib_elem.write('        integer :: i=0                                          
 
 
 
+# *********************************
+# open input files for I/O
+# *********************************
+abqinp=open(abqinputfile,'r')
+fnminp=open(fnminputfile,'w')
 
 
-## *********************************
-#
-## .inp file from Abaqus for reading
-#file1=strcat(filename,'.inp')
-#file2=strcat('uel-',file1)
-#
-#
-##***************************************************************
-##********** first read to find no. nodes & elms ****************
-##***************************************************************
-#
-#fid1 = open(file1, 'r')
-#
-##************************ Read nodes ***************************
-## Read over non-useful lines
-#tline=fgets(fid1)
-#for i=1:8,
-#    tline=fgets(fid1)
-#end
-#
-#nndmsh1=0 # no. of original nodes
-#tline=fgets(fid1)
-#while ~strcmp('*',tline(1)),# before the *Element
-#    nndmsh1=nndmsh1+1 # update no. of nodes
-#    tline=fgets(fid1)
-#end
-##*********************** Read elements *************************
-#nelm1=0 # no. of elements
-#tline=fgets(fid1)
-#while ~strcmp('*',tline(1)),# before the *End Part
-#    nelm1=nelm1+1 # update no. of elms
-#    tline=fgets(fid1)
-#end
-##**************** Define useful matrices ***********************
+#**************** Define useful matrices ***********************
+nodes=[]
+edges=[]
+elems=[]
+
+lines=abqinp.readlines()
+isheader=True
+isnode=False
+iselem=False
+cycle=False
+
+for line in lines:
+    cycle=False
+    
+    if(len(line)>=5 and line[0:5]=='*Node'):
+        isheader=False
+        isnode=True
+        cycle=True
+        fnminp.write(line)
+    elif(len(line)>=8 and line[0:8]=='*Element'):
+        isnode=False
+        iselem=True
+        cycle=True
+        fnminp.write(line)
+      
+    if not cycle:
+        if isheader:
+            fnminp.write(line)
+        elif isnode:
+            fnminp.write(line)
+            l = []
+            for t in line.split(','):
+                try:
+                    l.append(float(t))
+                except ValueError:
+                    pass
+
+            if ndim==2:
+                nodes=nodes+[node(x=l[1], y=l[2], z=0.0)]
+            else:
+                nodes=nodes+[node(x=l[1], y=l[2], z=l[3])]   
+        elif iselem:
+            continue
+        else:
+            fnminp.write(line)
+        
+    
+
+        
+    
 #ndcoords=zeros(nndmsh1,ndim) # nodal coords real matrix
 #elmnodes=zeros(nelm1,ttlnode+1)
 #maxedge=elmedge*nelm1/2 #max no. of breakable edges in the mesh, each internal edge is shared by 2 elmts
@@ -480,14 +513,8 @@ lib_elem.write('        integer :: i=0                                          
 #elmt_edge=zeros(elmedge,3)#local elmt edges of an elmt, each defined by 3 nodes, used only temporarily
 #nds_edge=zeros(nndmsh1,nndmsh1) #matrix containing edges formed by two arbitrary nodes
 #
-## newline = sprintf('\r\n') # empty newline for newline identification later on
-## newline2 = sprintf('\n')
 #
-#fclose(fid1)
 #
-##***************************************************************
-##***************************************************************
-##***************************************************************
 #
 #
 ##***************************************************************
