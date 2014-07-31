@@ -189,6 +189,8 @@ top, 2, 2
 *Step, name=tension
 *Static
 0.01, 0.01, 1e-07, 0.01
+*CONTROLS, PARAMETERS=TIME INCREMENTATION
+1600, 2000, , 3000, 2400, 50, , 125, , ,
 ** 
 ** BOUNDARY CONDITIONS
 ** 
