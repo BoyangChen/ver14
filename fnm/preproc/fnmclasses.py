@@ -74,6 +74,15 @@ class interface:
         self.toughness=toughness
 
 
+class material:
+
+    def __init__(self, name, type, typekey, theta):
+        self.name = name
+        self.type = type
+        self.typekey  = typekey
+        self.theta= theta
+
+
 class node:
 
     def __init__(self, x, y, z):

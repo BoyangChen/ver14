@@ -10,9 +10,10 @@
         
         private
         
-        character(len=matnamelength) :: matname='' ! user-given name from input
-        character(len=mattypelength) :: mattype='' ! defined material types: isotropic, lamina, interlayer, etc.
-        integer :: matkey=0 ! index in the respective array of the associated material type
+        character(len=matnamelength) :: matname=''  ! user-given name from input
+        character(len=mattypelength) :: mattype=''  ! defined material types: isotropic, lamina, interlayer, etc.
+        integer :: typekey=0                         ! index in the respective array of the associated material type
+        real(dp):: theta=zero                       ! material angle (fibre angle)
         
     end type
     
@@ -47,36 +48,41 @@
         
         mat%matname=''
         mat%mattype=''
-        mat%matkey=0
+        mat%typekey=0
+        mat%theta=zero
     
     end subroutine empty_material
     
     
     ! this subroutine is used in the preprocessing to fill in the
     ! material information in the global material library lib_mat
-    subroutine update_material(mat,matname,mattype,matkey)
+    subroutine update_material(mat,matname,mattype,typekey,theta)
         type(material),intent(inout):: mat
         character(len=matnamelength),optional,intent(in) :: matname 
         character(len=mattypelength),optional,intent(in) :: mattype 
-        integer,optional,intent(in) :: matkey
+        integer,optional,intent(in) :: typekey
+        real(dp),optional,intent(in):: theta
         
         if(present(matname)) mat%matname=matname
         if(present(mattype)) mat%mattype=mattype
-        if(present(matkey)) mat%matkey=matkey
+        if(present(typekey)) mat%typekey=typekey
+        if(present(theta)) mat%theta=theta
     
     end subroutine update_material
     
     
     ! this subroutine is used anywhere to extract material information
-    subroutine extract_material(mat,matname,mattype,matkey)
+    subroutine extract_material(mat,matname,mattype,typekey,theta)
         type(material),intent(in):: mat
         character(len=matnamelength),optional,intent(out) :: matname 
         character(len=mattypelength),optional,intent(out) :: mattype 
-        integer,optional,intent(out) :: matkey
+        integer,optional,intent(out) :: typekey
+        real(dp),optional,intent(out):: theta
         
         if(present(matname)) matname=mat%matname
         if(present(mattype)) mattype=mat%mattype
-        if(present(matkey)) matkey=mat%matkey
+        if(present(typekey)) typekey=mat%typekey
+        if(present(theta)) theta=mat%theta
     
     end subroutine extract_material
     

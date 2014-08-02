@@ -27,7 +27,7 @@
     subroutine initialize_lib_mat()                            
                                                                
         integer :: i=0, nmat=0, niso=0, nlamina=0, ninterface=0
-        nmat=2                                            
+        nmat=5                                            
         niso=0                                            
         nlamina=1                                      
         ninterface=1                                
@@ -35,8 +35,11 @@
         if(niso>0) allocate(lib_iso(niso))                       
         if(nlamina>0) allocate(lib_lamina(nlamina))              
         if(ninterface>0) allocate(lib_interface(ninterface))     
-        call update(lib_mat(1),matname='bulkmat',mattype='lamina',matkey=1)
-        call update(lib_mat(2),matname='cohmat',mattype='interface',matkey=1)
+        call update(lib_mat(1),matname='IM7-8552 0 ply',mattype='lamina',typekey=1,theta=0.0_dp)
+        call update(lib_mat(2),matname='IM7-8552 45 ply',mattype='lamina',typekey=1,theta=45.0_dp)
+        call update(lib_mat(3),matname='IM7-8552 90 ply',mattype='lamina',typekey=1,theta=90.0_dp)
+        call update(lib_mat(4),matname='IM7-8552 -45 ply',mattype='lamina',typekey=1,theta=-45.0_dp)
+        call update(lib_mat(5),matname='IM7-8552 Matrix Crack',mattype='interface',typekey=1,theta=0.0_dp)
         call update(lib_lamina(1), & 
       & lamina_modulus(& 
       & E1=161000.0_dp,& 

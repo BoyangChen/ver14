@@ -1,14 +1,14 @@
-
 ################################################################
-####### Preprocessing for 3D linear brick FNM elmt #############
+################# Preprocessing for the FNM ####################
+##  writing lib_node, lib_edge and lib_elem modules           ##
 ################################################################
 
-from fnmclasses import* # objects defined for FNM
+from fnmclasses import* # glb objects defined for FNM
 import math
 
 
 #***************************************************************
-#   define input files
+#   fetch Abaqus input files
 #***************************************************************
 
 jobname='Patch1'
@@ -28,187 +28,12 @@ nprops=0        # no. of input material properties used in uel code
 nsvars=0        # no. of sol. dpdnt var. used and ouput by uel code to be determined
 
 
-
-#***************************************************************
-#   define material information
-#***************************************************************
-
-# material section info
-theta='45._dp'  # fibre orientation; change here for other angles
-
-nmat=2          # no. of materials in the model, = sum of no. of the following individual materials
-niso=0          # no. of isotropic materials
-nlamina=1       # no. of lamina materials
-ninterface=1    # no. of cohesive materials
-mname=["'bulkmat'","'cohmat'"]
-mtype=["'lamina'","'interface'"]
-mkey=[1,1]      # index of the two materials in their respective type arrays
-bulkmat=1       # index of bulk material in the material array
-cohmat=2        # index of cohesive material in the material array
-
-# *** change below for other lamina/cohesive properties ***
-
-# lamina material properties
-matlam=[lamina( lamina_modulus(\
-                                        E1=161000., 
-                                        E2=11400., 
-                                        G12=5170., 
-                                        G23=3980., 
-                                        nu12=0.34, 
-                                        nu23=0.43   
-                               ),
-                lamina_strength(\
-                                        Xt=2806., 
-                                        Xc=1400., 
-                                        Yt=60., 
-                                        Yc=185., 
-                                        Sl=90., 
-                                        St=90.     
-                                ),
-                lamina_matrixtoughness(\
-                                        GmcI=0.2, 
-                                        GmcII=1., 
-                                        eta=1.
-                                       ),
-                lamina_fibretoughness(\
-                                        GfcT=100., 
-                                        GfcC=100.   
-                                     )      )]
-
-# cohesive material properties
-matcoh=[interface(   interface_modulus(\
-                                        Dnn=1000000., 
-                                        Dtt=1000000., 
-                                        Dll=1000000.
-                                     ),
-                    interface_strength(\
-                                        tau_nc=60., 
-                                        tau_tc=90., 
-                                        tau_lc=90.
-                                      ),
-                    interface_toughness(\
-                                        Gnc=0.293, 
-                                        Gtc=0.631, 
-                                        Glc=0.631, 
-                                        eta=1.
-                                       )    )]
-
-
-
-
-
-
-
-
-
 #***************************************************************
 #   Open Fortran modules to be written during pre-processing
 #***************************************************************
-lib_mat=open('lib_mat_module.f90','w')    # array of all materials
 lib_node=open('lib_node_module.f90','w')  # array of all nodes
 lib_edge=open('lib_edge_module.f90','w')  # array of all edges
 lib_elem=open('lib_elem_module.f90','w')  # array of all elements
-
-
-
-
-
-
-#***************************************************************
-#       write lib_mat_module.f90
-#***************************************************************
-lib_mat.write('    !***************************************!                  \n')
-lib_mat.write('    !   the global library of materials     !                  \n')
-lib_mat.write('    !***************************************!                  \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    include "materials/isotropic_type_module.f90"              \n')
-lib_mat.write('    include "materials/lamina_type_module.f90"                 \n')
-lib_mat.write('    include "materials/interface_type_module.f90"              \n')
-lib_mat.write('    include "materials/material_module.f90"                    \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    module lib_mat_module                                      \n')
-lib_mat.write('    use parameter_module                                       \n')
-lib_mat.write('    use isotropic_type_module                                  \n')
-lib_mat.write('    use lamina_type_module                                     \n')
-lib_mat.write('    use interface_type_module                                  \n')
-lib_mat.write('    use material_module                                        \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    implicit none                                              \n')
-lib_mat.write('    save                                                       \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    type(material),       allocatable    :: lib_mat(:)         \n')
-lib_mat.write('    type(isotropic_type), allocatable    :: lib_iso(:)         \n')
-lib_mat.write('    type(lamina_type),    allocatable    :: lib_lamina(:)      \n')
-lib_mat.write('    type(interface_type), allocatable    :: lib_interface(:)   \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    contains                                                   \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    subroutine initialize_lib_mat()                            \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('        integer :: i=0, nmat=0, niso=0, nlamina=0, ninterface=0\n')
-
-lib_mat.write('        nmat='+str(nmat)+'                                            \n')
-lib_mat.write('        niso='+str(niso)+'                                            \n')
-lib_mat.write('        nlamina='+str(nlamina)+'                                      \n')
-lib_mat.write('        ninterface='+str(ninterface)+'                                \n')
-lib_mat.write('        if(nmat>0) allocate(lib_mat(nmat))                       \n')
-lib_mat.write('        if(niso>0) allocate(lib_iso(niso))                       \n')
-lib_mat.write('        if(nlamina>0) allocate(lib_lamina(nlamina))              \n')
-lib_mat.write('        if(ninterface>0) allocate(lib_interface(ninterface))     \n')
-
-# write material section info
-if(nmat>0):
-    for i in range(nmat):
-        lib_mat.write('        call update(lib_mat('+str(i+1)+'),matname='+mname[i]+',mattype='+mtype[i]+',matkey='+str(mkey[i])+')\n')
-
-
-# write lamina material properties
-if(nlamina>0):
-    for i in range(nlamina):
-        lib_mat.write('        call update(lib_lamina('+str(i+1)+'), & \n')
-        lib_mat.write('      & lamina_modulus(& \n') 
-        lib_mat.write('      & E1='                +str(matlam[i].modulus.E1)+               '_dp,& \n')
-        lib_mat.write('      & E2='                +str(matlam[i].modulus.E2)+               '_dp,& \n')
-        lib_mat.write('      & G12='                +str(matlam[i].modulus.G12)+              '_dp,& \n')
-        lib_mat.write('      & G23='                +str(matlam[i].modulus.G23)+              '_dp,& \n')
-        lib_mat.write('      & nu12='                +str(matlam[i].modulus.nu12)+             '_dp,& \n')
-        lib_mat.write('      & nu23='                +str(matlam[i].modulus.nu23)+            '_dp),& \n')
-        lib_mat.write('      & lamina_strength(& \n')
-        lib_mat.write('      & Xt='                +str(matlam[i].strength.Xt)+             '_dp,& \n')
-        lib_mat.write('      & Xc='                +str(matlam[i].strength.Xc)+              '_dp,& \n')
-        lib_mat.write('      & Yt='                +str(matlam[i].strength.Yt)+              '_dp,& \n')
-        lib_mat.write('      & Yc='                +str(matlam[i].strength.Yc)+              '_dp,& \n')
-        lib_mat.write('      & Sl='                +str(matlam[i].strength.Sl)+              '_dp,& \n')
-        lib_mat.write('      & St='                +str(matlam[i].strength.St)+             '_dp),& \n')
-        lib_mat.write('      & lamina_matrixtoughness(& \n') 
-        lib_mat.write('      & GmcI='                         +str(matlam[i].matrixtoughness.GmcI)+     '_dp,& \n')
-        lib_mat.write('      & GmcII='                         +str(matlam[i].matrixtoughness.GmcII)+    '_dp,& \n')
-        lib_mat.write('      & eta='                         +str(matlam[i].matrixtoughness.eta)+     '_dp),& \n')
-        lib_mat.write('      & lamina_fibretoughness(& \n')  
-        lib_mat.write('      & GfcT='                         +str(matlam[i].fibretoughness.GfcT)+      '_dp,& \n')
-        lib_mat.write('      & GfcC='                         +str(matlam[i].fibretoughness.GfcC)+      '_dp)) \n')
-        lib_mat.write('\n')
-
-
-
-# write interface material properties
-if(ninterface>0):
-    for i in range(ninterface):
-        lib_mat.write('        call update(lib_interface('+str(i+1)+'), & \n')
-        lib_mat.write('      & interface_modulus(& \n')
-        lib_mat.write('      & Dnn='                   +str(matcoh[i].modulus.Dnn)+          '_dp,& \n')
-        lib_mat.write('      & Dtt='                   +str(matcoh[i].modulus.Dtt)+          '_dp,& \n')
-        lib_mat.write('      & Dll='                   +str(matcoh[i].modulus.Dll)+         '_dp),& \n')
-        lib_mat.write('      & interface_strength(& \n')
-        lib_mat.write('      & tau_nc='                    +str(matcoh[i].strength.tau_nc)+     '_dp,& \n')
-        lib_mat.write('      & tau_tc='                    +str(matcoh[i].strength.tau_tc)+     '_dp,& \n')
-        lib_mat.write('      & tau_lc='                    +str(matcoh[i].strength.tau_lc)+    '_dp),& \n')
-        lib_mat.write('      & interface_toughness(& \n')
-        lib_mat.write('      & Gnc='                     +str(matcoh[i].toughness.Gnc)+      '_dp,& \n')
-        lib_mat.write('      & Gtc='                     +str(matcoh[i].toughness.Gtc)+      '_dp,& \n')
-        lib_mat.write('      & Glc='                     +str(matcoh[i].toughness.Glc)+      '_dp,& \n')
-        lib_mat.write('      & eta='                     +str(matcoh[i].toughness.eta)+      '_dp)) \n')
-        lib_mat.write('\n')
 
 
 
@@ -370,15 +195,17 @@ ndedg=[]
 eltype=[]
 
 
+
+
+#***************************************************************
+#       Read & store nodes and elements, find edges
+#***************************************************************
 lines=abqinp.readlines()
 isheader=True
 isnode=False
 iselem=False
 cycle=False
 
-#***************************************************************
-#       Read & store nodes and elements, find edges
-#***************************************************************
 for ln, line in enumerate(lines):
     cycle=False
     
@@ -590,10 +417,7 @@ for line in lines[ln:]:
 
 
 
-#   close lib_mat_module.f90
-lib_mat.write('    end subroutine initialize_lib_mat          \n')
-lib_mat.write('    end module lib_mat_module                  \n')
-lib_mat.close()
+
 #   close lib_node_module.f90
 lib_node.write('    end subroutine initialize_lib_node        \n')
 lib_node.write('    end module lib_node_module                \n')
