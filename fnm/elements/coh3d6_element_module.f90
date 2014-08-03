@@ -184,7 +184,7 @@
         ! - variables extracted from element material
         character(len=matnamelength)    :: matname      ! name of the material assigned to this element
         character(len=mattypelength)    :: mattype      ! type of the material
-        integer                         :: matkey       ! index of the material in the material library of its type 
+        integer                         :: typekey       ! index of the material in the material library of its type 
         
         ! - variables extracted from element isdv
         integer         :: nstep, ninc                  ! step and increment no. of the last iteration, stored in the element
@@ -235,7 +235,7 @@
         
         ! pure local variables
         coords=zero; midcoords=zero; u=zero 
-        matname=''; mattype=''; matkey=0 
+        matname=''; mattype=''; typekey=0 
         nstep=0; ninc=0; last_converged=.false.
         igxi=zero; igwt=zero
         tmpx=zero; tmpu=zero
@@ -301,7 +301,7 @@
         
         
         ! - extract values from mat (material type) and assign to local vars (matname, mattype & matkey)
-        call extract(mat,matname,mattype,matkey) 
+        call extract(mat,matname,mattype,typekey) 
         
         
         ! - extract isdv values from element and assign to nstep and ninc
@@ -422,7 +422,7 @@
                 case ('interface')
                     
                     ! calculate D matrix, update stress, and iterating sdv
-                    call ddsdde(lib_interface(matkey), Dee, jump=delta, stress=Tau, sdv=ig_sdv(2), dfail=dfail) 
+                    call ddsdde(lib_interface(typekey), Dee, jump=delta, stress=Tau, sdv=ig_sdv(2), dfail=dfail) 
                     
                 case default
                     write(msg_file,*) 'material type not supported for cohesive element!'

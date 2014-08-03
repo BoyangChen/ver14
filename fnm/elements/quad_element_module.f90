@@ -170,7 +170,7 @@
         type(material) :: mat ! matname, mattype and matkey to glb mattype array
         character(len=matnamelength) :: matname
         character(len=mattypelength) :: mattype
-        integer :: matkey
+        integer :: typekey
         ! - glb clock step and increment no. extracted from glb clock module
         integer         :: curr_step, curr_inc
         
@@ -241,7 +241,7 @@
         
         ! extract material values from global material array
         mat=lib_mat(elem%matkey)
-        call extract(mat,matname,mattype,matkey)
+        call extract(mat,matname,mattype,typekey,theta)
         
         ! - extract curr step and inc values from glb clock module
         call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
@@ -249,8 +249,6 @@
         ! extract plain strain variable from element
         if(present(planestrain)) plstrain=planestrain
         
-        ! extract orientation from element
-        theta=elem%theta
         
         
         ! calculate approximate clength
@@ -357,26 +355,26 @@
                 case ('isotropic')
                     
                     ! check if failure analysis is needed (check if strength parameters are present)
-                    call extract(lib_iso(matkey),strength_active=failure)
+                    call extract(lib_iso(typekey),strength_active=failure)
                     
                     if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
                     & quad_element type isotropic material; only linear elastic stiffness matrix is integrated."
                     
                     ! calculate D matrix, update tmpstress
-                    call ddsdde(lib_iso(matkey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
+                    call ddsdde(lib_iso(typekey),dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain) 
                     
                 case ('lamina')
                 
                     ! check if failure analysis is needed (check if strength parameters are present)
-                    call extract(lib_lamina(matkey),strength_active=failure)
+                    call extract(lib_lamina(typekey),strength_active=failure)
                     
                     if(failure) then
                         ! calculate D matrix, update tmpstress and sdv
-                        call ddsdde(lib_lamina(matkey),clength,dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain &
+                        call ddsdde(lib_lamina(typekey),clength,dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain &
                         & ,sdv=ig_sdv(2),dfail=dfail)
                     else
                         ! calculate D matrix, update tmpstress
-                        call ddsdde(lib_lamina(matkey),dee=dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
+                        call ddsdde(lib_lamina(typekey),dee=dee,strain=tmpstrain,stress=tmpstress,PlaneStrain=plstrain)
                     end if
                     
                 case default

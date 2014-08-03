@@ -21,7 +21,6 @@ module xquad_element_module
         integer :: key=0
         integer :: bulkmat=0
         integer :: cohmat=0
-        real(dp):: theta=zero           ! fibre orientation for lamina
 
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
@@ -72,7 +71,6 @@ module xquad_element_module
         elem%key=0
         elem%bulkmat=0
         elem%cohmat=0
-        elem%theta=zero
 
         elem%nodecnc=0
         elem%edgecnc=0
@@ -86,33 +84,30 @@ module xquad_element_module
 
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xquad_element(elem,key,bulkmat,cohmat,theta,nodecnc,edgecnc)
+    subroutine prepare_xquad_element(elem,key,bulkmat,cohmat,nodecnc,edgecnc)
 
         type(xquad_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: bulkmat, cohmat
-        real(dp),               intent(in)      :: theta
         integer,                intent(in)      :: nodecnc(nnode)
         integer,                intent(in)      :: edgecnc(nedge)
 
         elem%key=key
         elem%bulkmat=bulkmat
         elem%cohmat=cohmat
-        elem%theta=theta
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
 
     end subroutine prepare_xquad_element
 
 
-    subroutine extract_xquad_element(elem,curr_status,key,bulkmat,cohmat,theta,nodecnc,edgecnc,subelem,subcnc)
+    subroutine extract_xquad_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc,subelem,subcnc)
 
         type(xquad_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: bulkmat
         integer,                        optional, intent(out) :: cohmat
-        real(dp),                       optional, intent(out) :: theta
         integer,            allocatable,optional, intent(out) :: nodecnc(:)
         integer,            allocatable,optional, intent(out) :: edgecnc(:)
         type(sub2d_element),allocatable,optional, intent(out) :: subelem(:)
@@ -122,7 +117,6 @@ module xquad_element_module
         if(present(key)) key=elem%key
         if(present(bulkmat)) bulkmat=elem%bulkmat
         if(present(cohmat)) cohmat=elem%cohmat
-        if(present(theta)) theta=elem%theta
 
         if(present(nodecnc)) then
             allocate(nodecnc(nnode))
@@ -202,7 +196,7 @@ module xquad_element_module
                 elem%subcnc(1)%array=[1,2,3,4]
                 subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                 ! create sub elements
-                call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+                call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
             end if
         end if
 
@@ -297,6 +291,7 @@ module xquad_element_module
     real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
     real(dp) :: x1, y1, x2, y2          ! (x,y) of node 1 and node 2 of an element edge
     real(dp) :: xct, yct                ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
+    real(dp) :: theta
 
     ! --------------------------------------------------------------------!
     !       *** workings of edgstat, nfailedge, ifedg ***
@@ -325,6 +320,7 @@ module xquad_element_module
         x2=zero; y2=zero
 
         xct=zero; yct=zero
+        theta=zero
 
 
 !-----------------------------------------------------------------------!
@@ -338,6 +334,9 @@ module xquad_element_module
         do i=1, nnode
             call extract(lib_node(elem%nodecnc(i)),x=coord(i)%array)
         end do
+        
+        ! extract material orientation (fibre angle)
+        call extract(lib_mat(elem%bulkmat),theta=theta)
 
 
 
@@ -384,8 +383,8 @@ module xquad_element_module
                 yp1=coord(jnode)%array(2)
 
                 ! from theta (local fibre dir.), calculate another point on the crack line (could be any point along the line)
-                xp2=xp1+cos(elem%theta/halfcirc*pi)
-                yp2=yp1+sin(elem%theta/halfcirc*pi)
+                xp2=xp1+cos(theta/halfcirc*pi)
+                yp2=yp1+sin(theta/halfcirc*pi)
 
                 ! next, find the other edge crossed by the crack line
                 do i=1,nedge
@@ -623,7 +622,8 @@ module xquad_element_module
 
         edg=topo
 
-        theta=elem%theta
+        ! extract material orientation (fibre angle)
+        call extract(lib_mat(elem%bulkmat),theta=theta)
         
         elstat=elem%curr_status
 
@@ -902,9 +902,9 @@ module xquad_element_module
             subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
 
             ! create sub elements
-            call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-            call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-            call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
+            call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+            call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
+            call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array)
 
 
 
@@ -1002,8 +1002,8 @@ module xquad_element_module
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
 
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                    call prepare(elem%subelem(2),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
+                    call prepare(elem%subelem(1),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='quad', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
 
                     if(iscoh) then
 
@@ -1088,10 +1088,10 @@ module xquad_element_module
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
 
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                    call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-                    call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
-                    call prepare(elem%subelem(4),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array, theta=elem%theta)
+                    call prepare(elem%subelem(1),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
+                    call prepare(elem%subelem(3),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array)
+                    call prepare(elem%subelem(4),eltype='tri', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array)
 
                     if(iscoh) then
 

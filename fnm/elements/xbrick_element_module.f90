@@ -22,7 +22,6 @@ module xbrick_element_module
         integer :: key=0 
         integer :: bulkmat=0
         integer :: cohmat=0
-        real(dp):: theta=zero           ! fibre orientation for lamina
         
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
@@ -73,7 +72,6 @@ module xbrick_element_module
         elem%key=0 
         elem%bulkmat=0
         elem%cohmat=0
-        elem%theta=zero
         
         elem%nodecnc=0
         elem%edgecnc=0
@@ -87,33 +85,30 @@ module xbrick_element_module
   
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xbrick_element(elem,key,bulkmat,cohmat,theta,nodecnc,edgecnc)
+    subroutine prepare_xbrick_element(elem,key,bulkmat,cohmat,nodecnc,edgecnc)
     
         type(xbrick_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: bulkmat, cohmat
-        real(dp),               intent(in)      :: theta
         integer,                intent(in)      :: nodecnc(nnode)
         integer,                intent(in)      :: edgecnc(nedge)
 
         elem%key=key 
         elem%bulkmat=bulkmat
         elem%cohmat=cohmat
-        elem%theta=theta
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
     
     end subroutine prepare_xbrick_element
     
     
-    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,theta,nodecnc,edgecnc,subelem,subcnc)
+    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc,subelem,subcnc)
     
         type(xbrick_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: bulkmat
         integer,                        optional, intent(out) :: cohmat
-        real(dp),                       optional, intent(out) :: theta
         integer,            allocatable,optional, intent(out) :: nodecnc(:)
         integer,            allocatable,optional, intent(out) :: edgecnc(:)
         type(sub3d_element),allocatable,optional, intent(out) :: subelem(:)
@@ -123,7 +118,6 @@ module xbrick_element_module
         if(present(key)) key=elem%key 
         if(present(bulkmat)) bulkmat=elem%bulkmat
         if(present(cohmat)) cohmat=elem%cohmat
-        if(present(theta)) theta=elem%theta
         
         if(present(nodecnc)) then 
             allocate(nodecnc(nnode))
@@ -177,7 +171,6 @@ module xbrick_element_module
         i=0; j=0; l=0
         elstat=0
 
-        print*,elem%curr_status
 
         !---------------------------------------------------------------------!
         !               update sub element definitions
@@ -203,7 +196,7 @@ module xbrick_element_module
                 elem%subcnc(1)%array=[(i, i=1,nndrl)]
                 subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                 ! create sub elements
-                call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
+                call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
             end if
         end if 
         
@@ -302,6 +295,7 @@ module xbrick_element_module
     real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
     real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
     real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
+    real(dp) :: theta
     
     ! --------------------------------------------------------------------!
     !       *** workings of edgstat, nfailedge, ifedg ***
@@ -330,6 +324,7 @@ module xbrick_element_module
         x2=zero; y2=zero; z2=zero
         
         xct=zero; yct=zero; zct=zero
+        theta=zero
 
 
 !-----------------------------------------------------------------------!
@@ -344,6 +339,8 @@ module xbrick_element_module
             call extract(lib_node(elem%nodecnc(i)),x=coord(i)%array)
         end do
 
+        ! extract material orientation (fibre angle)
+        call extract(lib_mat(elem%bulkmat),theta=theta)
 
 
 !-----------------------------------------------------------------------!
@@ -391,8 +388,8 @@ module xbrick_element_module
                 yp1=coord(jnode)%array(2)
 
                 ! from theta (local fibre dir.), calculate another point on the crack line (could be any point along the line)
-                xp2=xp1+cos(elem%theta/halfcirc*pi)
-                yp2=yp1+sin(elem%theta/halfcirc*pi)
+                xp2=xp1+cos(theta/halfcirc*pi)
+                yp2=yp1+sin(theta/halfcirc*pi)
                 
                 ! next, find the other edge crossed by the crack line
                 do i=1,nedge
@@ -651,7 +648,8 @@ module xbrick_element_module
         
         edg=topo
 
-        theta=elem%theta
+        ! extract material orientation (fibre angle)
+        call extract(lib_mat(elem%bulkmat),theta=theta)
         
         elstat=elem%curr_status
 
@@ -964,9 +962,9 @@ module xbrick_element_module
             subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
 
             ! create sub elements
-            call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-            call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-            call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
+            call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+            call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
+            call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array)
          
 
  
@@ -977,7 +975,7 @@ module xbrick_element_module
                 if(ifedg(i)<=nedge/2) ibe2=max(ibe2,ifedg(i))! local edge index of 2nd broken edge
             end do  
             if(edgstat(ibe1)==cohcrack .or. edgstat(ibe2)==cohcrack) iscoh=.true.
-            print*,ibe1,ibe2
+
             
             ! determine partition based on the indices of the two broken edges
             !   partition: no. of bulk sub domains
@@ -1077,8 +1075,8 @@ module xbrick_element_module
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                    call prepare(elem%subelem(2),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
+                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
                     
                     if(iscoh) then
                     
@@ -1186,10 +1184,10 @@ module xbrick_element_module
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array, theta=elem%theta)
-                    call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array, theta=elem%theta)
-                    call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array, theta=elem%theta)
-                    call prepare(elem%subelem(4),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array, theta=elem%theta)
+                    call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
+                    call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array)
+                    call prepare(elem%subelem(4),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array)
                     
                     if(iscoh) then
                     

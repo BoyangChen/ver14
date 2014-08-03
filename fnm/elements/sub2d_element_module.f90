@@ -288,7 +288,7 @@
                     if(.not.allocated(elem%tri)) then
                         allocate(elem%tri(1))
                         call empty(elem%tri(1))
-                        call prepare(elem%tri(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,theta=elem%theta)
+                        call prepare(elem%tri(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
                     end if
                     
                     call integrate(elem%tri(1),Kmatrix,Fvector)
@@ -300,7 +300,7 @@
                     if(.not.allocated(elem%quad)) then
                         allocate(elem%quad(1))
                         call empty(elem%quad(1))
-                        call prepare(elem%quad(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,theta=elem%theta)
+                        call prepare(elem%quad(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
                     end if
                     
                     call integrate(elem%quad(1),Kmatrix,Fvector)
