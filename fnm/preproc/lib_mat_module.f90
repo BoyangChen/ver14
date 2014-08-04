@@ -55,13 +55,14 @@
       & Yc=185.0_dp,& 
       & Sl=90.0_dp,& 
       & St=90.0_dp),& 
+      & lamina_fibretoughness(& 
+      & GfcT=100.0_dp,& 
+      & GfcC=100.0_dp),& 
       & lamina_matrixtoughness(& 
       & GmcI=0.2_dp,& 
       & GmcII=1.0_dp,& 
       & eta=1.0_dp),& 
-      & lamina_fibretoughness(& 
-      & GfcT=100.0_dp,& 
-      & GfcC=100.0_dp)) 
+      & ) 
 
         call update(lib_interface(1), & 
       & interface_modulus(& 

@@ -58,8 +58,8 @@
     ! material information in the global material library lib_mat
     subroutine update_material(mat,matname,mattype,typekey,theta)
         type(material),intent(inout):: mat
-        character(len=matnamelength),optional,intent(in) :: matname 
-        character(len=mattypelength),optional,intent(in) :: mattype 
+        character(len=*),optional,intent(in) :: matname 
+        character(len=*),optional,intent(in) :: mattype 
         integer,optional,intent(in) :: typekey
         real(dp),optional,intent(in):: theta
         

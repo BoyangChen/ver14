@@ -151,13 +151,16 @@ if(nlamina>0):
         lib_mat.write('      & Yc='                +str(list_lamina[i].strength.Yc)+              '_dp,& \n')
         lib_mat.write('      & Sl='                +str(list_lamina[i].strength.Sl)+              '_dp,& \n')
         lib_mat.write('      & St='                +str(list_lamina[i].strength.St)+             '_dp),& \n')
-        lib_mat.write('      & lamina_matrixtoughness(& \n') 
-        lib_mat.write('      & GmcI='                         +str(list_lamina[i].matrixtoughness.GmcI)+     '_dp,& \n')
-        lib_mat.write('      & GmcII='                         +str(list_lamina[i].matrixtoughness.GmcII)+    '_dp,& \n')
-        lib_mat.write('      & eta='                         +str(list_lamina[i].matrixtoughness.eta)+     '_dp),& \n')
         lib_mat.write('      & lamina_fibretoughness(& \n')  
         lib_mat.write('      & GfcT='                         +str(list_lamina[i].fibretoughness.GfcT)+      '_dp,& \n')
-        lib_mat.write('      & GfcC='                         +str(list_lamina[i].fibretoughness.GfcC)+      '_dp)) \n')
+        lib_mat.write('      & GfcC='                         +str(list_lamina[i].fibretoughness.GfcC)+      '_dp),& \n')
+        # matrix toughness is not needed in lamina type, as matrix crack is treated by a cohesive sub-element;
+        # matrix crack smeared crack model is not supported here in fnm lamina type
+        #lib_mat.write('      & lamina_matrixtoughness(& \n') 
+        #lib_mat.write('      & GmcI='                         +str(list_lamina[i].matrixtoughness.GmcI)+     '_dp,& \n')
+        #lib_mat.write('      & GmcII='                         +str(list_lamina[i].matrixtoughness.GmcII)+    '_dp,& \n')
+        #lib_mat.write('      & eta='                         +str(list_lamina[i].matrixtoughness.eta)+     '_dp),& \n')
+        lib_mat.write('      & ) \n')
         lib_mat.write('\n')
 
 

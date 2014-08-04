@@ -72,9 +72,9 @@
         nxbrick=2
         
         allocate(lib_xbrick(nxbrick))
-        call prepare(lib_xbrick(1),key=1,bulkmat=2,cohmat=3,theta=zero, &
+        call prepare(lib_xbrick(1),key=1,bulkmat=2,cohmat=5, &
         & nodecnc=[1,2,4,3,7,8,10,9,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],edgecnc=[1,2,3,4,5,6,7,8])
-        call prepare(lib_xbrick(2),key=2,bulkmat=2,cohmat=3,theta=half*ninety, &
+        call prepare(lib_xbrick(2),key=2,bulkmat=2,cohmat=5, &
         & nodecnc=[3,4,6,5,9,10,12,11,18,17,29,30,31,32,33,34,26,25,35,36,37,38,39,40],edgecnc=[3,9,10,11,7,12,13,14])
 
 

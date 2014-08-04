@@ -182,17 +182,19 @@ fnminp=open(fnminputfile,'w')
 #***************************************************************
 #       define usefule variables
 #***************************************************************
-nodes=[]
-edges=[]
-elems=[]
-ndedg=[]
+nodes=[]    # list of all nodes in the mesh
+edges=[]    # list of all breakable edges in the mesh
+elems=[]    # list of all elements in the mesh
+ndedg=[]    # matrix of node_i-to-node_j edge no. 
+eltype=[]   # list of all element types in the mesh
+elcount=[]  # count of elements of each type in the mesh
 
 #eltype=3080     # just a random name, must be consistent with uel.f
 #nndrl=8         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
 #nedge=8         # no. of breakable edges in this element
 #nndfl=2*nedge
 #nnode=nndrl+nndfl
-eltype=[]
+
 
 
 
@@ -221,19 +223,26 @@ for ln, line in enumerate(lines):
         
         if 'C2D3' in line:
             eltype.append('xtri')
+            elcount.append(0)
         elif 'C2D4' in line:
             eltype.append('xquad')
+            elcount.append(0)
         elif 'COH2D4' in line:
             eltype.append('coh2d')  # change to x version in future
+            elcount.append(0)
         elif ('C3D6' in line) or ('SC6' in line):
             eltype.append('xwedge')
+            elcount.append(0)
         elif ('C3D8' in line) or ('SC8' in line):
             eltype.append('xbrick')
+            elcount.append(0)
         elif 'COH3D6' in line:
             eltype.append('coh3d6') # change to x version in future
+            elcount.append(0)
         elif 'COH3D8' in line:
             eltype.append('coh3d8') # change to x version in future
-        else
+            elcount.append(0)
+        else:
             print 'warning: abaqus element type in line:', ln, 'is not supported in fnm.'
 
     elif(len(line)>=9 and line[0:9]=='*End Part'):
@@ -265,6 +274,10 @@ for ln, line in enumerate(lines):
             
         elif iselem:
         # build edges, store elements' nodecnc and edgecnc
+            
+            # increase the elem count of the latest elem type
+            elcount[-1]+=1
+        
             l = []
             for t in line.split(','):
                 try:
@@ -293,7 +306,7 @@ for ln, line in enumerate(lines):
                         for nf in range(2):                     # create floating nodes on this edge
                             nodes.append(node(0.0,0.0,0.0))
                             
-                        edges.append(edge(nodes=[row,col,fn1,fn2]))     # create this edge
+                        edges.append(edge(nodes=[row+1,col+1,fn1+1,fn2+1]))     # create this edge (for output in Fortran)
                         ndedg[row][col]=len(edges)              # fill the new edge index in the ndedg matrix
                         ndedg[col][row]=-(len(edges))           # nodes in rev. order makes the same edge in rev. dir.
                         elems[-1].edges.append(ndedg[row][col]) # append this edge no. in this elem
@@ -319,7 +332,7 @@ for ln, line in enumerate(lines):
                             for nf in range(2):                     # create floating nodes on this edge
                                 nodes.append(node(0.0,0.0,0.0))
                                 
-                            edges.append(edge(nodes=[row,col,fn1,fn2]))     # create this edge
+                            edges.append(edge(nodes=[row+1,col+1,fn1+1,fn2+1]))     # create this edge
                             ndedg[row][col]=len(edges)              # fill the new edge index in the ndedg matrix
                             ndedg[col][row]=-(len(edges))           # nodes in rev. order makes the same edge in rev. dir.
                             elems[-1].edges.append(ndedg[row][col]) # append this edge no. in this elem
@@ -359,53 +372,126 @@ lib_edge.write('        lib_edge=0                  \n')
     
 #***************************************************************        
 #       Write Elements
-#***************************************************************    
-fnminp.write('*USER ELEMENT, TYPE='+str(eltype)+', NODES='+str(nnode)+', COORDINATES='+str(ndim)+
-    ', PROPERTIES='+str(nprops)+', VARIABLES='+str(nsvars)+'\n')
-if ndim==2:
-    fnminp.write('1,2\n')
-else:
-    fnminp.write('1,2,3\n')
+#***************************************************************
+for eli, elt in enumerate(eltype):
+
+    # determine no. of nodes and uel element integer type
+    # uel element integer type:
+    #   1st digit: ndim
+    #   2nd digit: 0: bulk elem; 1: coh elem; 2: x elem
+    #   3rd onwards: no. of real nodes
+    if ndim == 2:
+        if elt == 'xtri':
+            nndrl=3         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
+            nedge=3         # no. of breakable edges in this element
+            nndfl=2*nedge
+            nnode=nndrl+nndfl
+            eltuel=223
+        elif elt == 'xquad':
+            nndrl=4         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
+            nedge=4         # no. of breakable edges in this element
+            nndfl=2*nedge
+            nnode=nndrl+nndfl
+            eltuel=224
+        elif elt == 'coh2d':
+            nnode=4
+            eltuel=214
+    elif ndim == 3:
+        if elt == 'xwedge':
+            nndrl=6         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
+            nedge=6         # no. of breakable edges in this element
+            nndfl=2*nedge
+            nnode=nndrl+nndfl
+            eltuel=326
+        elif elt == 'xbrick':
+            nndrl=8         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
+            nedge=8         # no. of breakable edges in this element
+            nndfl=2*nedge
+            nnode=nndrl+nndfl
+            eltuel=328
+        elif elt == 'coh3d6':
+            nnode=6
+            eltuel=316
+        elif elt == 'coh3d8':
+            nnode=8
+            eltuel=318
+    
+    # write user element definition in abaqus fnm input file
+    fnminp.write('*USER ELEMENT, TYPE='+str(eltuel)+', NODES='+str(nnode)+', COORDINATES='+str(ndim)+
+        ', PROPERTIES='+str(nprops)+', VARIABLES='+str(nsvars)+'\n')
+    if ndim==2:
+        fnminp.write('1,2\n')
+    else:
+        fnminp.write('1,2,3\n')
       
-fnminp.write('*Element, type='+str(eltype)+', elset=uel\n')
+    # allocate lib_elem in fnm lib_elem module
+    lib_elem.write('        n'+elt+'='+str(elcount[eli])+'     \n')
+    lib_elem.write('        allocate(lib_'+elt+'(n'+elt+'))   \n')
 
-lib_elem.write('        nxbrick='+str(len(elems))+'     \n')
-lib_elem.write('        nelem=nxbrick                   \n')
-lib_elem.write('        allocate(lib_xbrick(nxbrick))   \n')
-lib_elem.write('        allocate(lib_elem(nelem))       \n')
- 
-
-for cntr0, el in enumerate(elems):
-    cntr=cntr0+1
-    eline=str(cntr)
-    nodecnc=''
-    edgecnc=''
-    for k in el.nodes:
-        eline=eline+', '+str(k)
-        nodecnc=nodecnc+str(k)+','
+    # write elem nodal connec in abaqus fnm input file
+    fnminp.write('*Element, type='+str(eltuel)+', elset=uel_'+elt+'\n')
+    
+    # find start and end elem indices for elements of the same type
+    if eli == 0:
+        elstart=0
+    else:
+        elstart=sum(elcount[:eli])
         
-    for m in el.edges:
-        edgecnc=edgecnc+str(abs(m))+','
-        if m>0:
-            eline=eline+', '+str(edges[m-1].nodes[2])+', '+str(edges[m-1].nodes[3])
-            nodecnc=nodecnc+str(edges[m-1].nodes[2])+', '+str(edges[m-1].nodes[3])+','
-        elif m<0:
-            eline=eline+', '+str(edges[-m-1].nodes[3])+', '+str(edges[-m-1].nodes[2])
-            nodecnc=nodecnc+str(edges[-m-1].nodes[3])+', '+str(edges[-m-1].nodes[2])+','
+    elend=elstart+elcount[eli]
+    
+    
+    # write elem nodal connec of elements of the same type
+    for cntr0, el in enumerate(elems[elstart:elend]):
+        cntr=cntr0+1
+        
+        # elem line to be printed in abaqus fnm input file
+        eline=str(cntr+elstart) 
+        
+        # elem node and edge cnc to be printed in fnm lib_elem module
+        nodecnc=''
+        edgecnc=''
+        
+        # include real nodes in lists
+        for k in el.nodes:
+            eline=eline+', '+str(k)
+            nodecnc=nodecnc+str(k)+','
+            
+        # include edge fl. nodes in lists for x-version elements
+        if (elt[0] == 'x'):    
+            for m in el.edges:
+                edgecnc=edgecnc+str(abs(m))+','
+                if m>0:     # elem edge's endnodes are in the same order as the definition of the edge
+                    eline=eline+', '+str(edges[m-1].nodes[2])+', '+str(edges[m-1].nodes[3])
+                    nodecnc=nodecnc+str(edges[m-1].nodes[2])+', '+str(edges[m-1].nodes[3])+','
+                elif m<0:   # elem edge's endnodes are in the reverse order as the definition of the edge
+                    eline=eline+', '+str(edges[-m-1].nodes[3])+', '+str(edges[-m-1].nodes[2])
+                    nodecnc=nodecnc+str(edges[-m-1].nodes[3])+', '+str(edges[-m-1].nodes[2])+','
+                else:
+                    print 'warning: edges in elem ',cntr,' are empty'
+        
+        # wrap up eline and print in abaqus fnm input file
+        eline=eline+'\n'
+        fnminp.write(eline)
+        
+        # write node cnc and edge cnc (for x version elems only) to the respective type arrays in fnm lib_elem module
+        if (elt[0] == 'x'):
+            lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(cntr+elstart)+', & \n')
+            lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
+            lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
+            lib_elem.write('& bulkmat=0, cohmat=0 ) \n')    # update matkeys later accord. to mat section assignment
         else:
-            print 'warning: edges in elem ',cntr,' are empty'
-    
-    eline=eline+'\n'
-    fnminp.write(eline)
-    
-    lib_elem.write('        call prepare(lib_xbrick('+str(cntr)+'),key='+str(cntr)+', & \n')
-    lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
-    lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
-    lib_elem.write('& bulkmat='+str(bulkmat)+', cohmat='+str(cohmat)+', theta='+theta+' ) \n')
-    
-    lib_elem.write('        call update(lib_elem('+str(cntr)+'),elname="xbrick",eltype="xbrick",elkey='+str(cntr)+') \n')
-    lib_elem.write('\n')
+            lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(cntr+elstart)+', & \n')
+            lib_elem.write('& connec=['+nodecnc[:-1]+'], & \n')
+            lib_elem.write('& matkey=0 ) \n')   # update matkey later accord. to mat section assignment
+        
+        # write elem type and typekey (elem index in its own type array) 
+        lib_elem.write('        call update(lib_elem('+str(cntr+elstart)+'),elname="'+elt+'",eltype="'+elt+'",typekey='+str(cntr)+') \n')
+        lib_elem.write('\n')
 
+
+nelem=sum(elcount)
+lib_elem.write('        nelem='+str(nelem)+'            \n')
+lib_elem.write('        allocate(lib_elem(nelem))       \n')
 
 #***************************************************************        
 #       Write the rest
