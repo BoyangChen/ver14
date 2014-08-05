@@ -478,11 +478,11 @@ for eli, elt in enumerate(eltype):
             lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(cntr+elstart)+', & \n')
             lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
             lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
-            lib_elem.write('& bulkmat=0, cohmat=0 ) \n')    # update matkeys later accord. to mat section assignment
+            lib_elem.write('& bulkmat=1, cohmat=5 ) \n')    # update matkeys later accord. to mat section assignment
         else:
             lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(cntr+elstart)+', & \n')
             lib_elem.write('& connec=['+nodecnc[:-1]+'], & \n')
-            lib_elem.write('& matkey=0 ) \n')   # update matkey later accord. to mat section assignment
+            lib_elem.write('& matkey=1 ) \n')   # update matkey later accord. to mat section assignment
         
         # write elem type and typekey (elem index in its own type array) 
         lib_elem.write('        call update(lib_elem('+str(cntr+elstart)+'),elname="'+elt+'",eltype="'+elt+'",typekey='+str(cntr)+') \n')

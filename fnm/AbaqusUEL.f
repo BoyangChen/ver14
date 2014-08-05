@@ -131,7 +131,7 @@
     type(element)               :: elem
     character(len=elnamelength) :: elname
     character(len=eltypelength) :: eltype
-    integer                     :: elkey
+    integer                     :: typekey
     
     ! nodal cnc of this elem
     integer, allocatable    :: cnc(:)
@@ -150,17 +150,17 @@
     ! extract this element definition from glb library, using the element key jelem
     elem=lib_elem(jelem)
     
-    ! extract elname, eltype and elkey
-    call extract(elem,elname,eltype,elkey)
+    ! extract elname, eltype and typekey
+    call extract(elem,elname,eltype,typekey)
     
     ! extract nodal cnc based on element type
     select case(eltype)
         case('xbrick')
             ! extract nodal cnc from this elem
-            call extract(lib_xbrick(elkey),nodecnc=cnc)
+            call extract(lib_xbrick(typekey),nodecnc=cnc)
         case('coh3d8')
             ! extract nodal cnc from this elem
-            call extract(lib_coh3d8(elkey),nodecnc=cnc)
+            call extract(lib_coh3d8(typekey),nodecnc=cnc)
         case default
             write(msg_file,*)'unsupported element type'
             call exit_function
@@ -189,9 +189,9 @@
     ! integrate this element
     select case(eltype)
         case('xbrick')
-            call integrate(lib_xbrick(elkey),Kmat,Fvec)
+            call integrate(lib_xbrick(typekey),Kmat,Fvec)
         case('coh3d8')
-            call integrate(lib_coh3d8(elkey),Kmat,Fvec)
+            call integrate(lib_coh3d8(typekey),Kmat,Fvec)
         case default
             write(msg_file,*)'unsupported element type'
             call exit_function
