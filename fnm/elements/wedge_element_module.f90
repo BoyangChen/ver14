@@ -5,7 +5,7 @@
     implicit none
     private
     
-    integer, parameter :: ndim=3, nst=6, nnode=6, nig=2, ndof=ndim*nnode ! constants for type wedge_element 
+    integer, parameter :: ndim=3, nst=6, nnode=6, nig=9, ndof=ndim*nnode ! constants for type wedge_element 
     real(dp),parameter :: dfail=one                                      ! max. degradation at final failure 
     
     type, public :: wedge_element 
@@ -404,7 +404,10 @@
         
         
         ! deallocate local dynamic arrays
-        if(allocated(vec)) deallocate(vec)
+        if(allocated(xj)) deallocate(xj) 
+        if(allocated(uj)) deallocate(uj) 
+        if(allocated(vec)) deallocate(vec) 
+        if(allocated(ig_sdv)) deallocate(ig_sdv)
         
         
     
@@ -443,6 +446,46 @@
             xi(2,2)= one_third
             xi(3,2)= root3
             wt = half
+        else if(nig == 9) then
+            xi(1,1)=one/six
+            xi(2,1)=one/six
+            xi(3,1)=-sqrt(three/five)
+
+            xi(1,2)=four/six
+            xi(2,2)=one/six
+            xi(3,2)=-sqrt(three/five)
+
+            xi(1,3)=one/six
+            xi(2,3)=four/six
+            xi(3,3)=-sqrt(three/five)
+
+            xi(1,4)=one/six
+            xi(2,4)=one/six
+            xi(3,4)=sqrt(three/five)
+
+            xi(1,5)=four/six
+            xi(2,5)=one/six
+            xi(3,5)=sqrt(three/five)
+
+            xi(1,6)=one/six
+            xi(2,6)=four/six
+            xi(3,6)=sqrt(three/five)
+
+            xi(1,7)=one/six
+            xi(2,7)=one/six
+            xi(3,7)=zero
+
+            xi(1,8)=four/six
+            xi(2,8)=one/six
+            xi(3,8)=zero
+
+            xi(1,9)=one/six
+            xi(2,9)=four/six
+            xi(3,9)=zero
+
+            wt(1:6)=five/54._dp
+            wt(7:9)=eight/54._dp
+
         else
             write(msg_file,*) 'no. of integration points incorrect for wedge_ig!'
             call exit_function

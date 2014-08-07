@@ -160,6 +160,7 @@ module xquad_element_module
         real(kind=dp),allocatable           :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
 
         integer :: i,j,l, elstat
+        integer, allocatable :: dofcnc(:)
 
 
         ! initialize K & F
@@ -217,7 +218,15 @@ module xquad_element_module
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
                 call integrate(elem%subelem(i),Ki,Fi)
-                call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                if(allocated(dofcnc)) deallocate(dofcnc)
+                allocate(dofcnc(size(Fi))); dofcnc=0
+                do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                    do l=1, ndim
+                        ! dof indices of the jth node of sub elem i 
+                        dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                    end do
+                end do
+                call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
             end do
 
             !***** check failure criterion *****
@@ -230,7 +239,15 @@ module xquad_element_module
                 ! integrate sub elements and assemble into global matrix
                 do i=1, size(elem%subelem)
                     call integrate(elem%subelem(i),Ki,Fi)
-                    call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                    if(allocated(dofcnc)) deallocate(dofcnc)
+                    allocate(dofcnc(size(Fi))); dofcnc=0
+                    do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                        do l=1, ndim
+                            ! dof indices of the jth node of sub elem i 
+                            dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                        end do
+                    end do
+                    call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
                 end do
             end if
 
@@ -240,7 +257,15 @@ module xquad_element_module
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
                 call integrate(elem%subelem(i),Ki,Fi)
-                call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                if(allocated(dofcnc)) deallocate(dofcnc)
+                allocate(dofcnc(size(Fi))); dofcnc=0
+                do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                    do l=1, ndim
+                        ! dof indices of the jth node of sub elem i 
+                        dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                    end do
+                end do
+                call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
             end do
 
         else
@@ -256,6 +281,8 @@ module xquad_element_module
         !---------------------------------------------------------------------!
         if(allocated(Ki)) deallocate(Ki)
         if(allocated(Fi)) deallocate(Fi)
+        if(allocated(subglbcnc)) deallocate(subglbcnc)
+        if(allocated(dofcnc)) deallocate(dofcnc)
 
 
     end subroutine integrate_xquad_element

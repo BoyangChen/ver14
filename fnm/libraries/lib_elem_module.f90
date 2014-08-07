@@ -6,7 +6,6 @@
     include "elements/coh2d_element_module.f90"                           
     include "elements/sub2d_element_module.f90"                           
     include "elements/xquad_element_module.f90"                           
-    include "elements/element_module.f90"                                 
     include "elements/wedge_element_module.f90"                           
     include "elements/brick_element_module.f90"                           
     include "elements/coh3d6_element_module.f90"                          
@@ -52,7 +51,9 @@
         integer ::  nelem=0, ntri=0, nquad=0, nwedge=0, nbrick=0 &        
         &          ,ncoh2d=0, ncoh3d6=0, ncoh3d8=0, nsub2d=0, nsub3d=0 &  
         &          ,nxquad=0, nxbrick=0                                   
-        integer :: i=0                                                    
+        integer :: i=0 
+        nelem=9            
+        allocate(lib_elem(nelem)) 
         nxbrick=9     
         allocate(lib_xbrick(nxbrick))   
         call prepare(lib_xbrick(1),key=1, & 
@@ -109,7 +110,6 @@
 & bulkmat=1, cohmat=5 ) 
         call update(lib_elem(9),elname="xbrick",eltype="xbrick",typekey=9) 
 
-        nelem=9            
-        allocate(lib_elem(nelem))       
+              
     end subroutine initialize_lib_elem        
     end module lib_elem_module                

@@ -460,6 +460,10 @@
             
             
        	end do !-looped over all int points. ig=nig
+
+        if(allocated(xj)) deallocate(xj) 
+        if(allocated(uj)) deallocate(uj) 
+        if(allocated(ig_sdv)) deallocate(ig_sdv) 
           
     
     end subroutine integrate_coh2d_element

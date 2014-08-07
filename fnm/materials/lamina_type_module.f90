@@ -316,6 +316,8 @@
             E1=E1*(one-df)
             nu12=nu12*(one-df)
             nu13=nu13*(one-df)
+
+            E1=max(E1,Kres)
         end if
         
         if(present(dm2)) then
@@ -324,6 +326,9 @@
             nu23=nu23*(one-dm2)
             G12=G12*(one-dm2)
             dm=max(dm,dm2)
+
+            E2=max(E2,Kres)
+            G12=max(G12,Kres)
         end if
         
         if(present(dm3)) then
@@ -332,10 +337,14 @@
             nu32=nu32*(one-dm3)
             G13=G13*(one-dm2)
             dm=max(dm,dm3)
+
+            E3=max(E3,Kres)
+            G13=max(G13,Kres)
         end if
             
         G23=G23*(one-dm)
         
+        G23=max(G23,Kres)
         
         del= one-nu12*nu21-nu13*nu31-nu23*nu32-two*nu21*nu32*nu13
         

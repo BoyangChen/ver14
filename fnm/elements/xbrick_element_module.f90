@@ -161,6 +161,7 @@ module xbrick_element_module
         real(kind=dp),allocatable           :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
         
         integer :: i,j,l, elstat
+        integer, allocatable :: dofcnc(:)
     
     
         ! initialize K & F
@@ -171,6 +172,8 @@ module xbrick_element_module
         i=0; j=0; l=0
         elstat=0
 
+
+        
 
         !---------------------------------------------------------------------!
         !               update sub element definitions
@@ -219,8 +222,17 @@ module xbrick_element_module
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
                 call integrate(elem%subelem(i),Ki,Fi)
-                call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                if(allocated(dofcnc)) deallocate(dofcnc)
+                allocate(dofcnc(size(Fi))); dofcnc=0
+                do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                    do l=1, ndim
+                        ! dof indices of the jth node of sub elem i 
+                        dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                    end do
+                end do
+                call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
             end do
+
  
             !***** check failure criterion *****
             call failure_criterion_partition(elem)
@@ -234,17 +246,34 @@ module xbrick_element_module
                 ! integrate sub elements and assemble into global matrix
                 do i=1, size(elem%subelem)
                     call integrate(elem%subelem(i),Ki,Fi)
-                    call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                    if(allocated(dofcnc)) deallocate(dofcnc)
+                    allocate(dofcnc(size(Fi))); dofcnc=0
+                    do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                        do l=1, ndim
+                            ! dof indices of the jth node of sub elem i 
+                            dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                        end do
+                    end do
+                    call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
                 end do          
             end if
                
         else if(elem%curr_status==elfail) then
         ! element is already failed, integrate and assemble subelem
+            
         
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
-                call integrate(elem%subelem(i),Ki,Fi) 
-                call assembleKF(K_matrix,F_vector,Ki,Fi,elem%subcnc(i)%array)
+                call integrate(elem%subelem(i),Ki,Fi)  
+                if(allocated(dofcnc)) deallocate(dofcnc)
+                allocate(dofcnc(size(Fi))); dofcnc=0
+                do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                    do l=1, ndim
+                        ! dof indices of the jth node of sub elem i 
+                        dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                    end do
+                end do
+                call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
             end do
             
         else
@@ -254,12 +283,13 @@ module xbrick_element_module
         
          
         
-        
         !---------------------------------------------------------------------!
         !               deallocate local arrays 
         !---------------------------------------------------------------------!
         if(allocated(Ki)) deallocate(Ki)
         if(allocated(Fi)) deallocate(Fi)
+        if(allocated(subglbcnc)) deallocate(subglbcnc)
+        if(allocated(dofcnc)) deallocate(dofcnc)
     
  
     end subroutine integrate_xbrick_element
@@ -1081,14 +1111,14 @@ module xbrick_element_module
                     if(iscoh) then
                     
                     ! sub elm 3 connec
-                    elem%subcnc(3)%array(1)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(1)=jnode3
-                    elem%subcnc(3)%array(2)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(2)=jnode1
+                    elem%subcnc(3)%array(2)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(2)=jnode3
+                    elem%subcnc(3)%array(1)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(1)=jnode1
                     
                     elem%subcnc(3)%array(3)=elem%subcnc(3)%array(2)+nndfl/2
                     elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nndfl/2
                     
-                    elem%subcnc(3)%array(5)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(6)=jnode3
-                    elem%subcnc(3)%array(6)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(5)=jnode1
+                    elem%subcnc(3)%array(6)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(6)=jnode3
+                    elem%subcnc(3)%array(5)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(5)=jnode1
                     
                     elem%subcnc(3)%array(7)=elem%subcnc(3)%array(6)+nndfl/2
                     elem%subcnc(3)%array(8)=elem%subcnc(3)%array(5)+nndfl/2

@@ -114,7 +114,7 @@
       
         ! set format for integer output
         fmat='(i5.5)'   ! for increment no.
-        fmatcnc='(i3)'  ! for connec node no.
+        fmatcnc='(i10)'  ! for connec node no.
       
         ! write the increment number as a character and store in outnum
         write(outnum,fmat) kinc
@@ -152,7 +152,7 @@
         !                     write nodes
         ! -----------------------------------------------------------------!
         
-        write(outunit,'(a, i5, a)')'POINTS ',nnode,' FLOAT'    
+        write(outunit,'(a, i10, a)')'POINTS ',nnode,' FLOAT'    
         do i=1,nnode
             ! empty x3d array
             x3d=zero
@@ -225,7 +225,7 @@
         &    +nsubwedge*(1+6)+nsubbrick*(1+8)+nsubcoh3d6*(1+6)+nsubcoh3d8*(1+8)
         
         ! write a summary of output
-        write(outunit,'(a, i5, i5)')'CELLS ', nelem, nsize
+        write(outunit,'(a, i10, i10)')'CELLS ', nelem, nsize
         
         if(ntri > 0) then
             do i=1,ntri ! write each element's connec individually
@@ -320,7 +320,7 @@
         
         !                   write elements' types (order matters)
         
-        write(outunit,'(a, i5)')'CELL_TYPES ', nelem
+        write(outunit,'(a, i10)')'CELL_TYPES ', nelem
         
         if (ntri > 0) then
             do i=1,ntri
@@ -412,7 +412,7 @@
 
 
         ! write nodal varibales (disp.)
-        write(outunit,'(a, i5)')'POINT_DATA ', nnode
+        write(outunit,'(a, i10)')'POINT_DATA ', nnode
         write(outunit,'(a)')'VECTORS displacement float'
         !~write(outunit,'(a)')'LOOKUP_TABLE default' ! ** this is only for scalar **
         
@@ -438,7 +438,7 @@
         ! -----------------------------------------------------------------!     
         
         ! write element stress
-        write(outunit,'(a, i5)')'CELL_DATA ', nelem
+        write(outunit,'(a, i10)')'CELL_DATA ', nelem
         write(outunit,'(a)')'TENSORS stress float'
         
         if (ntri > 0) then
@@ -1767,8 +1767,23 @@
 
         
 
-        
-        
+
+        if(allocated(connec)) deallocate(connec)
+        if(allocated(x)) deallocate(x)
+        if(allocated(disp)) deallocate(disp)
+        if(allocated(subtri)) deallocate(subtri)
+        if(allocated(subquad)) deallocate(subquad)
+        if(allocated(subwedge)) deallocate(subwedge)
+        if(allocated(subbrick)) deallocate(subbrick)
+        if(allocated(subcoh2d)) deallocate(subcoh2d)
+        if(allocated(subcoh3d6)) deallocate(subcoh3d6)
+        if(allocated(subcoh3d8)) deallocate(subcoh3d8)
+        if(allocated(sub2d)) deallocate(sub2d)
+        if(allocated(sub3d)) deallocate(sub3d)        
+        if(allocated(igpnt)) deallocate(igpnt)
+        if(allocated(sig)) deallocate(sig)
+        if(allocated(eps)) deallocate(eps)   
+        if(allocated(fsdv)) deallocate(fsdv)        
         
         
         close(outunit)

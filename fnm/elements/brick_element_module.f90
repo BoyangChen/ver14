@@ -403,9 +403,14 @@
        	end do !-looped over all int points. ig=nig
         
         F_vector=matmul(K_matrix,u) 
+
         
         ! deallocate local dynamic arrays
+
+        if(allocated(xj)) deallocate(xj) 
+        if(allocated(uj)) deallocate(uj) 
         if(allocated(vec)) deallocate(vec) 
+        if(allocated(ig_sdv)) deallocate(ig_sdv)
         
         
     

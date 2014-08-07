@@ -23,6 +23,7 @@
         integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
         
         
+        ! some common real numbers
         real(kind=dp), parameter :: zero=0._dp,one=1._dp,two=2._dp, &
       three=3._dp,four=4._dp,five=5._dp,six=6._dp,seven=7._dp,      &
       eight=8._dp,nine=9._dp,ten=10._dp,half=0.5_dp,quarter=0.25_dp,&
@@ -30,6 +31,10 @@
       one_eighth=one/eight,root3=one/sqrt(three),                   &
       halfcirc=180._dp,pi=3.14159265359_dp,ninety=90._dp            &
       ,tolerance=0.1_dp
+
+
+        ! residual stiffness
+        real(kind=dp), parameter :: Kres=one    ! one MPa (or other unit) of residual stiffness after failure, to prevent nodes run wild
       
       
         ! derived data type sdv_array, just to group 3 types of arrays together
@@ -50,7 +55,9 @@
         contains
         
         subroutine exit_function
-            stop"**exit function reached**"
+            !stop"**exit function reached**"
+            write(msg_file,*) "**exit function reached**"
+            CALL XIT    ! abaqus exit function
         end subroutine 
      
        end module parameter_module

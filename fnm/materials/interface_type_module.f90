@@ -245,15 +245,20 @@
         ! local variables
         real(dp) :: Dnn0, dm, u0, uf, Gnc, Gtc, Glc, Gsc, eta, findex, &
         & Gn, Gt, Gl, Gs, bk, Gmc, u_eff, T_eff, T0, dm2
-        integer  :: nst, fstat
+        integer  :: nst, fstat, i, j, l
+
+        real(dp) :: Dres(size(dee(:,1)),size(dee(1,:)))
 
         ! initialize local variables
         Dnn0=zero; dm=zero; u0=zero; uf=zero; Gnc=zero; Gtc=zero
         Glc=zero;  Gsc=zero;  eta=zero; findex=zero
         Gn=zero;  Gt=zero; Gl=zero; Gs=zero; bk=zero
         Gmc=zero; u_eff=zero; T_eff=zero; T0=zero; dm2=zero
-        nst=0; fstat=0
-        
+        nst=0; fstat=0; i=0; j=0; l=0
+
+        Dres=zero
+
+
         ! extract Dnn0 and nst
         Dnn0=dee(1,1)
         nst=size(dee(:,1))
@@ -264,13 +269,17 @@
         end if
         fstat=sdv%i(1)
         
-        
+        do i=1, nst
+            Dres(i,i)= Kres
+        end do
+
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
         ! --------------------------------------------------------- !
         if(fstat==failed) then    ! already failed
             ! calculate penalty stiffness
             dee=dee*(one-dmax)
+            dee=max(dee,Dres)
             if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! calculate stress
             sigma=matmul(dee,jump)
@@ -407,6 +416,8 @@
         ! update D matrix
         dee=dee*(one-dm)
         if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
+
+        dee=max(dee,Dres)
         
         ! update stress
         sigma=matmul(dee,jump)

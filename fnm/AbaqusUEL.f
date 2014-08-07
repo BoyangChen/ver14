@@ -17,6 +17,7 @@
     include 'outputs/output_module.f90'
 !------------------------------------------------------
 
+    !write(msg_file,*) 'reach here'
 
     !---------------------------------------------------------!
     !   Abaqus user subroutine for I/O to external files
@@ -45,6 +46,7 @@
 
         if (lop .eq. 0) then
 !       start of the analysis
+            
 
             ! initialize global clock and libraries
             call initialize_glb_clock
@@ -68,12 +70,13 @@
 
         else if (lop .eq. 1) then
 !       start of the current increment
+            call update_glb_clock(kstep,kinc)
         
         else if (lop .eq. 2) then
 !	    end of the increment 
 
             ! print element outputs after each increment
-            call output(kstep,kinc,outdir)
+            !call output(kstep,kinc,outdir)
         
         else if (lop .eq. 3) then
 !	    end of the analysis
@@ -160,7 +163,7 @@
             call extract(lib_xbrick(typekey),nodecnc=cnc)
         case('coh3d8')
             ! extract nodal cnc from this elem
-            call extract(lib_coh3d8(typekey),nodecnc=cnc)
+            call extract(lib_coh3d8(typekey),connec=cnc)
         case default
             write(msg_file,*)'unsupported element type'
             call exit_function
@@ -169,7 +172,7 @@
     ! extract nodal values from passed in variables
     do j=1, nnode
         uj(1:mcrd,j)    =   u( (j-1)*mcrd+1 : j*mcrd )
-        duj(1:mcrd,j)   =   du( (j-1)*mcrd+1 : j*mcrd )
+        !~duj(1:mcrd,j)   =   du( (j-1)*mcrd+1 : j*mcrd )
         vj(1:mcrd,j)    =   v( (j-1)*mcrd+1 : j*mcrd )
         aj(1:mcrd,j)    =   a( (j-1)*mcrd+1 : j*mcrd )
     end do
@@ -208,7 +211,12 @@
     ! in the end, pass Kmat and Fvec to Abaqus UEL amatrx and rhs
     amatrx=zero; rhs(:,1)=zero
     amatrx=Kmat; rhs(:,1)=-Fvec(:)
-    
+
+    if(allocated(Kmat)) deallocate(Kmat)
+    if(allocated(Fvec)) deallocate(Fvec)
+    if(allocated(cnc)) deallocate(cnc)
+
+
     
     return
     end subroutine uel

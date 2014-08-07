@@ -390,7 +390,7 @@
             do i = 1,ndim
                 do j = 1,nnode/2
                 Nmatrix(i,i+(j-1)*ndim)= -fn(j)
-                Nmatrix(i,i+(nnode-j)*ndim)=fn(j)
+                Nmatrix(i,i+(j-1+nnode/2)*ndim)=fn(j)
                 end do
             end do
             
@@ -474,7 +474,10 @@
             
             
        	end do !-looped over all int points. ig=nig
-          
+
+        if(allocated(xj)) deallocate(xj) 
+        if(allocated(uj)) deallocate(uj) 
+        if(allocated(ig_sdv)) deallocate(ig_sdv)           
     
     end subroutine integrate_coh3d6_element
     

@@ -71,6 +71,8 @@
   4,  32,   4
 *Nset, nset=TOP, instance=PART-1-MESH-1-1
  13, 14, 15, 16, 29, 30, 31, 32
+*Nset, nset=BACK, instance=PART-1-MESH-1-1, generate
+  1,  16,  1
 *End Assembly
 ** 
 ** BOUNDARY CONDITIONS
@@ -84,13 +86,14 @@ LEFT, 1, 1
 ** Name: Disp-BC-3 Type: Displacement/Rotation
 *Boundary
 TOP, 2, 2
+BACK, 3, 3
 ** ----------------------------------------------------------------
 ** 
 ** STEP: tension
 ** 
 *Step, name=tension
 *Static
-0.01, 0.01, 1e-07, 0.01
+0.001, 0.02, 1e-07, 0.001
 ** 
 ** BOUNDARY CONDITIONS
 ** 

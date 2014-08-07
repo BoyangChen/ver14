@@ -88,6 +88,9 @@
         ndset(1)=nodeset(setname='left', setnode=[1,3,5,7,9,11])
         ndset(2)=nodeset(setname='right',setnode=[2,4,6,8,10,12])
 
+        ndset(1)=nodeset(setname='left', setnode=[1,5,9,13,17,21,25,29])
+        ndset(2)=nodeset(setname='right',setnode=[4,8,12,16,20,24,28,32])
+
 
         ! obtain the current working directory and specify output directory
         call getcwd(workdir)

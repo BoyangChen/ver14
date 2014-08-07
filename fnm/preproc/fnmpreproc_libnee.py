@@ -11,7 +11,7 @@ import math
 #   fetch Abaqus input files
 #***************************************************************
 
-jobname='Patch1'
+jobname=raw_input('abaqus job name:')
 
 abqinputfile=jobname+'.inp'         # abaqus input file
 fnminputfile='fnm-'+jobname+'.inp'  # fnm uel input file
@@ -24,8 +24,8 @@ fnminputfile='fnm-'+jobname+'.inp'  # fnm uel input file
 
 ndim=3          # dimension
 
-nprops=0        # no. of input material properties used in uel code
-nsvars=0        # no. of sol. dpdnt var. used and ouput by uel code to be determined
+nprops=1        # no. of input material properties used in uel code (min 1)
+nsvars=1        # no. of sol. dpdnt var. used and ouput by uel code to be determined (min 1)
 
 
 #***************************************************************
@@ -108,7 +108,6 @@ lib_elem.write('    include "elements/quad_element_module.f90"                  
 lib_elem.write('    include "elements/coh2d_element_module.f90"                           \n')
 lib_elem.write('    include "elements/sub2d_element_module.f90"                           \n')
 lib_elem.write('    include "elements/xquad_element_module.f90"                           \n')
-lib_elem.write('    include "elements/element_module.f90"                                 \n')
 #else
 lib_elem.write('    include "elements/wedge_element_module.f90"                           \n')
 lib_elem.write('    include "elements/brick_element_module.f90"                           \n')
@@ -356,10 +355,10 @@ for cntr0, nd in enumerate(nodes):
     cntr=cntr0+1
     if ndim==2:
         fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+'\n')
-        lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+','+str(nd.y)+'],u=[zero,zero])\n')
+        lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp],u=[zero,zero])\n')
     else:
         fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+', '+str(nd.z)+'\n')
-        lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+','+str(nd.y)+','+str(nd.z)+'],u=[zero,zero,zero])\n')
+        lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp,'+str(nd.z)+'_dp],u=[zero,zero,zero])\n')
 
 
 #***************************************************************        
@@ -373,6 +372,11 @@ lib_edge.write('        lib_edge=0                  \n')
 #***************************************************************        
 #       Write Elements
 #***************************************************************
+nelem=sum(elcount)
+lib_elem.write('        nelem='+str(nelem)+'            \n')
+lib_elem.write('        allocate(lib_elem(nelem))       \n')
+
+
 for eli, elt in enumerate(eltype):
 
     # determine no. of nodes and uel element integer type
@@ -417,7 +421,7 @@ for eli, elt in enumerate(eltype):
             eltuel=318
     
     # write user element definition in abaqus fnm input file
-    fnminp.write('*USER ELEMENT, TYPE='+str(eltuel)+', NODES='+str(nnode)+', COORDINATES='+str(ndim)+
+    fnminp.write('*USER ELEMENT, TYPE=U'+str(eltuel)+', NODES='+str(nnode)+', COORDINATES='+str(ndim)+
         ', PROPERTIES='+str(nprops)+', VARIABLES='+str(nsvars)+'\n')
     if ndim==2:
         fnminp.write('1,2\n')
@@ -429,7 +433,7 @@ for eli, elt in enumerate(eltype):
     lib_elem.write('        allocate(lib_'+elt+'(n'+elt+'))   \n')
 
     # write elem nodal connec in abaqus fnm input file
-    fnminp.write('*Element, type='+str(eltuel)+', elset=uel_'+elt+'\n')
+    fnminp.write('*Element, type=U'+str(eltuel)+', elset=uel_'+elt+'\n')
     
     # find start and end elem indices for elements of the same type
     if eli == 0:
@@ -473,10 +477,21 @@ for eli, elt in enumerate(eltype):
         eline=eline+'\n'
         fnminp.write(eline)
         
+        
         # write node cnc and edge cnc (for x version elems only) to the respective type arrays in fnm lib_elem module
         if (elt[0] == 'x'):
             lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(cntr+elstart)+', & \n')
-            lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
+            #lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
+            if len(nodecnc) <= 100:
+                lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
+            else:
+                
+                for ic, c in enumerate(nodecnc):
+                    if ic >= 90 and c==',':
+                        break
+                lib_elem.write('& nodecnc=['+nodecnc[:ic]+' & \n')
+                lib_elem.write('& '+nodecnc[ic:-1]+'], & \n')
+
             lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
             lib_elem.write('& bulkmat=1, cohmat=5 ) \n')    # update matkeys later accord. to mat section assignment
         else:
@@ -488,10 +503,10 @@ for eli, elt in enumerate(eltype):
         lib_elem.write('        call update(lib_elem('+str(cntr+elstart)+'),elname="'+elt+'",eltype="'+elt+'",typekey='+str(cntr)+') \n')
         lib_elem.write('\n')
 
+    # print the mandatory uel property line (not needed for calculation)
+    fnminp.write('*UEL PROPERTY, elset=uel_'+elt+'\n')
+    fnminp.write('1\n')
 
-nelem=sum(elcount)
-lib_elem.write('        nelem='+str(nelem)+'            \n')
-lib_elem.write('        allocate(lib_elem(nelem))       \n')
 
 #***************************************************************        
 #       Write the rest
