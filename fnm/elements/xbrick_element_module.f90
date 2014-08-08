@@ -1036,10 +1036,13 @@ module xbrick_element_module
                     if(ibe2==4) then
                         nbulk=4
                         e1=3; e2=4; e3=1; e4=2
+                    else
+                        write(msg_file,*)'wrong broken edge in update subcnc xbrick'
+                        call exit_function                    
                     end if    
                 case default
-                        write(msg_file,*)'wrong broken edge in update subcnc xbrick'
-                        call exit_function
+                    write(msg_file,*)'wrong broken edge in update subcnc xbrick'
+                    call exit_function
             end select
             
             
@@ -1222,17 +1225,17 @@ module xbrick_element_module
                     if(iscoh) then
                     
                     ! sub elm 5 connec
-                    elem%subcnc(5)%array(1)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(1)=jnode1
-                    elem%subcnc(5)%array(2)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(2)=jnode2
-                    
-                    elem%subcnc(5)%array(3)=elem%subcnc(5)%array(2)+nndfl/2
-                    elem%subcnc(5)%array(4)=elem%subcnc(5)%array(1)+nndfl/2
-                    
-                    elem%subcnc(5)%array(5)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(4)=jnode1
-                    elem%subcnc(5)%array(6)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(3)=jnode2   
+                    elem%subcnc(5)%array(5)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(5)=jnode1
+                    elem%subcnc(5)%array(6)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(6)=jnode2
                     
                     elem%subcnc(5)%array(7)=elem%subcnc(5)%array(6)+nndfl/2
                     elem%subcnc(5)%array(8)=elem%subcnc(5)%array(5)+nndfl/2
+                    
+                    elem%subcnc(5)%array(1)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(1)=jnode1
+                    elem%subcnc(5)%array(2)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(2)=jnode2   
+                    
+                    elem%subcnc(5)%array(3)=elem%subcnc(5)%array(2)+nndfl/2
+                    elem%subcnc(5)%array(4)=elem%subcnc(5)%array(1)+nndfl/2
                     
                     subglbcnc(5)%array(:)=elem%nodecnc(elem%subcnc(5)%array(:))
                     
