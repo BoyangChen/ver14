@@ -180,9 +180,9 @@ module xbrick_element_module
         !---------------------------------------------------------------------!
      
         ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
-        if(elem%curr_status<elfail) then   
-            call edge_status_partition(elem)   
-        end if
+!        if(elem%curr_status<elfail) then   
+!            call edge_status_partition(elem)   
+!        end if
         
         !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
 
@@ -623,6 +623,7 @@ module xbrick_element_module
     real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
     real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
     real(dp) :: xo, yo                  ! (x,y) of element centroid
+    real(dp) :: detlc
     
     
     ! --------------------------------------------------------------------!
@@ -658,7 +659,7 @@ module xbrick_element_module
         
         xct=zero; yct=zero; zct=zero
         
-        xo=zero; yo=zero
+        xo=zero; yo=zero; detlc=zero
         
         
 
@@ -708,7 +709,7 @@ module xbrick_element_module
                 ! find xp2, yp2
                 xp2=xp1+cos(theta/halfcirc*pi)
                 yp2=yp1+sin(theta/halfcirc*pi)
-                do i=1,nedge 
+                do i=1,nedge/2 
                     ! tip corods of edge i
                     x1=xelm(1,edg(1,i))
                     y1=xelm(2,edg(1,i))
@@ -730,7 +731,47 @@ module xbrick_element_module
                      endif
                      if(nfailedge==2) exit ! found 2 broken edges already
                 end do
-                
+
+                if(nfailedge==0) then
+                    write(msg_file,*)'error in xbrick failure criterion partition: cannot find any broken edges'
+                    call exit_function
+                else if(nfailedge==1) then
+                    xp1=xct
+                    yp1=yct
+                    xp2=xp1+cos(theta/halfcirc*pi)
+                    yp2=yp1+sin(theta/halfcirc*pi)
+                    do i=1,nedge/2 
+                        if (i==ifedg(1)) cycle
+                        ! tip corods of edge i
+                        x1=xelm(1,edg(1,i))
+                        y1=xelm(2,edg(1,i))
+                        z1=xelm(3,edg(1,i))
+                        x2=xelm(1,edg(2,i))
+                        y2=xelm(2,edg(2,i))
+                        z2=xelm(3,edg(2,i))
+                        iscross=0
+                        xct=zero
+                        yct=zero
+                        call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct,detlc)
+                        write(msg_file,*)'detlc =',detlc
+                        write(msg_file,*)'iscross=',iscross
+                        if (iscross.gt.0) then
+                            edgstat(i)=cohcrack  ! edge i cracked
+                            nfailedge=nfailedge+1
+                            ifedg(nfailedge)=i   ! store failed edge indices
+                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                            xelm(:,edg(3,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 1
+                            xelm(:,edg(4,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 2
+                         endif
+                         if(nfailedge==2) exit ! found 2 broken edges already
+                    end do
+
+                    if(nfailedge==1) then
+                        write(msg_file,*)'error in xbrick failure criterion partition: cannot find 2nd broken edge'
+                        call exit_function
+                    endif
+                end if                
+
                 !***** project edge status variables to top edges *****
                 
                 nfailedge=4
@@ -1004,6 +1045,13 @@ module xbrick_element_module
             do i=1, 4
                 if(ifedg(i)<=nedge/2) ibe2=max(ibe2,ifedg(i))! local edge index of 2nd broken edge
             end do  
+
+            ! ibe1 must be between 1 to 3, and ibe2 between 2 to 4, with ibe2 > ibe1
+            if(ibe1>=nedge/2 .or. ibe1==0 .or. ibe2<=1 .or. ibe2<=ibe1) then
+                write(msg_file,*) 'something wrong in xbrick update subcnc case nfailedge=4'
+                call exit_function
+            end if
+
             if(edgstat(ibe1)==cohcrack .or. edgstat(ibe2)==cohcrack) iscoh=.true.
 
             

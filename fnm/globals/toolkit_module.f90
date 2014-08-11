@@ -388,7 +388,7 @@
 !********************************************************************************************
 !           subroutine to checks if two lines cross, and locate the crossing point
 !********************************************************************************************    
-      subroutine klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
+      subroutine klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct,detlc)
 
       
       ! feed in variables
@@ -397,6 +397,7 @@
       ! update variables
       real(kind=dp),intent(inout) :: xct,yct        ! coords of intersection
       integer,intent(inout) :: iscross              ! status of intersection
+      real(kind=dp),optional,intent(out)::detlc
       ! local variables
       real(kind=dp) :: a1,b1,c1,a2,b2,c2,det
       real(kind=dp) :: xmin,ymin,xpmin,ypmin,xmax,ymax,xpmax,ypmax
@@ -405,6 +406,7 @@
       a2=zero;b2=zero;c2=zero
       xmin=zero;ymin=zero;xmax=zero;ymax=zero
       xpmin=zero;ypmin=zero;xpmax=zero;ypmax=zero
+      det=zero
 !
 !     **************** algorithm for the determination of precrack intersecting with element edges: *****************
 !     equation of a line: a*x+b*y=c
@@ -445,6 +447,7 @@
       ! check intersection
       det=a1*b2-a2*b1
       if(abs(det)<=tiny(one)) then ! lines are parallel; no intersection possible
+!      if(abs(det)==zero) then ! lines are parallel; no intersection possible
         ! do nothing
         
       else ! intersection possible
@@ -455,6 +458,7 @@
         if ((xmin.gt.xct).or.(xmax.lt.xct).or.(ymin.gt.yct).or.(ymax.lt.yct)) then ! intersection not on edge
         ! do nothing
           !write(6,*)'intersection out of range of edge'
+            iscross=-1
         else if (xct.eq.x1.and.yct.eq.y1) then
             !write(6,*)'precrack line passes node 1'
             xct=max(xct,xmin+tolerance*(xmax-xmin))
@@ -489,6 +493,8 @@
             end if
         end if
       end if 
+
+      if(present(detlc)) detlc=det
              
       end subroutine klinecross
       

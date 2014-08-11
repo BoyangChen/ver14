@@ -71,12 +71,15 @@
         else if (lop .eq. 1) then
 !       start of the current increment
             call update_glb_clock(kstep,kinc)
+            !write(msg_file,*)'reach increment:',kinc
+            !call output(kstep,kinc,outdir)
         
         else if (lop .eq. 2) then
 !	    end of the increment 
 
             ! print element outputs after each increment
-            !call output(kstep,kinc,outdir)
+            call output(kstep,kinc,outdir)
+            
         
         else if (lop .eq. 3) then
 !	    end of the analysis
