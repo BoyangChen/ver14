@@ -25,6 +25,7 @@ module xbrick_element_module
         
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
+        integer :: ifailedge(nedge)=0       ! indices of failed edges
         
         type(sub3d_element), allocatable :: subelem(:)
         type(int_alloc_array), allocatable :: subcnc(:)      ! sub_elem connec to parent elem nodes
@@ -75,6 +76,7 @@ module xbrick_element_module
         
         elem%nodecnc=0
         elem%edgecnc=0
+        elem%ifailedge=0
         
         if(allocated(elem%subelem)) deallocate(elem%subelem)
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
@@ -102,7 +104,7 @@ module xbrick_element_module
     end subroutine prepare_xbrick_element
     
     
-    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc,subelem,subcnc)
+    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc,ifailedge,subelem,subcnc)
     
         type(xbrick_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
@@ -111,6 +113,7 @@ module xbrick_element_module
         integer,                        optional, intent(out) :: cohmat
         integer,            allocatable,optional, intent(out) :: nodecnc(:)
         integer,            allocatable,optional, intent(out) :: edgecnc(:)
+        integer,            allocatable,optional, intent(out) :: ifailedge(:)
         type(sub3d_element),allocatable,optional, intent(out) :: subelem(:)
         type(int_alloc_array),allocatable,optional,intent(out):: subcnc(:)
 
@@ -127,6 +130,11 @@ module xbrick_element_module
         if(present(edgecnc)) then 
             allocate(edgecnc(nedge))
             edgecnc=elem%edgecnc
+        end if
+
+        if(present(ifailedge)) then 
+            allocate(ifailedge(nedge))
+            ifailedge=elem%ifailedge
         end if
         
         if(present(subelem)) then
@@ -180,9 +188,9 @@ module xbrick_element_module
         !---------------------------------------------------------------------!
      
         ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
-!        if(elem%curr_status<elfail) then   
-!            call edge_status_partition(elem)   
-!        end if
+        if(elem%curr_status<elfail) then   
+            call edge_status_partition(elem)   
+        end if
         
         !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
 
@@ -325,6 +333,7 @@ module xbrick_element_module
     real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
     real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
     real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
+    real(dp) :: detlc,a1,b1,a2,b2,xmid,ymid
     real(dp) :: theta
     
     ! --------------------------------------------------------------------!
@@ -354,6 +363,9 @@ module xbrick_element_module
         x2=zero; y2=zero; z2=zero
         
         xct=zero; yct=zero; zct=zero
+
+        detlc=zero; a1=zero; b1=zero; a2=zero; b2=zero; xmid=zero; ymid=zero
+
         theta=zero
 
 
@@ -361,6 +373,9 @@ module xbrick_element_module
 !               EXTRACTION INTERFACE
 !           extract variables from global libraries
 !-----------------------------------------------------------------------!
+        ! extract elem status variable
+        elstat=elem%curr_status
+
         ! extract edge status variables from glb edge library
         edgstat(:)=lib_edge(elem%edgecnc(:))
         
@@ -372,19 +387,22 @@ module xbrick_element_module
         ! extract material orientation (fibre angle)
         call extract(lib_mat(elem%bulkmat),theta=theta)
 
+        ! extract elem failed edges' indices
+        ifedg=elem%ifailedge
 
 !-----------------------------------------------------------------------!
 !       procedure calculations (pure)
 !-----------------------------------------------------------------------!
     
-!       find and store the broken edges' variables
-        do i=1,nedge
-            if(edgstat(i)/=intact) then
-                nfailedge=nfailedge+1   ! update total no. of damaged edges
-                ifedg(nfailedge)=i  ! update the indices of damaged edges
-            end if
-        end do
-     
+!       find and store the broken edges' variables when element is still intact
+        if(elstat==intact) then
+            do i=1,nedge
+                if(edgstat(i)/=intact) then
+                    nfailedge=nfailedge+1   ! update total no. of damaged edges
+                    ifedg(nfailedge)=i  ! update the indices of damaged edges
+                end if
+            end do
+        end if
 
 !       calculate elstat value from edge status variables
 
@@ -422,7 +440,7 @@ module xbrick_element_module
                 yp2=yp1+sin(theta/halfcirc*pi)
                 
                 ! next, find the other edge crossed by the crack line
-                do i=1,nedge
+                do i=1,nedge/2
                     if (i==jbe1) cycle ! the already broken edge, go to next edge
                     
                     ! extract end node 1 coords of edge i
@@ -444,24 +462,64 @@ module xbrick_element_module
                     
                     ! check intersection of the crack line and the edge
                     call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
-                    if (iscross>0) exit ! found the edge, no need to proceed
+                    if (iscross>0) then
+                        nfailedge=nfailedge+1
+                        ifedg(nfailedge)=i  ! index of the 3rd broken edge is i
+                        zct=half*(z1+z2)    ! z1 should be the same as z2
+                        coord(topo(3,i))%array=[xct,yct,zct]
+                        coord(topo(4,i))%array=[xct,yct,zct]
+                    end if
+                    if (nfailedge==3) exit ! found the edge, no need to proceed
                 end do
                 
-                ! update nfailedge & ifedg
-                nfailedge=3         ! no. of broken edge is now 3
-                ifedg(nfailedge)=i  ! index of the 3rd broken edge is i
+                ! badly shaped element may have large angles; e.g.: 3 or all edges almost parallel to crack, then numerical error may
+                ! prevent the algorithm from finding any broken edge or only one broken edge
+
+                if(nfailedge == 2) then
+                ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
+                    nfailedge=3
+                    ! crack line equation constants
+                    a2=sin(theta/halfcirc*pi)
+                    b2=-cos(theta/halfcirc*pi)
+                    ! find the midpoint which forms the most parrallel-to-crack line with (xp1,yp1)
+                    do i=1,nedge/2 
+                        if (i==jbe1) cycle
+                        ! tip coords of edge i
+                        x1=coord(topo(1,i))%array(1)
+                        y1=coord(topo(1,i))%array(2)
+                        z1=coord(topo(1,i))%array(3)
+                        x2=coord(topo(2,i))%array(1)
+                        y2=coord(topo(2,i))%array(2)
+                        z2=coord(topo(2,i))%array(3)
+                        ! mid point of edge i
+                        xmid=half*(x1+x2)
+                        ymid=half*(y1+y2)
+                        ! line equation constants of midpoint-(xp1,yp1)
+                        a1=ymid-yp1
+                        b1=xp1-xmid
+                        ! initialize detlc and intersection info
+                        if(i==1 .or. (jbe1==1 .and. i==2)) then
+                            detlc=a1*b2-a2*b1
+                            ifedg(3)=i   ! store failed edge indices
+                            xct=xmid
+                            yct=ymid
+                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                        end if
+                        ! find the most parallel trial line and update stored info
+                        if(abs(a1*b2-a2*b1)<abs(detlc)) then
+                            ifedg(3)=i   ! store failed edge indices
+                            xct=xmid
+                            yct=ymid
+                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                        end if
+                    end do
+                    coord(topo(3,ifedg(3)))%array=[xct,yct,zct]
+                    coord(topo(4,ifedg(3)))%array=[xct,yct,zct]
+                end if
                 
-                ! store it in jbe3 (safer)
-                jbe3=i
-                
-                ! update the two fl. node coords on this edge
-                zct=half*(z1+z2) ! z1 should be the same as z2
-                jnode=topo(3,jbe3)
-                coord(jnode)%array=[xct,yct,zct]
-                jnode=topo(4,jbe3)               
-                coord(jnode)%array=[xct,yct,zct]
-                
-                
+
+                jbe3=ifedg(3)   ! store it in jbe3 (safer)
+
                 ! update edge status variables
                 if(edgstat(jbe1)==egref) then ! tip elem end, refinement elem. start (1st time)
                     elstat=elref               
@@ -532,7 +590,16 @@ module xbrick_element_module
                 write(msg_file,*)'unknown combination of 2 edge status!'
                 call exit_function
             end if
-          
+   
+        else if( nfailedge==6 .and. &
+        & (ifedg(4)-ifedg(1))==nedge/2 .and. (ifedg(5)-ifedg(2))==nedge/2 .and. &
+        & (ifedg(6)-ifedg(3))==nedge/2 ) then
+            continue    ! not yet properly treated; use failure criterion partition for this case
+
+        else if( nfailedge==8 .and. &
+        & (ifedg(5)-ifedg(1))==nedge/2 .and. (ifedg(6)-ifedg(2))==nedge/2 .and. &
+        & (ifedg(7)-ifedg(3))==nedge/2 .and. (ifedg(8)-ifedg(4))==nedge/2 ) then
+            continue    ! not yet properly treated; use failure criterion partition for this case       
           
         else
         
@@ -550,7 +617,10 @@ module xbrick_element_module
 !       update element curr_status and sub-element cnc matrices
 
         if(elstat>elem%curr_status) then
-            elem%curr_status=elstat                       
+
+            elem%curr_status=elstat 
+            elem%ifailedge=ifedg                      
+
             call update_subcnc(elem,edgstat,ifedg,nfailedge)
         
 
@@ -623,7 +693,9 @@ module xbrick_element_module
     real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
     real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
     real(dp) :: xo, yo                  ! (x,y) of element centroid
-    real(dp) :: detlc
+    real(dp) :: detlc,a1,b1,a2,b2,xmid,ymid
+    real(dp) :: xmid1,ymid1,zmid1,xmid2,ymid2,zmid2
+    real(dp) :: xct1,yct1,zct1,xct2,yct2,zct2
     
     
     ! --------------------------------------------------------------------!
@@ -660,6 +732,10 @@ module xbrick_element_module
         xct=zero; yct=zero; zct=zero
         
         xo=zero; yo=zero; detlc=zero
+
+        a1=zero; b1=zero; a2=zero; b2=zero; xmid=zero; ymid=zero
+        xmid1=zero; ymid1=zero; zmid1=zero; xmid2=zero; ymid2=zero; zmid2=zero
+        xct1=zero; yct1=zero; zct1=zero; xct2=zero; yct2=zero; zct2=zero
         
         
 
@@ -683,6 +759,8 @@ module xbrick_element_module
         call extract(lib_mat(elem%bulkmat),theta=theta)
         
         elstat=elem%curr_status
+
+        ifedg=elem%ifailedge
 
 
 !-----------------------------------------------------------------------!
@@ -732,44 +810,124 @@ module xbrick_element_module
                      if(nfailedge==2) exit ! found 2 broken edges already
                 end do
 
+
+                ! badly shaped element may have large angles; e.g.: 3 or all edges almost parallel to crack, then numerical error may
+                ! prevent the algorithm from finding any broken edge or only one broken edge
+
                 if(nfailedge==0) then
-                    write(msg_file,*)'error in xbrick failure criterion partition: cannot find any broken edges'
-                    call exit_function
-                else if(nfailedge==1) then
-                    xp1=xct
-                    yp1=yct
-                    xp2=xp1+cos(theta/halfcirc*pi)
-                    yp2=yp1+sin(theta/halfcirc*pi)
-                    do i=1,nedge/2 
-                        if (i==ifedg(1)) cycle
-                        ! tip corods of edge i
+                ! use trial lines: connecting midpoints of two edges and find the most parrallel-to-crack one
+
+                    ! the following algorithm will find two broken edges
+                    nfailedge=2
+                    ! line equation constants of the crack
+                    a2=sin(theta/halfcirc*pi)
+                    b2=-cos(theta/halfcirc*pi)
+                    ! connecting midpoints of two edges and find the most parrallel one
+                    do i=1,nedge/2-1
+                        ! tip coords of edge i
                         x1=xelm(1,edg(1,i))
                         y1=xelm(2,edg(1,i))
                         z1=xelm(3,edg(1,i))
                         x2=xelm(1,edg(2,i))
                         y2=xelm(2,edg(2,i))
                         z2=xelm(3,edg(2,i))
-                        iscross=0
-                        xct=zero
-                        yct=zero
-                        call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct,detlc)
-                        write(msg_file,*)'detlc =',detlc
-                        write(msg_file,*)'iscross=',iscross
-                        if (iscross.gt.0) then
-                            edgstat(i)=cohcrack  ! edge i cracked
-                            nfailedge=nfailedge+1
-                            ifedg(nfailedge)=i   ! store failed edge indices
-                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
-                            xelm(:,edg(3,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 1
-                            xelm(:,edg(4,i))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 2
-                         endif
-                         if(nfailedge==2) exit ! found 2 broken edges already
+                        ! mid point of edge i
+                        xmid1=half*(x1+x2)
+                        ymid1=half*(y1+y2)
+                        zmid1=half*(z1+z2)
+                        ! loop over midpoints of other edges
+                        do j=i+1,nedge/2
+                            ! tip coords of edge j
+                            x1=xelm(1,edg(1,j))
+                            y1=xelm(2,edg(1,j))
+                            z1=xelm(3,edg(1,j))
+                            x2=xelm(1,edg(2,j))
+                            y2=xelm(2,edg(2,j))
+                            z2=xelm(3,edg(2,j))
+                            ! mid point of edge j
+                            xmid2=half*(x1+x2)
+                            ymid2=half*(y1+y2)
+                            zmid2=half*(z1+z2)
+                            ! line equation constants of midpoint1-midpoint2
+                            a1=ymid1-ymid2
+                            b1=xmid2-xmid1
+                            ! initialize detlc and intersection info
+                            if(i==1 .and. j==2) then
+                                detlc=a1*b2-a2*b1                               
+                                ifedg(1)=i   ! store failed edge indices
+                                ifedg(2)=j
+                                xct1=xmid1
+                                yct1=ymid1
+                                zct1=zmid1
+                                xct2=xmid2
+                                yct2=ymid2
+                                zct2=zmid2
+                            end if
+                            ! find the most parallel trial line and update stored info
+                            if(abs(a1*b2-a2*b1)<abs(detlc)) then
+                                ifedg(1)=i   ! store failed edge indices
+                                ifedg(2)=j
+                                xct1=xmid1
+                                yct1=ymid1
+                                zct1=zmid1
+                                xct2=xmid2
+                                yct2=ymid2
+                                zct2=zmid2
+                            endif
+                        end do
                     end do
+                    edgstat(ifedg(1:2))=cohcrack
+                    xelm(:,edg(3,ifedg(1)))=[xct1,yct1,zct1] ! store c tip coords on edge i fl. nd 1
+                    xelm(:,edg(4,ifedg(1)))=[xct1,yct1,zct1] ! store c tip coords on edge i fl. nd 2 
+                    xelm(:,edg(3,ifedg(2)))=[xct2,yct2,zct2] ! store c tip coords on edge i fl. nd 1
+                    xelm(:,edg(4,ifedg(2)))=[xct2,yct2,zct2] ! store c tip coords on edge i fl. nd 2 
 
-                    if(nfailedge==1) then
-                        write(msg_file,*)'error in xbrick failure criterion partition: cannot find 2nd broken edge'
-                        call exit_function
-                    endif
+                else if(nfailedge==1) then                
+                ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
+
+                    ! the following algorithm will find the second broken edge
+                    nfailedge=2
+                    ! existing crack tip coords
+                    xp1=xct
+                    yp1=yct
+                    ! crack line equation constants
+                    a2=sin(theta/halfcirc*pi)
+                    b2=-cos(theta/halfcirc*pi)
+                    ! find the midpoint which forms the most parrallel-to-crack line with (xp1,yp1)
+                    do i=1,nedge/2 
+                        if (i==ifedg(1)) cycle
+                        ! tip coords of edge i
+                        x1=xelm(1,edg(1,i))
+                        y1=xelm(2,edg(1,i))
+                        z1=xelm(3,edg(1,i))
+                        x2=xelm(1,edg(2,i))
+                        y2=xelm(2,edg(2,i))
+                        z2=xelm(3,edg(2,i))
+                        ! mid point of edge i
+                        xmid=half*(x1+x2)
+                        ymid=half*(y1+y2)
+                        ! line equation constants of midpoint-(xp1,yp1)
+                        a1=ymid-yp1
+                        b1=xp1-xmid
+                        ! initialize detlc and intersection info
+                        if(i==1 .or. (ifedg(1)==1 .and. i==2)) then
+                            detlc=a1*b2-a2*b1
+                            ifedg(2)=i   ! store failed edge indices
+                            xct=xmid
+                            yct=ymid
+                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                        end if
+                        ! find the most parallel trial line and update stored info
+                        if(abs(a1*b2-a2*b1)<abs(detlc)) then
+                            ifedg(2)=i   ! store failed edge indices
+                            xct=xmid
+                            yct=ymid
+                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                        endif
+                    end do
+                    edgstat(ifedg(2))=cohcrack
+                    xelm(:,edg(3,ifedg(2)))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 1
+                    xelm(:,edg(4,ifedg(2)))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 2 
                 end if                
 
                 !***** project edge status variables to top edges *****
@@ -790,21 +948,11 @@ module xbrick_element_module
                 xelm(3,edg(4,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
               
             else ! element already partitioned
-                !---------- find no. of broken edges -------------------------
-                do i=1,nedge
-                    if(edgstat(i)/=intact) then
-                        nfailedge=nfailedge+1   ! update total no. of damaged edges
-                        ifedg(nfailedge)=i  ! update the indices of damaged edges
-                    end if
-                end do
-                !-------------------------------------------------------------
+
                 ! find (xp1,yp1), (xp2,yp2)
                 if (elstat .eq. eltrans) then ! transition elm, already has an edge partitioned
-                    if(nfailedge/=2) then 
-                         write(msg_file,*)'inconsistency in xbrick failure criterion partition, elstat=1!'
-                         call exit_function
-                    end if
-                    ! update edgstat(j) & fnode(jfnd)
+
+                    nfailedge=2
                     edgstat(ifedg(1:2))=cohcrack ! cohesive crack
                     
                     j=ifedg(1)
@@ -818,7 +966,7 @@ module xbrick_element_module
                     yp2=yp1+sin(theta/halfcirc*pi)
                      
                      ! next, find the edge crossed by the crack line
-                    do i=1,nedge
+                    do i=1,nedge/2
                         if (i.eq.j) cycle ! the already cracked edge,go to next edge
                         ! tip corods of edge i
                         x1=xelm(1,edg(1,i))
@@ -841,6 +989,52 @@ module xbrick_element_module
                         end if
                         if(nfailedge .eq. 3) exit ! found 2 broken edges already
                     end do
+
+                    ! badly shaped element may have large angles; e.g.: 3 or all edges almost parallel to crack, then numerical error may
+                    ! prevent the algorithm from finding any broken edge or only one broken edge
+
+                    if(nfailedge == 2) then
+                    ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
+                        ! crack line equation constants
+                        a2=sin(theta/halfcirc*pi)
+                        b2=-cos(theta/halfcirc*pi)
+                        ! find the midpoint which forms the most parrallel-to-crack line with (xp1,yp1)
+                        do i=1,nedge/2 
+                            if (i==ifedg(1)) cycle
+                            ! tip coords of edge i
+                            x1=xelm(1,edg(1,i))
+                            y1=xelm(2,edg(1,i))
+                            z1=xelm(3,edg(1,i))
+                            x2=xelm(1,edg(2,i))
+                            y2=xelm(2,edg(2,i))
+                            z2=xelm(3,edg(2,i))
+                            ! mid point of edge i
+                            xmid=half*(x1+x2)
+                            ymid=half*(y1+y2)
+                            ! line equation constants of midpoint-(xp1,yp1)
+                            a1=ymid-yp1
+                            b1=xp1-xmid
+                            ! initialize detlc and intersection info
+                            if(i==1 .or. (ifedg(1)==1 .and. i==2)) then
+                                detlc=a1*b2-a2*b1
+                                ifedg(3)=i   ! store failed edge indices
+                                xct=xmid
+                                yct=ymid
+                                zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                            end if
+                            ! find the most parallel trial line and update stored info
+                            if(abs(a1*b2-a2*b1)<abs(detlc)) then
+                                ifedg(3)=i   ! store failed edge indices
+                                xct=xmid
+                                yct=ymid
+                                zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
+                            end if
+                        end do
+                        edgstat(ifedg(3))=cohcrack
+                        xelm(:,edg(3,ifedg(3)))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 1
+                        xelm(:,edg(4,ifedg(3)))=[xct,yct,zct] ! store c tip coords on edge i fl. nd 2 
+                    end if
+
                     
                     !***** project edge status variables to top edges *****
                     
@@ -854,11 +1048,8 @@ module xbrick_element_module
                     
                 else if (elstat.gt.eltrans .and. elstat.lt.elfail) then 
                 ! element already has two edges partitioned; just update edge status var to coh crack status
-                    if(nfailedge/=4) then 
-                         write(msg_file,*)'inconsistency in kplyfail,elstat>1!'
-                         call exit_function
-                    end if
-                    nfailedge=4 ! ignore more than 2 broken edges at the moment
+
+                    nfailedge=4
                     ! update edge status var
                     edgstat(ifedg(1:4))=cohcrack ! cohesive crack 
            
@@ -877,7 +1068,8 @@ module xbrick_element_module
 
     !       update element curr_status and sub-element cnc matrices
 
-            elem%curr_status=elstat                       
+            elem%curr_status=elstat 
+            elem%ifailedge=ifedg                      
             call update_subcnc(elem,edgstat,ifedg,nfailedge)
 
 
@@ -1070,6 +1262,9 @@ module xbrick_element_module
                         case(4)
                             nbulk=4
                             e1=4; e2=1; e3=2; e4=3
+                        case default
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xbrick'
+                            call exit_function
                     end select
                 case(2)
                     select case(ibe2)
@@ -1079,13 +1274,16 @@ module xbrick_element_module
                         case(4)
                             nbulk=2
                             e1=2; e2=3; e3=4; e4=1
+                        case default
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xbrick'
+                            call exit_function
                     end select
                 case(3)
                     if(ibe2==4) then
                         nbulk=4
                         e1=3; e2=4; e3=1; e4=2
                     else
-                        write(msg_file,*)'wrong broken edge in update subcnc xbrick'
+                        write(msg_file,*)'wrong 2nd broken edge in update subcnc xbrick'
                         call exit_function                    
                     end if    
                 case default
@@ -1297,15 +1495,13 @@ module xbrick_element_module
             end select
 
           
-        !~case(3) !- three edges crack
-        !~   write(msg_file,*) 'three-edge crack partition not yet supported!'
-        !~   nfailedge=2
-        !~   goto 10
-        !~   
-        !~case(4) !- four edges crack
-        !~   write(msg_file,*) 'four-edge crack partition not yet supported!'
-        !~   nfailedge=2
-        !~   goto 10
+!        case(6)
+        ! do not update partition
+            
+
+!        case(8)
+
+
            
         case default
            write(msg_file,*) 'WARNING: xbrick update subcnc case selection default!'
