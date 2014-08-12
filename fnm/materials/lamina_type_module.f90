@@ -241,18 +241,21 @@
         if(.not.this_mat%fibretoughness_active) then
             write(msg_file,*)'fibre failure must include fibre toughness to ensure robust prediction!'
             call exit_function
-        else
-            sig=matmul(dee,strain)
-            call FibreCohesiveLaw(ffstat,sdv%r,sig,this_mat%strength, &
-        &   this_mat%fibretoughness,strain,clength,dmax)
-            ! update sdv
-            sdv%i(2)=ffstat
-            ! update ddsdde
-            df=sdv%r(1)
-            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
-            ! update stress
-            sig=matmul(dee,strain)
         end if
+        
+        
+        
+        sig=matmul(dee,strain)
+        call FibreCohesiveLaw(ffstat,sdv%r,sig,this_mat%strength, &
+    &   this_mat%fibretoughness,strain,clength,dmax)
+        ! update sdv
+        sdv%i(2)=ffstat
+        ! update ddsdde
+        df=sdv%r(1)
+        call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+        ! update stress
+        sig=matmul(dee,strain)
+
 
         ! do only strength failure criterion
         if(this_mat%matrixtoughness_active) then
@@ -262,7 +265,7 @@
 
         ! calculate stress based on jump
         ! dee is defined based on intact stiffness
-        sig=matmul(dee,strain)
+        !sig=matmul(dee,strain)
         ! check and update fstat
         if(mfstat<mfonset) then               
             ! go through failure criterion and update fstat
@@ -489,6 +492,7 @@
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
                 dm=dmax
+                fstat=ffailed
             else
                 ! effective jump and traction
                 u_eff=abs(strain(1))*clength
@@ -500,7 +504,7 @@
             end if
         
             ! check dm and update fstat
-            if (dm>=dmax) then
+            if (dm>=dmax-tiny(one)) then
                 dm=dmax
                 fstat=ffailed
             end if
@@ -557,7 +561,7 @@
         !               max. stress
         !           ...
         
-        if(min(Xt,Xc) > tiny(one)) then
+        if(min(Xt,abs(Xc)) > tiny(one)) then
             ! failure index for tensile failure; matrix crack perpendicular to shell plane, no z-dir stress components
             findex2=max(sigma(1),zero)/Xt + abs(min(sigma(1),zero)/Xc)
             
