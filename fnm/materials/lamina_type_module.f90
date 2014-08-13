@@ -244,18 +244,25 @@
         end if
         
         
-        
-        sig=matmul(dee,strain)
-        call FibreCohesiveLaw(ffstat,sdv%r,sig,this_mat%strength, &
-    &   this_mat%fibretoughness,strain,clength,dmax)
-        ! update sdv
-        sdv%i(2)=ffstat
-        ! update ddsdde
-        df=sdv%r(1)
-        call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
-        ! update stress
-        sig=matmul(dee,strain)
-
+        if(ffstat==ffailed) then
+        ! already completely failed, no need to go through coh law; update dee and calculate stress
+            df=sdv%r(1)
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            sig=matmul(dee,strain)
+        else
+            ! when fibres are intact, calculate stress for failure criterion check
+            if(ffstat==intact) sig=matmul(dee,strain)
+            ! use cohesive law, calculate damage var. (sdv%r) with strain (and sig when intact)
+            call FibreCohesiveLaw(ffstat,sdv%r,sig,this_mat%strength, &
+    &       this_mat%fibretoughness,strain,clength,dmax)
+            ! update sdv
+            sdv%i(2)=ffstat
+            ! update ddsdde
+            df=sdv%r(1) ! fibre stiffness degradation
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            ! update stress
+            sig=matmul(dee,strain)
+        end if
 
         ! do only strength failure criterion
         if(this_mat%matrixtoughness_active) then
@@ -263,10 +270,8 @@
             & only failure criterion is assessed; use FNM cohesive subelem instead for matrix cracking'
         end if
 
-        ! calculate stress based on jump
-        ! dee is defined based on intact stiffness
-        !sig=matmul(dee,strain)
-        ! check and update fstat
+
+        ! check and update mfstat
         if(mfstat<mfonset) then               
             ! go through failure criterion and update fstat
             call MatrixFailureCriterion(sig,this_mat%strength,mfstat)

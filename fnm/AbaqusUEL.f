@@ -40,9 +40,14 @@
     ! local variables
     character(len=dirlength)    :: workdir
     integer                     :: lenworkdir
+    integer                     :: freq
 
         workdir=''
         lenworkdir=0
+        freq=0
+
+        ! output frequency x: once every x increments
+        freq=100
 
         if (lop .eq. 0) then
 !       start of the analysis
@@ -77,8 +82,8 @@
         else if (lop .eq. 2) then
 !	    end of the increment 
 
-            ! print element outputs after each increment
-            call output(kstep,kinc,outdir)
+            ! print element outputs after certain increment         
+           if(kinc==1 .or. mod(kinc,freq)==0) call output(kstep,kinc,outdir)
             
         
         else if (lop .eq. 3) then
