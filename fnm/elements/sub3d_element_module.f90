@@ -18,7 +18,7 @@
             
             character(len=eltypelength)     :: eltype=''    ! can be all types of 2D elements
             integer                         :: matkey=0     ! material index in glb material array
-            real(kind=dp)                   :: theta=zero   ! fibre orientation (lamina)
+
 
             integer,allocatable             :: glbcnc(:)    ! sub_elem connec to global node library
             
@@ -75,7 +75,7 @@
             elem%curr_status=0
             elem%eltype=''    ! can be all types of 2D elements
             elem%matkey=0     ! material index in glb material array
-            elem%theta=zero   ! fibre orientation (lamina)
+
             
             if(allocated(elem%glbcnc))      deallocate(elem%glbcnc)
             if(allocated(elem%wedge))       deallocate(elem%wedge)
@@ -96,7 +96,7 @@
         
         
         
-        subroutine prepare_sub3d_element(elem,eltype,matkey,theta,glbcnc,Tmatrix,mnode)
+        subroutine prepare_sub3d_element(elem,eltype,matkey,glbcnc,Tmatrix,mnode)
         
             type(sub3d_element), intent(inout) :: elem
             
@@ -105,7 +105,7 @@
             
             integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
             
-            real(kind=dp),intent(in),optional       :: theta        ! fibre orientation (lamina)
+
             real(kind=dp),intent(in),optional       :: Tmatrix(:,:) ! interpolation matrix
             type(xnode),  intent(in),optional       :: mnode(:)     ! interpolated (material domain) nodes
             
@@ -129,7 +129,7 @@
             elem%glbcnc=glbcnc
                 
 
-            if(present(theta)) elem%theta=theta
+
             
             if(present(Tmatrix)) then
                 if(.not.present(mnode)) then
@@ -183,13 +183,13 @@
         
         
         
-        subroutine extract_sub3d_element(elem,eltype,curr_status,matkey,theta,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
+        subroutine extract_sub3d_element(elem,eltype,curr_status,matkey,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
         
             type(sub3d_element), intent(in) :: elem
             
             character(len=eltypelength),  intent(out),optional    :: eltype       ! can be all types of 2D elements
             integer,                    intent(out),optional    :: curr_status,matkey       ! material index in glb material array
-            real(kind=dp),              intent(out),optional    :: theta        ! fibre orientation (lamina)
+
             
             integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
                         
@@ -207,7 +207,7 @@
             if(present(eltype)) eltype=elem%eltype
             if(present(curr_status)) curr_status=elem%curr_status
             if(present(matkey)) matkey=elem%matkey
-            if(present(theta))  theta=elem%theta
+
             
             
             if(present(glbcnc)) then

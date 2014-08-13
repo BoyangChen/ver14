@@ -8,6 +8,10 @@
     integer, parameter :: ndim=3, nst=6, nnode=8, nig=8, ndof=ndim*nnode ! constants for type brick_element
     real(dp),parameter :: dfail=one                                      ! max. degradation at final failure 
     
+    ! parameters used for calculating element characteristic length (clength)
+    integer, parameter :: nedge=4
+    integer, parameter :: edg(2,nedge)=reshape([1,2,2,3,3,4,4,1],[2,nedge])
+    
     
     type, public :: brick_element 
         private
@@ -16,7 +20,7 @@
         integer :: key=0 ! glb index of this element
         integer :: connec(nnode)=0 ! node indices in their global arrays
         integer :: matkey=0 ! material index in the global material arrays
-        real(kind=dp) :: theta=zero ! material (local) orientation for composite lamina
+
         type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
         
         ! below are optional terms 
@@ -68,7 +72,7 @@
         elem%key=0
         elem%connec=0
         elem%matkey=0
-        elem%theta=zero
+
         do i=1,nig
             call empty(elem%ig_point(i))
         end do      
@@ -82,12 +86,12 @@
     
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_brick_element(elem,key,connec,matkey,theta)
+    subroutine prepare_brick_element(elem,key,connec,matkey)
     
         type(brick_element),    intent(inout)   :: elem
         integer,                intent(in)      :: connec(nnode)
         integer,                intent(in)      :: key,matkey
-        real(kind=dp),optional, intent(in)      :: theta
+
         
         real(kind=dp)   :: x(ndim),u(ndim),stress(nst),strain(nst)
         integer         :: i
@@ -97,7 +101,7 @@
         elem%key=key
         elem%connec=connec
         elem%matkey=matkey
-        if(present(theta)) elem%theta=theta
+
         
         do i=1,nig
             call update(elem%ig_point(i),x=x,u=u,stress=stress,strain=strain)
@@ -108,12 +112,12 @@
     
     
     
-    subroutine extract_brick_element(elem,curr_status,key,connec,matkey,theta,ig_point,sdv)
+    subroutine extract_brick_element(elem,curr_status,key,connec,matkey,ig_point,sdv)
     
         type(brick_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: curr_status,key, matkey
-        real(kind=dp),                        optional, intent(out) :: theta
+
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
@@ -124,7 +128,7 @@
         
         if(present(matkey)) matkey=elem%matkey
         
-        if(present(theta)) theta=elem%theta
+
         
         
         if(present(connec)) then
@@ -194,10 +198,14 @@
         real(kind=dp)   :: btd(ndof,nst),btdb(ndof,ndof) ! b'*d & b'*d*b
         real(kind=dp)   :: tmpx(ndim),tmpu(ndim),tmpstrain(nst),tmpstress(nst) ! temp. x, strain & stress arrays for intg pnts      
         real(kind=dp),allocatable :: xj(:),uj(:)! nodal vars extracted from glb lib_node array
-        real(kind=dp),allocatable :: vec(:,:)
-        real(kind=dp)   :: vecf(2), c, s, clength
         
         integer :: i,j,kig,igstat
+        
+        ! variables used for calculating clength
+        real(kind=dp)   :: clength
+        real(kind=dp)   :: xo,yo,xp1,yp1,xp2,yp2,x1,y1,x2,y2,xct,yct,xct1,yct1,xct2,yct2
+        real(kind=dp)   :: a1,b1,a2,b2,xmid,ymid,xmid1,ymid1,xmid2,ymid2,detlc,ctip(2,2)
+        integer :: nfailedge,iscross,ifedg(nedge)
         
         ! initialize variables
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
@@ -213,6 +221,8 @@
         igxi=zero; igwt=zero
         coords=zero; theta=zero; u=zero
         failure=.false.
+        
+        
         
         ! copy nodes from global node array 
         node(:)=lib_node(elem%connec(:))
@@ -246,15 +256,145 @@
         call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
         
         
-        ! calculate approximate clength
-        vecf=zero; c=zero; s=zero; clength=zero
-        allocate(vec(2,2)); vec=zero
-        vec(1:2,1)=coords(1:2,3)-coords(1:2,1) ! diagonal vector 1
-        vec(1:2,2)=coords(1:2,4)-coords(1:2,2) ! diagonal vector 2 
-        c=cos(pi*theta/halfcirc)
-        s=sin(pi*theta/halfcirc)
-        vecf=[c,s]
-        clength=max(dot_product(vecf,vec(:,1)),dot_product(vecf,vec(:,2)))
+        !-----------------------------------------------------------!
+        !           calculate approximate clength
+        !-----------------------------------------------------------!
+        ! initialize relevant variables
+        clength=zero
+        xo=zero; yo=zero; xp1=zero; yp1=zero; xp2=zero; yp2=zero
+        x1=zero; y1=zero; x2=zero; y2=zero; xct=zero; yct=zero
+        xct1=zero; yct1=zero; xct2=zero; yct2=zero
+        a1=zero; b1=zero; a2=zero; b2=zero
+        xmid=zero; ymid=zero; xmid1=zero; ymid1=zero; xmid2=zero; ymid2=zero
+        detlc=zero; ctip=zero
+        nfailedge=0; iscross=0; ifedg=0
+        
+        ! find centroid
+        xo=quarter*(coords(1,1)+coords(1,2)+coords(1,3)+coords(1,4))
+        yo=quarter*(coords(2,1)+coords(2,2)+coords(2,3)+coords(2,4))
+        xp1=xo
+        yp1=yo
+        ! find xp2, yp2
+        xp2=xp1+cos(theta/halfcirc*pi)
+        yp2=yp1+sin(theta/halfcirc*pi)
+        do i=1,nedge 
+            ! tip corods of edge i
+            x1=coords(1,edg(1,i))
+            y1=coords(2,edg(1,i))
+            x2=coords(1,edg(2,i))
+            y2=coords(2,edg(2,i))
+            iscross=0
+            xct=zero
+            yct=zero
+            call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
+            if (iscross.gt.0) then
+                nfailedge=nfailedge+1
+                ifedg(nfailedge)=i
+                ctip(:,nfailedge)=[xct,yct]
+             endif
+             if(nfailedge==2) exit ! found 2 broken edges already
+        end do
+
+
+        ! badly shaped element may have large angles; e.g.: 3 or all edges almost parallel to crack, then numerical error may
+        ! prevent the algorithm from finding any broken edge or only one broken edge
+
+        if(nfailedge==0) then
+        ! use trial lines: connecting midpoints of two edges and find the most parrallel-to-crack one
+
+            ! the following algorithm will find two broken edges
+            nfailedge=2
+            ! line equation constants of the crack
+            a2=sin(theta/halfcirc*pi)
+            b2=-cos(theta/halfcirc*pi)
+            ! connecting midpoints of two edges and find the most parrallel one
+            do i=1,nedge-1
+                ! tip coords of edge i
+                x1=coords(1,edg(1,i))
+                y1=coords(2,edg(1,i))
+                x2=coords(1,edg(2,i))
+                y2=coords(2,edg(2,i))
+                ! mid point of edge i
+                xmid1=half*(x1+x2)
+                ymid1=half*(y1+y2)
+                ! loop over midpoints of other edges
+                do j=i+1,nedge
+                    ! tip coords of edge j
+                    x1=coords(1,edg(1,j))
+                    y1=coords(2,edg(1,j))
+                    x2=coords(1,edg(2,j))
+                    y2=coords(2,edg(2,j))
+                    ! mid point of edge j
+                    xmid2=half*(x1+x2)
+                    ymid2=half*(y1+y2)
+                    ! line equation constants of midpoint1-midpoint2
+                    a1=ymid1-ymid2
+                    b1=xmid2-xmid1
+                    ! initialize detlc and intersection info
+                    if(i==1 .and. j==2) then
+                        detlc=a1*b2-a2*b1
+                        xct1=xmid1
+                        yct1=ymid1
+                        xct2=xmid2
+                        yct2=ymid2
+                    end if
+                    ! find the most parallel trial line and update stored info
+                    if(abs(a1*b2-a2*b1)<abs(detlc)) then
+                        xct1=xmid1
+                        yct1=ymid1
+                        xct2=xmid2
+                        yct2=ymid2
+                    endif
+                end do
+            end do
+            ctip(:,1)=[xct1,yct1] 
+            ctip(:,2)=[xct2,yct2]
+
+        else if(nfailedge==1) then                
+        ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
+
+            ! the following algorithm will find the second broken edge
+            nfailedge=2
+            ! existing crack tip coords
+            xp1=xct
+            yp1=yct
+            ! crack line equation constants
+            a2=sin(theta/halfcirc*pi)
+            b2=-cos(theta/halfcirc*pi)
+            ! find the midpoint which forms the most parrallel-to-crack line with (xp1,yp1)
+            do i=1,nedge
+                if (i==ifedg(1)) cycle
+                ! tip coords of edge i
+                x1=coords(1,edg(1,i))
+                y1=coords(2,edg(1,i))
+                x2=coords(1,edg(2,i))
+                y2=coords(2,edg(2,i))
+                ! mid point of edge i
+                xmid=half*(x1+x2)
+                ymid=half*(y1+y2)
+                ! line equation constants of midpoint-(xp1,yp1)
+                a1=ymid-yp1
+                b1=xp1-xmid
+                ! initialize detlc and intersection info
+                if(i==1 .or. (ifedg(1)==1 .and. i==2)) then
+                    detlc=a1*b2-a2*b1
+                    xct=xmid
+                    yct=ymid
+                end if
+                ! find the most parallel trial line and update stored info
+                if(abs(a1*b2-a2*b1)<abs(detlc)) then
+                    xct=xmid
+                    yct=ymid
+                endif
+            end do
+            ctip(:,2)=[xct,yct]
+        end if 
+
+        clength=sqrt((ctip(1,2)-ctip(1,1))**2+(ctip(2,2)-ctip(2,1))**2)
+        
+        !-----------------------------------------------------------!
+        !-----------------------------------------------------------!
+
 
 
         ! - extract isdv values from element and assign to nstep and ninc
@@ -409,7 +549,6 @@
 
         if(allocated(xj)) deallocate(xj) 
         if(allocated(uj)) deallocate(uj) 
-        if(allocated(vec)) deallocate(vec) 
         if(allocated(ig_sdv)) deallocate(ig_sdv)
         
         
