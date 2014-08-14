@@ -146,7 +146,7 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_coh3d6_element(elem,K_matrix,F_vector,gauss,mnode)
+    subroutine integrate_coh3d6_element(elem,K_matrix,F_vector,nofailure,gauss,mnode)
         use toolkit_module                  ! global tools for element integration
         use lib_mat_module                  ! global material library
         use lib_node_module                 ! global node library
@@ -154,6 +154,7 @@
     
         type(coh3d6_element),       intent(inout)   :: elem 
         real(kind=dp), allocatable, intent(out)     :: K_matrix(:,:), F_vector(:)
+        logical,  optional,  intent(in)         :: nofailure
         logical,        optional,   intent(in)      :: gauss
         type(xnode),    optional,   intent(in)      :: mnode(:)  ! material (interpolated) nodes
  
@@ -169,6 +170,8 @@
 
         ! - glb clock step and increment no. extracted from glb clock module
         integer         :: curr_step, curr_inc
+        
+        logical :: nofail
         
         
         !-----------------------------------------!
@@ -232,6 +235,9 @@
         end do 
         call empty(mat)
         curr_step=0; curr_inc=0
+        
+        nofail=.false.
+        if(present(nofailure)) nofail=nofailure
         
         ! pure local variables
         coords=zero; midcoords=zero; u=zero 

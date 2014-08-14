@@ -170,6 +170,8 @@ module xbrick_element_module
         
         integer :: i,j,l, elstat
         integer, allocatable :: dofcnc(:)
+        
+        logical :: nofailure
     
     
         ! initialize K & F
@@ -179,8 +181,10 @@ module xbrick_element_module
         ! initialize local variables
         i=0; j=0; l=0
         elstat=0
+        nofailure=.false.
 
 
+        
         
 
         !---------------------------------------------------------------------!
@@ -188,8 +192,11 @@ module xbrick_element_module
         !---------------------------------------------------------------------!
      
         ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
-        if(elem%curr_status<elfail) then   
-            call edge_status_partition(elem)   
+        if(elem%curr_status<elfail) then 
+            elstat=elem%curr_status  
+            call edge_status_partition(elem) 
+            ! if there's new partitions, wait until the next iteration to do failure
+            if(elstat/=elem%curr_status) nofailure=.true.
         end if
         
         !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
@@ -229,7 +236,7 @@ module xbrick_element_module
               
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
-                call integrate(elem%subelem(i),Ki,Fi)
+                call integrate(elem%subelem(i),Ki,Fi,nofailure)
                 if(allocated(dofcnc)) deallocate(dofcnc)
                 allocate(dofcnc(size(Fi))); dofcnc=0
                 do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
@@ -251,9 +258,11 @@ module xbrick_element_module
             ! elem status changed, elem failed, partition changed, reintegrate subelems
                 ! empty K and F for reuse
                 K_matrix=zero; F_vector=zero
+                ! no failure right after new partition
+                nofailure=.true.
                 ! integrate sub elements and assemble into global matrix
                 do i=1, size(elem%subelem)
-                    call integrate(elem%subelem(i),Ki,Fi)
+                    call integrate(elem%subelem(i),Ki,Fi,nofailure)
                     if(allocated(dofcnc)) deallocate(dofcnc)
                     allocate(dofcnc(size(Fi))); dofcnc=0
                     do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
@@ -272,7 +281,7 @@ module xbrick_element_module
         
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
-                call integrate(elem%subelem(i),Ki,Fi)  
+                call integrate(elem%subelem(i),Ki,Fi,nofailure)  
                 if(allocated(dofcnc)) deallocate(dofcnc)
                 allocate(dofcnc(size(Fi))); dofcnc=0
                 do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i

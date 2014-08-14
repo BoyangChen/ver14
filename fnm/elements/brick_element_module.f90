@@ -158,7 +158,7 @@
     
     ! the integration subroutine, updates K matrix, F vector, integration point stress and strain
     ! as well as all the solution dependent variables (sdvs) at intg points and element
-    subroutine integrate_brick_element(elem,K_matrix,F_vector)
+    subroutine integrate_brick_element(elem,K_matrix,F_vector,nofailure)
     use toolkit_module                  ! global tools for element integration
     use lib_mat_module                  ! global material library
     use lib_node_module                 ! global node library
@@ -166,6 +166,7 @@
     
         type(brick_element),intent(inout)         :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
+        logical,  optional,  intent(in)         :: nofailure
         
         ! the rest are all local variables
         
@@ -207,6 +208,8 @@
         real(kind=dp)   :: a1,b1,a2,b2,xmid,ymid,xmid1,ymid1,xmid2,ymid2,detlc,ctip(2,2)
         integer :: nfailedge,iscross,ifedg(nedge)
         
+        logical :: nofail
+        
         ! initialize variables
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
         K_matrix=zero; F_vector=zero
@@ -222,7 +225,8 @@
         coords=zero; theta=zero; u=zero
         failure=.false.
         
-        
+        nofail=.false.
+        if(present(nofailure)) nofail=nofailure
         
         ! copy nodes from global node array 
         node(:)=lib_node(elem%connec(:))
@@ -492,6 +496,8 @@
                     ! check if failure analysis is needed (check if strength parameters are present)
                     call extract(lib_iso(typekey),strength_active=failure)
                     
+                    if(nofail) failure=.false.
+                    
                     if(failure) write(msg_file,*) "WARNING: failure analysis is not yet supported for &
                     & brick_element type isotropic material; only linear elastic stiffness matrix is integrated."
                     
@@ -502,6 +508,8 @@
                 
                     ! check if failure analysis is needed (check if strength parameters are present)
                     call extract(lib_lamina(typekey),strength_active=failure)
+                    
+                    if(nofail) failure=.false.
                     
                     if(failure) then
                         ! calculate D matrix, update tmpstress and sdv

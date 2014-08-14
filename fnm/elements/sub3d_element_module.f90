@@ -280,20 +280,22 @@
         
         
         
-        subroutine integrate_sub3d_element(elem,Kmatrix,Fvector,cohgauss)
+        subroutine integrate_sub3d_element(elem,Kmatrix,Fvector,nofailure,cohgauss)
         
             type(sub3d_element), intent(inout) :: elem
             real(dp), allocatable, intent(out) :: Kmatrix(:,:),Fvector(:)
+            logical,  optional,  intent(in)    :: nofailure
             logical,  optional,  intent(in)    :: cohgauss
             
             ! local variables
             !real(dp), allocatable ::  xi(:), xe(:), ue(:), xm(:), um(:), coords(:,:)
             integer :: i,j,l, elstat
-            logical :: gauss
+            logical :: nofail, gauss
             
             i=0; j=0; l=0; elstat=0
-            gauss=.false.
+            nofail=.false. ; gauss=.false.
             
+            if(present(nofailure)) nofail=nofailure
             if(present(cohgauss)) gauss=cohgauss
             
             select case(elem%eltype)
@@ -305,7 +307,7 @@
                         call prepare(elem%wedge(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
                     end if
                     
-                    call integrate(elem%wedge(1),Kmatrix,Fvector)
+                    call integrate(elem%wedge(1),Kmatrix,Fvector,nofail)
                     
                     call extract(elem%wedge(1),curr_status=elstat)
                     elem%curr_status=elstat
@@ -317,7 +319,7 @@
                         call prepare(elem%brick(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
                     end if
                     
-                    call integrate(elem%brick(1),Kmatrix,Fvector)
+                    call integrate(elem%brick(1),Kmatrix,Fvector,nofail)
                     
                     call extract(elem%brick(1),curr_status=elstat)
                     elem%curr_status=elstat
@@ -341,9 +343,9 @@
                     end if
                     
                     if(allocated(elem%Tmatrix)) then
-                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,gauss,elem%mnode)
+                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,nofail,gauss,elem%mnode)
                     else
-                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,gauss)
+                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,nofail,gauss)
                     end if
                     
                     call extract(elem%coh3d6(1),curr_status=elstat)
@@ -368,9 +370,9 @@
                     end if
                     
                     if(allocated(elem%Tmatrix)) then
-                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,gauss,elem%mnode)
+                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,nofail,gauss,elem%mnode)
                     else
-                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,gauss)
+                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,nofail,gauss)
                     end if
                     
                     call extract(elem%coh3d8(1),curr_status=elstat)
