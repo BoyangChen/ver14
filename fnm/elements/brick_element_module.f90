@@ -21,6 +21,9 @@
         integer :: connec(nnode)=0 ! node indices in their global arrays
         integer :: matkey=0 ! material index in the global material arrays
 
+        real(dp) :: stress(nst)=zero ! stresses for output
+        real(dp) :: strain(nst)=zero ! strains for output
+
         type(integration_point) :: ig_point(nig) ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
         
         ! below are optional terms 
@@ -72,6 +75,8 @@
         elem%key=0
         elem%connec=0
         elem%matkey=0
+        elem%stress=zero
+        elem%strain=zero
 
         do i=1,nig
             call empty(elem%ig_point(i))
@@ -112,12 +117,12 @@
     
     
     
-    subroutine extract_brick_element(elem,curr_status,key,connec,matkey,ig_point,sdv)
+    subroutine extract_brick_element(elem,curr_status,key,connec,matkey,stress,strain,ig_point,sdv)
     
         type(brick_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: curr_status,key, matkey
-
+        real(dp),                allocatable, optional, intent(out) :: stress(:), strain(:)
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
@@ -129,7 +134,15 @@
         if(present(matkey)) matkey=elem%matkey
         
 
-        
+        if(present(stress)) then
+            allocate(stress(nst))
+            stress=elem%stress
+        end if
+
+        if(present(strain)) then
+            allocate(strain(nst))
+            strain=elem%strain
+        end if
         
         if(present(connec)) then
             allocate(connec(nnode))
@@ -541,12 +554,17 @@
             
             
             ! update ig point arrays
-            call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=tmpstrain,stress=tmpstress,sdv=ig_sdv)
+            !call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=tmpstrain,stress=tmpstress,sdv=ig_sdv)
+            call update(elem%ig_point(kig),sdv=ig_sdv)
             
             ! update elem curr status variable
             igstat=0
             if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
             elem%curr_status=max(elem%curr_status,igstat)
+
+            ! update elem stress & strain (weighted avg of ig point stress & strains)
+            elem%stress=elem%stress+tmpstress*igwt(kig)
+            elem%strain=elem%strain+tmpstrain*igwt(kig)
             
        	end do !-looped over all int points. ig=nig
         

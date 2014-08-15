@@ -47,7 +47,7 @@
         freq=0
 
         ! output frequency x: once every x increments
-        freq=100
+        freq=10
 
         if (lop .eq. 0) then
 !       start of the analysis
@@ -181,13 +181,14 @@
     do j=1, nnode
         uj(1:mcrd,j)    =   u( (j-1)*mcrd+1 : j*mcrd )
         !~duj(1:mcrd,j)   =   du( (j-1)*mcrd+1 : j*mcrd )
-        vj(1:mcrd,j)    =   v( (j-1)*mcrd+1 : j*mcrd )
-        aj(1:mcrd,j)    =   a( (j-1)*mcrd+1 : j*mcrd )
+        !vj(1:mcrd,j)    =   v( (j-1)*mcrd+1 : j*mcrd )
+        !aj(1:mcrd,j)    =   a( (j-1)*mcrd+1 : j*mcrd )
     end do
     
     ! update nodal values to glb node library lib_node according to cnc
     do j=1, nnode
-        call update(lib_node(cnc(j)),u=uj(:,j),du=duj(:,j),v=vj(:,j),a=aj(:,j))
+        !call update(lib_node(cnc(j)),u=uj(:,j),du=duj(:,j),v=vj(:,j),a=aj(:,j))
+        call update(lib_node(cnc(j)),u=uj(:,j))
     end do
     
     

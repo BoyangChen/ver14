@@ -440,160 +440,160 @@
         ! write element stress
         write(outunit,'(a, i10)')'CELL_DATA ', nelem
         write(outunit,'(a)')'TENSORS stress float'
-        
-        if (ntri > 0) then
-            do i=1,ntri
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_tri(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)                   
-                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                    sigtsr(1,2)=sigtsr(1,2)+sig(3)
-                    sigtsr(2,1)=sigtsr(2,1)+sig(3)                         
-                end do 
-                ! average stress in the element
-                sigtsr=sigtsr/size(igpnt)  
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element                
-            end do 
-        end if
-        
-        if (nquad > 0) then
-            do i=1,nquad
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_quad(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)                   
-                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                    sigtsr(1,2)=sigtsr(1,2)+sig(3)
-                    sigtsr(2,1)=sigtsr(2,1)+sig(3)                         
-                end do 
-                ! average stress in the element
-                sigtsr=sigtsr/size(igpnt)  
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element                
-            end do 
-        end if
-        
-        if (nwedge > 0) then
-            do i=1,nwedge
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_wedge(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)                   
-                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                    sigtsr(3,2)=sigtsr(3,2)+sig(6)   
-                end do 
-                ! average stress in the element
-                sigtsr=sigtsr/size(igpnt)  
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element                
-            end do 
-        end if
-        
-        if (nbrick > 0) then
-            do i=1,nbrick
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_brick(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)                   
-                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                    sigtsr(3,2)=sigtsr(3,2)+sig(6)   
-                end do 
-                ! average stress in the element
-                sigtsr=sigtsr/size(igpnt)  
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element                
-            end do 
-        end if
-        
-        if (ncoh2d > 0) then
-            do i=1,ncoh2d
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_coh2d(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)  
-                    !epstsr(1,1)
-                    sigtsr(2,2)=sigtsr(2,2)+sig(1)
-                    sigtsr(1,2)=sigtsr(1,2)+sig(2)
-                    sigtsr(2,1)=sigtsr(2,1)+sig(2)                           
-                end do 
-                ! average strain in the element
-                sigtsr=sigtsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        if (ncoh3d6 > 0) then
-            do i=1,ncoh3d6
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_coh3d6(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)
-                    sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                    sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                    sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                    sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                end do 
-                ! average strain in the element
-                sigtsr=sigtsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        if (ncoh3d8 > 0) then
-            do i=1,ncoh3d8
-                sigtsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_coh3d8(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),stress=sig)  
-                    sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                    sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                    sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                    sigtsr(3,2)=sigtsr(3,2)+sig(3)                           
-                end do 
-                ! average strain in the element
-                sigtsr=sigtsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        
+        !~
+        !~if (ntri > 0) then
+        !~    do i=1,ntri
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_tri(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)                   
+        !~            sigtsr(1,1)=sigtsr(1,1)+sig(1)
+        !~            sigtsr(2,2)=sigtsr(2,2)+sig(2)
+        !~            sigtsr(1,2)=sigtsr(1,2)+sig(3)
+        !~            sigtsr(2,1)=sigtsr(2,1)+sig(3)                         
+        !~        end do 
+        !~        ! average stress in the element
+        !~        sigtsr=sigtsr/size(igpnt)  
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element                
+        !~    end do 
+        !~end if
+        !~
+        !~if (nquad > 0) then
+        !~    do i=1,nquad
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_quad(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)                   
+        !~            sigtsr(1,1)=sigtsr(1,1)+sig(1)
+        !~            sigtsr(2,2)=sigtsr(2,2)+sig(2)
+        !~            sigtsr(1,2)=sigtsr(1,2)+sig(3)
+        !~            sigtsr(2,1)=sigtsr(2,1)+sig(3)                         
+        !~        end do 
+        !~        ! average stress in the element
+        !~        sigtsr=sigtsr/size(igpnt)  
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element                
+        !~    end do 
+        !~end if
+        !~
+        !~if (nwedge > 0) then
+        !~    do i=1,nwedge
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_wedge(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)                   
+        !~            sigtsr(1,1)=sigtsr(1,1)+sig(1)
+        !~            sigtsr(2,2)=sigtsr(2,2)+sig(2)
+        !~            sigtsr(3,3)=sigtsr(3,3)+sig(3)
+        !~            sigtsr(1,2)=sigtsr(1,2)+sig(4)
+        !~            sigtsr(1,3)=sigtsr(1,3)+sig(5)
+        !~            sigtsr(2,3)=sigtsr(2,3)+sig(6)
+        !~            sigtsr(2,1)=sigtsr(2,1)+sig(4)
+        !~            sigtsr(3,1)=sigtsr(3,1)+sig(5)
+        !~            sigtsr(3,2)=sigtsr(3,2)+sig(6)   
+        !~        end do 
+        !~        ! average stress in the element
+        !~        sigtsr=sigtsr/size(igpnt)  
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element                
+        !~    end do 
+        !~end if
+        !~
+        !~if (nbrick > 0) then
+        !~    do i=1,nbrick
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_brick(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)                   
+        !~            sigtsr(1,1)=sigtsr(1,1)+sig(1)
+        !~            sigtsr(2,2)=sigtsr(2,2)+sig(2)
+        !~            sigtsr(3,3)=sigtsr(3,3)+sig(3)
+        !~            sigtsr(1,2)=sigtsr(1,2)+sig(4)
+        !~            sigtsr(1,3)=sigtsr(1,3)+sig(5)
+        !~            sigtsr(2,3)=sigtsr(2,3)+sig(6)
+        !~            sigtsr(2,1)=sigtsr(2,1)+sig(4)
+        !~            sigtsr(3,1)=sigtsr(3,1)+sig(5)
+        !~            sigtsr(3,2)=sigtsr(3,2)+sig(6)   
+        !~        end do 
+        !~        ! average stress in the element
+        !~        sigtsr=sigtsr/size(igpnt)  
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element                
+        !~    end do 
+        !~end if
+        !~
+        !~if (ncoh2d > 0) then
+        !~    do i=1,ncoh2d
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_coh2d(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)  
+        !~            !epstsr(1,1)
+        !~            sigtsr(2,2)=sigtsr(2,2)+sig(1)
+        !~            sigtsr(1,2)=sigtsr(1,2)+sig(2)
+        !~            sigtsr(2,1)=sigtsr(2,1)+sig(2)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        sigtsr=sigtsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~if (ncoh3d6 > 0) then
+        !~    do i=1,ncoh3d6
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_coh3d6(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)
+        !~            sigtsr(3,3)=sigtsr(3,3)+sig(1)
+        !~            sigtsr(1,3)=sigtsr(1,3)+sig(2)
+        !~            sigtsr(3,1)=sigtsr(3,1)+sig(2) 
+        !~            sigtsr(2,3)=sigtsr(2,3)+sig(3)
+        !~            sigtsr(3,2)=sigtsr(3,2)+sig(3)
+        !~        end do 
+        !~        ! average strain in the element
+        !~        sigtsr=sigtsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~if (ncoh3d8 > 0) then
+        !~    do i=1,ncoh3d8
+        !~        sigtsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_coh3d8(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),stress=sig)  
+        !~            sigtsr(3,3)=sigtsr(3,3)+sig(1)
+        !~            sigtsr(1,3)=sigtsr(1,3)+sig(2)
+        !~            sigtsr(3,1)=sigtsr(3,1)+sig(2) 
+        !~            sigtsr(2,3)=sigtsr(2,3)+sig(3)
+        !~            sigtsr(3,2)=sigtsr(3,2)+sig(3)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        sigtsr=sigtsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~
 
         if(nxbrick > 0) then
             do m=1,nxbrick
@@ -607,21 +607,31 @@
                                 ! extract wedge sub elem
                                 call extract(sub3d(i),wedge=subwedge)
                                 sigtsr=zero ! empty sig & eps tensor for reuse
-                                call extract(subwedge(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),stress=sig)                   
-                                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                                    sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                                end do 
-                                ! average stress in the element
-                                sigtsr=sigtsr/size(igpnt)  
+                                !~call extract(subwedge(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),stress=sig)                   
+                                !~    sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                !~    sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                !~    sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                !~    sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(6)
+                                !~end do 
+                                !~! average stress in the element
+                                !~sigtsr=sigtsr/size(igpnt)  
+                                call extract(subwedge(1),stress=sig)
+                                sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                sigtsr(3,2)=sigtsr(3,2)+sig(6)
                                 do l=1,3
                                     write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                                 end do
@@ -631,21 +641,31 @@
                                 ! extract brick sub elem
                                 call extract(sub3d(i),brick=subbrick)
                                 sigtsr=zero ! empty sig & eps tensor for reuse
-                                call extract(subbrick(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),stress=sig)                   
-                                    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                                    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                                    sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                                    sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                                    sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                                    sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                                    sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                                    sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                                    sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                                end do 
-                                ! average stress in the element
-                                sigtsr=sigtsr/size(igpnt)  
+                                !~call extract(subbrick(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),stress=sig)                   
+                                !~    sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                !~    sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                !~    sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                !~    sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(6)
+                                !~end do 
+                                !~! average stress in the element
+                                !~sigtsr=sigtsr/size(igpnt)  
+                                call extract(subbrick(1),stress=sig)
+                                sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                sigtsr(3,2)=sigtsr(3,2)+sig(6)
                                 do l=1,3
                                     write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                                 end do
@@ -655,17 +675,17 @@
                                 ! extract coh3d6 sub elem
                                 call extract(sub3d(i),coh3d6=subcoh3d6)
                                 sigtsr=zero ! empty sig & eps tensor for reuse
-                                call extract(subcoh3d6(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),stress=sig)  
-                                    sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                                    sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                                    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                                    sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                                    sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                                end do 
-                                ! average strain in the element
-                                sigtsr=sigtsr/size(igpnt)
+                                !~call extract(subcoh3d6(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),stress=sig)  
+                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(1)
+                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(2)
+                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
+                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(3)
+                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(3)
+                                !~end do 
+                                !~! average strain in the element
+                                !~sigtsr=sigtsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                                 end do
@@ -675,17 +695,17 @@
                                 ! extract coh3d8 sub elem
                                 call extract(sub3d(i),coh3d8=subcoh3d8)
                                 sigtsr=zero ! empty sig & eps tensor for reuse
-                                call extract(subcoh3d8(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),stress=sig)  
-                                    sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                                    sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                                    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                                    sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                                    sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                                end do 
-                                ! average strain in the element
-                                sigtsr=sigtsr/size(igpnt)
+                                !~call extract(subcoh3d8(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),stress=sig)  
+                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(1)
+                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(2)
+                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
+                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(3)
+                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(3)
+                                !~end do 
+                                !~! average strain in the element
+                                !~sigtsr=sigtsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                                 end do
@@ -709,158 +729,158 @@
         
         ! write element strain
         write(outunit,'(a)')'TENSORS strain float'
-        
-        if (ntri > 0) then
-            do i=1,ntri
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_tri(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)  
-                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                    epstsr(1,2)=epstsr(1,2)+eps(3)
-                    epstsr(2,1)=epstsr(2,1)+eps(3)                           
-                end do 
-                ! average strain in the element
-                epstsr=epstsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        if (nquad > 0) then
-            do i=1,nquad
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_quad(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)  
-                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                    epstsr(1,2)=epstsr(1,2)+eps(3)
-                    epstsr(2,1)=epstsr(2,1)+eps(3)                           
-                end do 
-                ! average strain in the element
-                epstsr=epstsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        if (nwedge > 0) then
-            do i=1,nwedge
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_wedge(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)                   
-                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                    epstsr(3,3)=epstsr(3,3)+eps(3)
-                    epstsr(1,2)=epstsr(1,2)+eps(4)
-                    epstsr(1,3)=epstsr(1,3)+eps(5)
-                    epstsr(2,3)=epstsr(2,3)+eps(6)
-                    epstsr(2,1)=epstsr(2,1)+eps(4)
-                    epstsr(3,1)=epstsr(3,1)+eps(5)
-                    epstsr(3,2)=epstsr(3,2)+eps(6)   
-                end do 
-                ! average stress in the element
-                epstsr=epstsr/size(igpnt)  
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element                
-            end do 
-        end if
-        
-        if (nbrick > 0) then
-            do i=1,nbrick
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_brick(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)                   
-                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                    epstsr(3,3)=epstsr(3,3)+eps(3)
-                    epstsr(1,2)=epstsr(1,2)+eps(4)
-                    epstsr(1,3)=epstsr(1,3)+eps(5)
-                    epstsr(2,3)=epstsr(2,3)+eps(6)
-                    epstsr(2,1)=epstsr(2,1)+eps(4)
-                    epstsr(3,1)=epstsr(3,1)+eps(5)
-                    epstsr(3,2)=epstsr(3,2)+eps(6)   
-                end do 
-                ! average stress in the element
-                epstsr=epstsr/size(igpnt)  
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element                
-            end do 
-        end if    
-        
-        if (ncoh2d > 0) then
-            do i=1,ncoh2d
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_coh2d(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)  
-                    !epstsr(1,1)
-                    epstsr(2,2)=epstsr(2,2)+eps(1)
-                    epstsr(1,2)=epstsr(1,2)+eps(2)
-                    epstsr(2,1)=epstsr(2,1)+eps(2)                           
-                end do 
-                ! average strain in the element
-                epstsr=epstsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        if (ncoh3d6 > 0) then
-            do i=1,ncoh3d6
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_coh3d6(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)  
-                    epstsr(3,3)=epstsr(3,3)+eps(1)
-                    epstsr(1,3)=epstsr(1,3)+eps(2)
-                    epstsr(3,1)=epstsr(3,1)+eps(2) 
-                    epstsr(2,3)=epstsr(2,3)+eps(3)
-                    epstsr(3,2)=epstsr(3,2)+eps(3)                           
-                end do 
-                ! average strain in the element
-                epstsr=epstsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
-        
-        if (ncoh3d8 > 0) then
-            do i=1,ncoh3d8
-                epstsr=zero ! empty sig & eps tensor for reuse
-                call extract(lib_coh3d8(i),ig_point=igpnt)
-                do j=1,size(igpnt)
-                    call extract(igpnt(j),strain=eps)  
-                    epstsr(3,3)=epstsr(3,3)+eps(1)
-                    epstsr(1,3)=epstsr(1,3)+eps(2)
-                    epstsr(3,1)=epstsr(3,1)+eps(2) 
-                    epstsr(2,3)=epstsr(2,3)+eps(3)
-                    epstsr(3,2)=epstsr(3,2)+eps(3)                           
-                end do 
-                ! average strain in the element
-                epstsr=epstsr/size(igpnt)
-                do l=1,3
-                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                end do
-                write(outunit,'(a)')'' ! separate from next element               
-            end do 
-        end if
+        !~
+        !~if (ntri > 0) then
+        !~    do i=1,ntri
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_tri(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)  
+        !~            epstsr(1,1)=epstsr(1,1)+eps(1)
+        !~            epstsr(2,2)=epstsr(2,2)+eps(2)
+        !~            epstsr(1,2)=epstsr(1,2)+eps(3)
+        !~            epstsr(2,1)=epstsr(2,1)+eps(3)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        epstsr=epstsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~if (nquad > 0) then
+        !~    do i=1,nquad
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_quad(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)  
+        !~            epstsr(1,1)=epstsr(1,1)+eps(1)
+        !~            epstsr(2,2)=epstsr(2,2)+eps(2)
+        !~            epstsr(1,2)=epstsr(1,2)+eps(3)
+        !~            epstsr(2,1)=epstsr(2,1)+eps(3)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        epstsr=epstsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~if (nwedge > 0) then
+        !~    do i=1,nwedge
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_wedge(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)                   
+        !~            epstsr(1,1)=epstsr(1,1)+eps(1)
+        !~            epstsr(2,2)=epstsr(2,2)+eps(2)
+        !~            epstsr(3,3)=epstsr(3,3)+eps(3)
+        !~            epstsr(1,2)=epstsr(1,2)+eps(4)
+        !~            epstsr(1,3)=epstsr(1,3)+eps(5)
+        !~            epstsr(2,3)=epstsr(2,3)+eps(6)
+        !~            epstsr(2,1)=epstsr(2,1)+eps(4)
+        !~            epstsr(3,1)=epstsr(3,1)+eps(5)
+        !~            epstsr(3,2)=epstsr(3,2)+eps(6)   
+        !~        end do 
+        !~        ! average stress in the element
+        !~        epstsr=epstsr/size(igpnt)  
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element                
+        !~    end do 
+        !~end if
+        !~
+        !~if (nbrick > 0) then
+        !~    do i=1,nbrick
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_brick(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)                   
+        !~            epstsr(1,1)=epstsr(1,1)+eps(1)
+        !~            epstsr(2,2)=epstsr(2,2)+eps(2)
+        !~            epstsr(3,3)=epstsr(3,3)+eps(3)
+        !~            epstsr(1,2)=epstsr(1,2)+eps(4)
+        !~            epstsr(1,3)=epstsr(1,3)+eps(5)
+        !~            epstsr(2,3)=epstsr(2,3)+eps(6)
+        !~            epstsr(2,1)=epstsr(2,1)+eps(4)
+        !~            epstsr(3,1)=epstsr(3,1)+eps(5)
+        !~            epstsr(3,2)=epstsr(3,2)+eps(6)   
+        !~        end do 
+        !~        ! average stress in the element
+        !~        epstsr=epstsr/size(igpnt)  
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element                
+        !~    end do 
+        !~end if    
+        !~
+        !~if (ncoh2d > 0) then
+        !~    do i=1,ncoh2d
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_coh2d(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)  
+        !~            !epstsr(1,1)
+        !~            epstsr(2,2)=epstsr(2,2)+eps(1)
+        !~            epstsr(1,2)=epstsr(1,2)+eps(2)
+        !~            epstsr(2,1)=epstsr(2,1)+eps(2)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        epstsr=epstsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~if (ncoh3d6 > 0) then
+        !~    do i=1,ncoh3d6
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_coh3d6(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)  
+        !~            epstsr(3,3)=epstsr(3,3)+eps(1)
+        !~            epstsr(1,3)=epstsr(1,3)+eps(2)
+        !~            epstsr(3,1)=epstsr(3,1)+eps(2) 
+        !~            epstsr(2,3)=epstsr(2,3)+eps(3)
+        !~            epstsr(3,2)=epstsr(3,2)+eps(3)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        epstsr=epstsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
+        !~
+        !~if (ncoh3d8 > 0) then
+        !~    do i=1,ncoh3d8
+        !~        epstsr=zero ! empty sig & eps tensor for reuse
+        !~        call extract(lib_coh3d8(i),ig_point=igpnt)
+        !~        do j=1,size(igpnt)
+        !~            call extract(igpnt(j),strain=eps)  
+        !~            epstsr(3,3)=epstsr(3,3)+eps(1)
+        !~            epstsr(1,3)=epstsr(1,3)+eps(2)
+        !~            epstsr(3,1)=epstsr(3,1)+eps(2) 
+        !~            epstsr(2,3)=epstsr(2,3)+eps(3)
+        !~            epstsr(3,2)=epstsr(3,2)+eps(3)                           
+        !~        end do 
+        !~        ! average strain in the element
+        !~        epstsr=epstsr/size(igpnt)
+        !~        do l=1,3
+        !~            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+        !~        end do
+        !~        write(outunit,'(a)')'' ! separate from next element               
+        !~    end do 
+        !~end if
 
 
 
@@ -876,21 +896,31 @@
                                 ! extract wedge sub elem
                                 call extract(sub3d(i),wedge=subwedge)
                                 epstsr=zero ! empty eps & eps tensor for reuse
-                                call extract(subwedge(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),strain=eps)                   
-                                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                                    epstsr(3,3)=epstsr(3,3)+eps(3)
-                                    epstsr(1,2)=epstsr(1,2)+eps(4)
-                                    epstsr(1,3)=epstsr(1,3)+eps(5)
-                                    epstsr(2,3)=epstsr(2,3)+eps(6)
-                                    epstsr(2,1)=epstsr(2,1)+eps(4)
-                                    epstsr(3,1)=epstsr(3,1)+eps(5)
-                                    epstsr(3,2)=epstsr(3,2)+eps(6)
-                                end do 
-                                ! average strain in the element
-                                epstsr=epstsr/size(igpnt)  
+                                !~call extract(subwedge(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),strain=eps)                   
+                                !~    epstsr(1,1)=epstsr(1,1)+eps(1)
+                                !~    epstsr(2,2)=epstsr(2,2)+eps(2)
+                                !~    epstsr(3,3)=epstsr(3,3)+eps(3)
+                                !~    epstsr(1,2)=epstsr(1,2)+eps(4)
+                                !~    epstsr(1,3)=epstsr(1,3)+eps(5)
+                                !~    epstsr(2,3)=epstsr(2,3)+eps(6)
+                                !~    epstsr(2,1)=epstsr(2,1)+eps(4)
+                                !~    epstsr(3,1)=epstsr(3,1)+eps(5)
+                                !~    epstsr(3,2)=epstsr(3,2)+eps(6)
+                                !~end do 
+                                !~! average strain in the element
+                                !~epstsr=epstsr/size(igpnt)  
+                                call extract(subwedge(1),strain=eps)
+                                epstsr(1,1)=epstsr(1,1)+eps(1)
+                                epstsr(2,2)=epstsr(2,2)+eps(2)
+                                epstsr(3,3)=epstsr(3,3)+eps(3)
+                                epstsr(1,2)=epstsr(1,2)+eps(4)
+                                epstsr(1,3)=epstsr(1,3)+eps(5)
+                                epstsr(2,3)=epstsr(2,3)+eps(6)
+                                epstsr(2,1)=epstsr(2,1)+eps(4)
+                                epstsr(3,1)=epstsr(3,1)+eps(5)
+                                epstsr(3,2)=epstsr(3,2)+eps(6)
                                 do l=1,3
                                     write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                                 end do
@@ -900,21 +930,31 @@
                                 ! extract brick sub elem
                                 call extract(sub3d(i),brick=subbrick)
                                 epstsr=zero ! empty eps & eps tensor for reuse
-                                call extract(subbrick(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),strain=eps)                   
-                                    epstsr(1,1)=epstsr(1,1)+eps(1)
-                                    epstsr(2,2)=epstsr(2,2)+eps(2)
-                                    epstsr(3,3)=epstsr(3,3)+eps(3)
-                                    epstsr(1,2)=epstsr(1,2)+eps(4)
-                                    epstsr(1,3)=epstsr(1,3)+eps(5)
-                                    epstsr(2,3)=epstsr(2,3)+eps(6)
-                                    epstsr(2,1)=epstsr(2,1)+eps(4)
-                                    epstsr(3,1)=epstsr(3,1)+eps(5)
-                                    epstsr(3,2)=epstsr(3,2)+eps(6)
-                                end do 
-                                ! average strain in the element
-                                epstsr=epstsr/size(igpnt)  
+                                !~call extract(subbrick(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),strain=eps)                   
+                                !~    epstsr(1,1)=epstsr(1,1)+eps(1)
+                                !~    epstsr(2,2)=epstsr(2,2)+eps(2)
+                                !~    epstsr(3,3)=epstsr(3,3)+eps(3)
+                                !~    epstsr(1,2)=epstsr(1,2)+eps(4)
+                                !~    epstsr(1,3)=epstsr(1,3)+eps(5)
+                                !~    epstsr(2,3)=epstsr(2,3)+eps(6)
+                                !~    epstsr(2,1)=epstsr(2,1)+eps(4)
+                                !~    epstsr(3,1)=epstsr(3,1)+eps(5)
+                                !~    epstsr(3,2)=epstsr(3,2)+eps(6)
+                                !~end do 
+                                !~! average strain in the element
+                                !~epstsr=epstsr/size(igpnt)  
+                                call extract(subbrick(1),strain=eps)
+                                epstsr(1,1)=epstsr(1,1)+eps(1)
+                                epstsr(2,2)=epstsr(2,2)+eps(2)
+                                epstsr(3,3)=epstsr(3,3)+eps(3)
+                                epstsr(1,2)=epstsr(1,2)+eps(4)
+                                epstsr(1,3)=epstsr(1,3)+eps(5)
+                                epstsr(2,3)=epstsr(2,3)+eps(6)
+                                epstsr(2,1)=epstsr(2,1)+eps(4)
+                                epstsr(3,1)=epstsr(3,1)+eps(5)
+                                epstsr(3,2)=epstsr(3,2)+eps(6)
                                 do l=1,3
                                     write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                                 end do
@@ -924,17 +964,17 @@
                                 ! extract coh3d6 sub elem
                                 call extract(sub3d(i),coh3d6=subcoh3d6)
                                 epstsr=zero ! empty eps & eps tensor for reuse
-                                call extract(subcoh3d6(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),strain=eps)  
-                                    epstsr(3,3)=epstsr(3,3)+eps(1)
-                                    epstsr(1,3)=epstsr(1,3)+eps(2)
-                                    epstsr(3,1)=epstsr(3,1)+eps(2) 
-                                    epstsr(2,3)=epstsr(2,3)+eps(3)
-                                    epstsr(3,2)=epstsr(3,2)+eps(3)
-                                end do 
-                                ! average strain in the element
-                                epstsr=epstsr/size(igpnt)
+                                !~call extract(subcoh3d6(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),strain=eps)  
+                                !~    epstsr(3,3)=epstsr(3,3)+eps(1)
+                                !~    epstsr(1,3)=epstsr(1,3)+eps(2)
+                                !~    epstsr(3,1)=epstsr(3,1)+eps(2) 
+                                !~    epstsr(2,3)=epstsr(2,3)+eps(3)
+                                !~    epstsr(3,2)=epstsr(3,2)+eps(3)
+                                !~end do 
+                                !~! average strain in the element
+                                !~epstsr=epstsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                                 end do
@@ -944,17 +984,17 @@
                                 ! extract coh3d8 sub elem
                                 call extract(sub3d(i),coh3d8=subcoh3d8)
                                 epstsr=zero ! empty eps & eps tensor for reuse
-                                call extract(subcoh3d8(1),ig_point=igpnt)
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),strain=eps)  
-                                    epstsr(3,3)=epstsr(3,3)+eps(1)
-                                    epstsr(1,3)=epstsr(1,3)+eps(2)
-                                    epstsr(3,1)=epstsr(3,1)+eps(2) 
-                                    epstsr(2,3)=epstsr(2,3)+eps(3)
-                                    epstsr(3,2)=epstsr(3,2)+eps(3)
-                                end do 
-                                ! average strain in the element
-                                epstsr=epstsr/size(igpnt)
+                                !~call extract(subcoh3d8(1),ig_point=igpnt)
+                                !~do j=1,size(igpnt)
+                                !~    call extract(igpnt(j),strain=eps)  
+                                !~    epstsr(3,3)=epstsr(3,3)+eps(1)
+                                !~    epstsr(1,3)=epstsr(1,3)+eps(2)
+                                !~    epstsr(3,1)=epstsr(3,1)+eps(2) 
+                                !~    epstsr(2,3)=epstsr(2,3)+eps(3)
+                                !~    epstsr(3,2)=epstsr(3,2)+eps(3)
+                                !~end do 
+                                !~! average strain in the element
+                                !~epstsr=epstsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                                 end do

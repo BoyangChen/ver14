@@ -471,7 +471,8 @@
             end do
             
             ! update element ig point arrays
-            call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=delta,stress=Tau,sdv=ig_sdv)
+            !call update(elem%ig_point(kig),x=tmpx,u=tmpu,strain=delta,stress=Tau,sdv=ig_sdv)
+            call update(elem%ig_point(kig),sdv=ig_sdv)
             
             ! update elem curr status variable
             igstat=0
