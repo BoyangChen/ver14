@@ -289,12 +289,14 @@
             ! assign x to coords matrix
             if(allocated(xj)) then
                 coords(:,j)=xj(:)
+                deallocate(xj)
             else
                 write(msg_file,*)'WARNING: x not allocated for node:',elem%connec(j)
             end if
             ! and u to u vector
             if(allocated(uj)) then 
                 u((j-1)*ndim+1:j*ndim)=uj(1:ndim)
+                deallocate(uj)
             else
                 write(msg_file,*)'WARNING: u not allocated for node:',elem%connec(j)
             end if    
@@ -479,6 +481,7 @@
             if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
             elem%curr_status=max(elem%curr_status,igstat)
             
+            deallocate(ig_sdv)
             
        	end do !-looped over all int points. ig=nig
 

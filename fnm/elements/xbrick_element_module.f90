@@ -246,6 +246,9 @@ module xbrick_element_module
                     end do
                 end do
                 call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
+                deallocate(Ki)
+                deallocate(Fi)
+                deallocate(dofcnc)
             end do
 
  
@@ -272,6 +275,9 @@ module xbrick_element_module
                         end do
                     end do
                     call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
+                    deallocate(Ki)
+                    deallocate(Fi)
+                    deallocate(dofcnc)
                 end do          
             end if
                
@@ -291,6 +297,9 @@ module xbrick_element_module
                     end do
                 end do
                 call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
+                deallocate(Ki)
+                deallocate(Fi)
+                deallocate(dofcnc)
             end do
             
         else

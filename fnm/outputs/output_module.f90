@@ -1,7 +1,14 @@
       module output_module
       use parameter_module
-      use lib_node_module
-      use lib_elem_module
+      use xnode_module
+      use lib_node_module, only : lib_node
+      use wedge_element_module                                              
+      use brick_element_module                                              
+      use coh3d6_element_module                                             
+      use coh3d8_element_module                                             
+      use sub3d_element_module                                              
+      use xbrick_element_module
+      use lib_elem_module, only : lib_xbrick
       use integration_point_module
       
       implicit none
@@ -58,14 +65,10 @@
         
         
         ! sub element arrays
-        type(tri_element),allocatable   :: subtri(:)
-        type(quad_element),allocatable  :: subquad(:)
         type(wedge_element),allocatable :: subwedge(:)
         type(brick_element),allocatable :: subbrick(:)
-        type(coh2d_element),allocatable :: subcoh2d(:)
         type(coh3d6_element),allocatable :: subcoh3d6(:)
         type(coh3d8_element),allocatable :: subcoh3d8(:)
-        type(sub2d_element),allocatable :: sub2d(:)
         type(sub3d_element),allocatable :: sub3d(:)
         
         
@@ -339,22 +342,7 @@
                             case('wedge')
                                 ! extract wedge sub elem
                                 call extract(sub3d(i),wedge=subwedge)
-                                sigtsr=zero ! empty sig & eps tensor for reuse
-                                !~call extract(subwedge(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),stress=sig)                   
-                                !~    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                                !~    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                                !~    sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                                !~    sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                                !~end do 
-                                !~! average stress in the element
-                                !~sigtsr=sigtsr/size(igpnt)  
+                                sigtsr=zero ! empty sig & eps tensor for reuse  
                                 call extract(subwedge(1),stress=sig)
                                 sigtsr(1,1)=sigtsr(1,1)+sig(1)
                                 sigtsr(2,2)=sigtsr(2,2)+sig(2)
@@ -376,22 +364,7 @@
                             case('brick')
                                 ! extract brick sub elem
                                 call extract(sub3d(i),brick=subbrick)
-                                sigtsr=zero ! empty sig & eps tensor for reuse
-                                !~call extract(subbrick(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),stress=sig)                   
-                                !~    sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                                !~    sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                                !~    sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                                !~    sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                                !~end do 
-                                !~! average stress in the element
-                                !~sigtsr=sigtsr/size(igpnt)  
+                                sigtsr=zero ! empty sig & eps tensor for reuse 
                                 call extract(subbrick(1),stress=sig)
                                 sigtsr(1,1)=sigtsr(1,1)+sig(1)
                                 sigtsr(2,2)=sigtsr(2,2)+sig(2)
@@ -414,17 +387,6 @@
                                 ! extract coh3d6 sub elem
                                 call extract(sub3d(i),coh3d6=subcoh3d6)
                                 sigtsr=zero ! empty sig & eps tensor for reuse
-                                !~call extract(subcoh3d6(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),stress=sig)  
-                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                                !~end do 
-                                !~! average strain in the element
-                                !~sigtsr=sigtsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                                 end do
@@ -436,17 +398,6 @@
                                 ! extract coh3d8 sub elem
                                 call extract(sub3d(i),coh3d8=subcoh3d8)
                                 sigtsr=zero ! empty sig & eps tensor for reuse
-                                !~call extract(subcoh3d8(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),stress=sig)  
-                                !~    sigtsr(3,3)=sigtsr(3,3)+sig(1)
-                                !~    sigtsr(1,3)=sigtsr(1,3)+sig(2)
-                                !~    sigtsr(3,1)=sigtsr(3,1)+sig(2) 
-                                !~    sigtsr(2,3)=sigtsr(2,3)+sig(3)
-                                !~    sigtsr(3,2)=sigtsr(3,2)+sig(3)
-                                !~end do 
-                                !~! average strain in the element
-                                !~sigtsr=sigtsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
                                 end do
@@ -487,22 +438,7 @@
                             case('wedge')
                                 ! extract wedge sub elem
                                 call extract(sub3d(i),wedge=subwedge)
-                                epstsr=zero ! empty eps & eps tensor for reuse
-                                !~call extract(subwedge(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),strain=eps)                   
-                                !~    epstsr(1,1)=epstsr(1,1)+eps(1)
-                                !~    epstsr(2,2)=epstsr(2,2)+eps(2)
-                                !~    epstsr(3,3)=epstsr(3,3)+eps(3)
-                                !~    epstsr(1,2)=epstsr(1,2)+eps(4)
-                                !~    epstsr(1,3)=epstsr(1,3)+eps(5)
-                                !~    epstsr(2,3)=epstsr(2,3)+eps(6)
-                                !~    epstsr(2,1)=epstsr(2,1)+eps(4)
-                                !~    epstsr(3,1)=epstsr(3,1)+eps(5)
-                                !~    epstsr(3,2)=epstsr(3,2)+eps(6)
-                                !~end do 
-                                !~! average strain in the element
-                                !~epstsr=epstsr/size(igpnt)  
+                                epstsr=zero ! empty eps & eps tensor for reuse  
                                 call extract(subwedge(1),strain=eps)
                                 epstsr(1,1)=epstsr(1,1)+eps(1)
                                 epstsr(2,2)=epstsr(2,2)+eps(2)
@@ -524,22 +460,7 @@
                             case('brick')
                                 ! extract brick sub elem
                                 call extract(sub3d(i),brick=subbrick)
-                                epstsr=zero ! empty eps & eps tensor for reuse
-                                !~call extract(subbrick(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),strain=eps)                   
-                                !~    epstsr(1,1)=epstsr(1,1)+eps(1)
-                                !~    epstsr(2,2)=epstsr(2,2)+eps(2)
-                                !~    epstsr(3,3)=epstsr(3,3)+eps(3)
-                                !~    epstsr(1,2)=epstsr(1,2)+eps(4)
-                                !~    epstsr(1,3)=epstsr(1,3)+eps(5)
-                                !~    epstsr(2,3)=epstsr(2,3)+eps(6)
-                                !~    epstsr(2,1)=epstsr(2,1)+eps(4)
-                                !~    epstsr(3,1)=epstsr(3,1)+eps(5)
-                                !~    epstsr(3,2)=epstsr(3,2)+eps(6)
-                                !~end do 
-                                !~! average strain in the element
-                                !~epstsr=epstsr/size(igpnt)  
+                                epstsr=zero ! empty eps & eps tensor for reuse  
                                 call extract(subbrick(1),strain=eps)
                                 epstsr(1,1)=epstsr(1,1)+eps(1)
                                 epstsr(2,2)=epstsr(2,2)+eps(2)
@@ -562,17 +483,6 @@
                                 ! extract coh3d6 sub elem
                                 call extract(sub3d(i),coh3d6=subcoh3d6)
                                 epstsr=zero ! empty eps & eps tensor for reuse
-                                !~call extract(subcoh3d6(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),strain=eps)  
-                                !~    epstsr(3,3)=epstsr(3,3)+eps(1)
-                                !~    epstsr(1,3)=epstsr(1,3)+eps(2)
-                                !~    epstsr(3,1)=epstsr(3,1)+eps(2) 
-                                !~    epstsr(2,3)=epstsr(2,3)+eps(3)
-                                !~    epstsr(3,2)=epstsr(3,2)+eps(3)
-                                !~end do 
-                                !~! average strain in the element
-                                !~epstsr=epstsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                                 end do
@@ -584,17 +494,6 @@
                                 ! extract coh3d8 sub elem
                                 call extract(sub3d(i),coh3d8=subcoh3d8)
                                 epstsr=zero ! empty eps & eps tensor for reuse
-                                !~call extract(subcoh3d8(1),ig_point=igpnt)
-                                !~do j=1,size(igpnt)
-                                !~    call extract(igpnt(j),strain=eps)  
-                                !~    epstsr(3,3)=epstsr(3,3)+eps(1)
-                                !~    epstsr(1,3)=epstsr(1,3)+eps(2)
-                                !~    epstsr(3,1)=epstsr(3,1)+eps(2) 
-                                !~    epstsr(2,3)=epstsr(2,3)+eps(3)
-                                !~    epstsr(3,2)=epstsr(3,2)+eps(3)
-                                !~end do 
-                                !~! average strain in the element
-                                !~epstsr=epstsr/size(igpnt)
                                 do l=1,3
                                     write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
                                 end do
@@ -806,14 +705,10 @@
         if(allocated(connec)) deallocate(connec)
         if(allocated(x)) deallocate(x)
         if(allocated(disp)) deallocate(disp)
-        if(allocated(subtri)) deallocate(subtri)
-        if(allocated(subquad)) deallocate(subquad)
         if(allocated(subwedge)) deallocate(subwedge)
         if(allocated(subbrick)) deallocate(subbrick)
-        if(allocated(subcoh2d)) deallocate(subcoh2d)
         if(allocated(subcoh3d6)) deallocate(subcoh3d6)
         if(allocated(subcoh3d8)) deallocate(subcoh3d8)
-        if(allocated(sub2d)) deallocate(sub2d)
         if(allocated(sub3d)) deallocate(sub3d)        
         if(allocated(igpnt)) deallocate(igpnt)
         if(allocated(sig)) deallocate(sig)

@@ -252,12 +252,14 @@
             ! assign values to coords matrix and u vector
             if(allocated(xj)) then
                 coords(:,j)=xj(:)
+                deallocate(xj)
             else
                 write(msg_file,*)'WARNING: x not allocated for node:',elem%connec(j)
             end if
             
             if(allocated(uj)) then 
                 u((j-1)*ndim+1:j*ndim)=uj(1:ndim)
+                deallocate(uj)
             else
                 write(msg_file,*)'WARNING: u not allocated for node:',elem%connec(j)
             end if
@@ -563,6 +565,8 @@
             ! update elem stress & strain (weighted avg of ig point stress & strains)
             elem%stress=elem%stress+tmpstress*igwt(kig)
             elem%strain=elem%strain+tmpstrain*igwt(kig)
+            
+            deallocate(ig_sdv)
             
        	end do !-looped over all int points. ig=nig
         
