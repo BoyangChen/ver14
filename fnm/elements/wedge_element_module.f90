@@ -437,7 +437,9 @@
         ! update ig point xi and weight
         call init_ig(igxi,igwt)
           
-        
+        ! zero element stress and strain (used for output only) for update
+        elem%stress=zero
+        elem%strain=zero
         
         !-calculate strain,stress,stiffness,sdv etc. at each int point
       	do kig=1,nig 
@@ -562,9 +564,9 @@
             if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
             elem%curr_status=max(elem%curr_status,igstat)
 
-            ! update elem stress & strain (weighted avg of ig point stress & strains)
-            elem%stress=elem%stress+tmpstress*igwt(kig)
-            elem%strain=elem%strain+tmpstrain*igwt(kig)
+            ! update elem stress & strain (avg of ig point stress & strains)
+            elem%stress=elem%stress+tmpstress/nig
+            elem%strain=elem%strain+tmpstrain/nig
             
             deallocate(ig_sdv)
             
