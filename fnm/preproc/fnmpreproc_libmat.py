@@ -81,38 +81,12 @@ ninterface=len(list_interface) # no. of cohesive materials
 #***************************************************************
 #   Open Fortran modules to be written during pre-processing
 #***************************************************************
-lib_mat=open('lib_mat_module.f90','w')    # array of all materials
+lib_mat=open('init_lib_mat.f90','w')    # array of all materials
 
 
 #***************************************************************
 #       write lib_mat_module.f90
 #***************************************************************
-lib_mat.write('    !***************************************!                  \n')
-lib_mat.write('    !   the global library of materials     !                  \n')
-lib_mat.write('    !***************************************!                  \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    include "materials/isotropic_type_module.f90"              \n')
-lib_mat.write('    include "materials/lamina_type_module.f90"                 \n')
-lib_mat.write('    include "materials/interface_type_module.f90"              \n')
-lib_mat.write('    include "materials/material_module.f90"                    \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    module lib_mat_module                                      \n')
-lib_mat.write('    use parameter_module                                       \n')
-lib_mat.write('    use isotropic_type_module                                  \n')
-lib_mat.write('    use lamina_type_module                                     \n')
-lib_mat.write('    use interface_type_module                                  \n')
-lib_mat.write('    use material_module                                        \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    implicit none                                              \n')
-lib_mat.write('    save                                                       \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    type(material),       allocatable    :: lib_mat(:)         \n')
-lib_mat.write('    type(isotropic_type), allocatable    :: lib_iso(:)         \n')
-lib_mat.write('    type(lamina_type),    allocatable    :: lib_lamina(:)      \n')
-lib_mat.write('    type(interface_type), allocatable    :: lib_interface(:)   \n')
-lib_mat.write('                                                               \n')
-lib_mat.write('    contains                                                   \n')
-lib_mat.write('                                                               \n')
 lib_mat.write('    subroutine initialize_lib_mat()                            \n')
 lib_mat.write('                                                               \n')
 lib_mat.write('        integer :: i=0, nmat=0, niso=0, nlamina=0, ninterface=0\n')
@@ -153,13 +127,7 @@ if(nlamina>0):
         lib_mat.write('      & St='                +str(list_lamina[i].strength.St)+             '_dp),& \n')
         lib_mat.write('      & lamina_fibretoughness(& \n')  
         lib_mat.write('      & GfcT='                         +str(list_lamina[i].fibretoughness.GfcT)+      '_dp,& \n')
-        lib_mat.write('      & GfcC='                         +str(list_lamina[i].fibretoughness.GfcC)+      '_dp),& \n')
-        # matrix toughness is not needed in lamina type, as matrix crack is treated by a cohesive sub-element;
-        # matrix crack smeared crack model is not supported here in fnm lamina type
-        #lib_mat.write('      & lamina_matrixtoughness(& \n') 
-        #lib_mat.write('      & GmcI='                         +str(list_lamina[i].matrixtoughness.GmcI)+     '_dp,& \n')
-        #lib_mat.write('      & GmcII='                         +str(list_lamina[i].matrixtoughness.GmcII)+    '_dp,& \n')
-        #lib_mat.write('      & eta='                         +str(list_lamina[i].matrixtoughness.eta)+     '_dp),& \n')
+        lib_mat.write('      & GfcC='                         +str(list_lamina[i].fibretoughness.GfcC)+      '_dp)& \n')
         lib_mat.write('      & ) \n')
         lib_mat.write('\n')
 
@@ -188,5 +156,4 @@ if(ninterface>0):
 
 #   close lib_mat_module.f90
 lib_mat.write('    end subroutine initialize_lib_mat          \n')
-lib_mat.write('    end module lib_mat_module                  \n')
 lib_mat.close()

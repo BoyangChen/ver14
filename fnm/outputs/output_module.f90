@@ -1,14 +1,7 @@
       module output_module
       use parameter_module
-      use xnode_module
-      use lib_node_module, only : lib_node
-      use wedge_element_module                                              
-      use brick_element_module                                              
-      use coh3d6_element_module                                             
-      use coh3d8_element_module                                             
-      use sub3d_element_module                                              
-      use xbrick_element_module
-      use lib_elem_module, only : lib_xbrick
+      use lib_node_module
+      use lib_elem_module
       use integration_point_module
       
       implicit none

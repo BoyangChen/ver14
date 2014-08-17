@@ -14,6 +14,7 @@
     include 'libraries/lib_edge_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
+    include 'libraries/initialize_lib_module.f90'
     include 'outputs/output_module.f90'
 !------------------------------------------------------
 
@@ -25,10 +26,7 @@
     subroutine uexternaldb(lop,lrestart,time,dtime,kstep,kinc)
     use parameter_module
     use glb_clock_module
-    use lib_mat_module
-    use lib_node_module
-    use lib_edge_module
-    use lib_elem_module
+    use initialize_lib_module
     use output_module
 
     implicit none
@@ -76,8 +74,6 @@
         else if (lop .eq. 1) then
 !       start of the current increment
             call update_glb_clock(kstep,kinc)
-            !write(msg_file,*)'reach increment:',kinc
-            !call output(kstep,kinc,outdir)
         
         else if (lop .eq. 2) then
 !	    end of the increment 
@@ -88,6 +84,10 @@
         
         else if (lop .eq. 3) then
 !	    end of the analysis
+            deallocate(lib_node)
+            deallocate(lib_elem)
+            deallocate(lib_mat)
+            deallocate(lib_edge)
 
         end if
 

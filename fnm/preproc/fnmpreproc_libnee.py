@@ -31,33 +31,16 @@ nsvars=1        # no. of sol. dpdnt var. used and ouput by uel code to be determ
 #***************************************************************
 #   Open Fortran modules to be written during pre-processing
 #***************************************************************
-lib_node=open('lib_node_module.f90','w')  # array of all nodes
-lib_edge=open('lib_edge_module.f90','w')  # array of all edges
-lib_elem=open('lib_elem_module.f90','w')  # array of all elements
+lib_node=open('init_lib_node.f90','w')  # array of all nodes
+lib_edge=open('init_lib_edge.f90','w')  # array of all edges
+lib_elem=open('init_lib_elem.f90','w')  # array of all elements
 
 
 
 
 #***************************************************************
 #       write lib_node_module.f90
-#***************************************************************
-lib_node.write('    !***************************************! \n')
-lib_node.write('    !   the global library of nodes         ! \n')
-lib_node.write('    !***************************************! \n')
-lib_node.write('                                              \n')
-lib_node.write('    include "globals/xnode_module.f90"        \n')
-lib_node.write('                                              \n')   
-lib_node.write('    module lib_node_module                    \n')
-lib_node.write('    use parameter_module                      \n')
-lib_node.write('    use xnode_module                          \n')
-lib_node.write('                                              \n')   
-lib_node.write('    implicit none                             \n')
-lib_node.write('    save                                      \n')
-lib_node.write('                                              \n')   
-lib_node.write('    type(xnode),allocatable :: lib_node(:)    \n')
-lib_node.write('                                              \n')   
-lib_node.write('    contains                                  \n')
-lib_node.write('                                              \n')    
+#***************************************************************    
 lib_node.write('    subroutine initialize_lib_node()          \n')
 lib_node.write('                                              \n')
 lib_node.write('        integer :: nnode=0                    \n')   
@@ -70,20 +53,6 @@ lib_node.write('        integer :: i=0                        \n')
 #***************************************************************
 #       write lib_edge_module.f90
 #***************************************************************
-lib_edge.write('    !***************************************! \n')
-lib_edge.write('    !   the global library of edges         ! \n')
-lib_edge.write('    !***************************************! \n')
-lib_edge.write('                                              \n')    
-lib_edge.write('    module lib_edge_module                    \n')
-lib_edge.write('    use parameter_module                      \n')
-lib_edge.write('                                              \n')
-lib_edge.write('    implicit none                             \n')
-lib_edge.write('    save                                      \n')
-lib_edge.write('                                              \n')
-lib_edge.write('    integer,allocatable :: lib_edge(:)        \n')
-lib_edge.write('                                              \n')
-lib_edge.write('    contains                                  \n')
-lib_edge.write('                                              \n')
 lib_edge.write('    subroutine initialize_lib_edge()          \n')
 lib_edge.write('                                              \n')
 lib_edge.write('        integer :: nedge=0                    \n')
@@ -98,65 +67,8 @@ lib_edge.write('                                              \n')
 
 #***************************************************************
 #       write lib_elem_module.f90
-#***************************************************************
-lib_elem.write('    !***************************************!                             \n')
-lib_elem.write('    !   the global library of elements      !                             \n')
-lib_elem.write('    !***************************************!                             \n')
-#if(ndim==2)
-lib_elem.write('    include "elements/tri_element_module.f90"                             \n')
-lib_elem.write('    include "elements/quad_element_module.f90"                            \n')
-lib_elem.write('    include "elements/coh2d_element_module.f90"                           \n')
-lib_elem.write('    include "elements/sub2d_element_module.f90"                           \n')
-lib_elem.write('    include "elements/xquad_element_module.f90"                           \n')
-#else
-lib_elem.write('    include "elements/wedge_element_module.f90"                           \n')
-lib_elem.write('    include "elements/brick_element_module.f90"                           \n')
-lib_elem.write('    include "elements/coh3d6_element_module.f90"                          \n')
-lib_elem.write('    include "elements/coh3d8_element_module.f90"                          \n')
-lib_elem.write('    include "elements/sub3d_element_module.f90"                           \n')
-lib_elem.write('    include "elements/xbrick_element_module.f90"                          \n')
-#end
-lib_elem.write('    include "elements/element_module.f90"                                 \n')
-lib_elem.write('                                                                          \n')
-lib_elem.write('                                                                          \n')
-lib_elem.write('    module lib_elem_module                                                \n')
-lib_elem.write('    use parameter_module                                                  \n')
-#if(ndim==2)
-lib_elem.write('    use tri_element_module                                                \n')
-lib_elem.write('    use quad_element_module                                               \n')
-lib_elem.write('    use coh2d_element_module                                              \n')
-lib_elem.write('    use sub2d_element_module                                              \n')
-lib_elem.write('    use xquad_element_module                                              \n')
-#else
-lib_elem.write('    use wedge_element_module                                              \n')
-lib_elem.write('    use brick_element_module                                              \n')
-lib_elem.write('    use coh3d6_element_module                                             \n')
-lib_elem.write('    use coh3d8_element_module                                             \n')
-lib_elem.write('    use sub3d_element_module                                              \n')
-lib_elem.write('    use xbrick_element_module                                             \n')
-#end
-lib_elem.write('    use element_module                                                    \n')
-lib_elem.write('                                                                          \n')
-lib_elem.write('    implicit none                                                         \n')
-lib_elem.write('    save                                                                  \n')
-lib_elem.write('                                                                          \n')
-lib_elem.write('    type(element),          allocatable :: lib_elem(:)                    \n')
-#if(ndim==2)     
-lib_elem.write('    type(tri_element),      allocatable :: lib_tri(:)                     \n')
-lib_elem.write('    type(quad_element),     allocatable :: lib_quad(:)                    \n')
-lib_elem.write('    type(coh2d_element),    allocatable :: lib_coh2d(:)                   \n')
-lib_elem.write('    type(xquad_element),    allocatable :: lib_xquad(:)                   \n')
-#else
-lib_elem.write('    type(wedge_element),    allocatable :: lib_wedge(:)                   \n')
-lib_elem.write('    type(brick_element),    allocatable :: lib_brick(:)                   \n')
-lib_elem.write('    type(coh3d6_element),   allocatable :: lib_coh3d6(:)                  \n')
-lib_elem.write('    type(coh3d8_element),   allocatable :: lib_coh3d8(:)                  \n')  
-lib_elem.write('    type(xbrick_element),   allocatable :: lib_xbrick(:)                  \n')
-#end
-lib_elem.write('                                                                          \n')   
-lib_elem.write('    contains                                                              \n')
-lib_elem.write('                                                                          \n')    
-lib_elem.write('    subroutine initialize_lib_elem                                        \n')
+#***************************************************************    
+lib_elem.write('    subroutine initialize_lib_elem()                                      \n')
 lib_elem.write('                                                                          \n') 
 lib_elem.write('        integer ::  nelem=0, ntri=0, nquad=0, nwedge=0, nbrick=0 &        \n')
 lib_elem.write('        &          ,ncoh2d=0, ncoh3d6=0, ncoh3d8=0, nsub2d=0, nsub3d=0 &  \n')
@@ -521,15 +433,12 @@ for line in lines[ln:]:
 
 #   close lib_node_module.f90
 lib_node.write('    end subroutine initialize_lib_node        \n')
-lib_node.write('    end module lib_node_module                \n')
 lib_node.close()
 #   close lib_node_module.f90
 lib_edge.write('    end subroutine initialize_lib_edge        \n')
-lib_edge.write('    end module lib_edge_module                \n')
 lib_edge.close()
 #   close lib_elem_module.f90
 lib_elem.write('    end subroutine initialize_lib_elem        \n')
-lib_elem.write('    end module lib_elem_module                \n')
 lib_elem.close()
 
 
