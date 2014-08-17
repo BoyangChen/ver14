@@ -42,6 +42,23 @@
     type(brick_element),    allocatable :: lib_brick(:)                   
     type(coh3d6_element),   allocatable :: lib_coh3d6(:)                  
     type(coh3d8_element),   allocatable :: lib_coh3d8(:)                  
-    type(xbrick_element),   allocatable :: lib_xbrick(:)                  
+    type(xbrick_element),   allocatable :: lib_xbrick(:)     
+
+    contains
+    
+    subroutine empty_lib_elem()
+    
+    if(allocated(lib_elem)) deallocate(lib_elem)                     
+    if(allocated(lib_tri)) deallocate(lib_tri)                    
+    if(allocated(lib_quad)) deallocate(lib_quad)                    
+    if(allocated(lib_coh2d)) deallocate(lib_coh2d)                
+    if(allocated(lib_xquad)) deallocate(lib_xquad)                   
+    if(allocated(lib_wedge)) deallocate(lib_wedge)                 
+    if(allocated(lib_brick)) deallocate(lib_brick)                  
+    if(allocated(lib_coh3d6)) deallocate(lib_coh3d6)                 
+    if(allocated(lib_coh3d8)) deallocate(lib_coh3d8)                  
+    if(allocated(lib_xbrick)) deallocate(lib_xbrick)
+    
+    end subroutine empty_lib_elem
                                                         
     end module lib_elem_module                

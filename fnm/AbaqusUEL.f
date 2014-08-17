@@ -84,11 +84,12 @@
         
         else if (lop .eq. 3) then
 !	    end of the analysis
-            deallocate(lib_node)
-            deallocate(lib_elem)
-            deallocate(lib_mat)
-            deallocate(lib_edge)
-
+            call empty_lib_mat
+            call empty_lib_node
+            call empty_lib_edge
+            call empty_lib_elem
+            
+      
         end if
 
 

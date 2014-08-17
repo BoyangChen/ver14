@@ -21,6 +21,16 @@
     type(isotropic_type), allocatable    :: lib_iso(:)         
     type(lamina_type),    allocatable    :: lib_lamina(:)      
     type(interface_type), allocatable    :: lib_interface(:)   
-                                                            
+    
+    contains
+    
+    subroutine empty_lib_mat()  
+                              
+    if(allocated(lib_mat)) deallocate(lib_mat)
+    if(allocated(lib_iso)) deallocate(lib_iso)
+    if(allocated(lib_lamina)) deallocate(lib_lamina)
+    if(allocated(lib_interface)) deallocate(lib_interface)
+
+    end subroutine empty_lib_mat
     
     end module lib_mat_module                  
