@@ -259,7 +259,7 @@
             sdv%i(2)=ffstat
             ! update ddsdde
             df=sdv%r(1) ! fibre stiffness degradation
-            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)   ! fibre damage also affects matrix
             ! update stress
             sig=matmul(dee,strain)
         end if
@@ -343,7 +343,7 @@
             E3=E3*(one-dm3)
             nu31=nu31*(one-dm3)
             nu32=nu32*(one-dm3)
-            G13=G13*(one-dm2)
+            G13=G13*(one-dm3)
             dm=max(dm,dm3)
 
             E3=max(E3,Kres)
