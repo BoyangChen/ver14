@@ -215,10 +215,7 @@
         integer :: i,j,kig,igstat
         
         ! variables used for calculating clength
-        real(kind=dp)   :: clength
-        real(kind=dp)   :: xo,yo,xp1,yp1,xp2,yp2,x1,y1,x2,y2,xct,yct,xct1,yct1,xct2,yct2
-        real(kind=dp)   :: a1,b1,a2,b2,xmid,ymid,xmid1,ymid1,xmid2,ymid2,detlc,ctip(2,2)
-        integer :: nfailedge,iscross,ifedg(nedge)
+        real(kind=dp)   :: clength,ctip(2,2)
 
         logical :: nofail
         
@@ -279,135 +276,7 @@
         !-----------------------------------------------------------!
         ! initialize relevant variables
         clength=zero
-        xo=zero; yo=zero; xp1=zero; yp1=zero; xp2=zero; yp2=zero
-        x1=zero; y1=zero; x2=zero; y2=zero; xct=zero; yct=zero
-        xct1=zero; yct1=zero; xct2=zero; yct2=zero
-        a1=zero; b1=zero; a2=zero; b2=zero
-        xmid=zero; ymid=zero; xmid1=zero; ymid1=zero; xmid2=zero; ymid2=zero
-        detlc=zero; ctip=zero
-        nfailedge=0; iscross=0; ifedg=0
-        
-        ! find centroid
-        xo=one_third*(coords(1,1)+coords(1,2)+coords(1,3))
-        yo=one_third*(coords(2,1)+coords(2,2)+coords(2,3))
-        xp1=xo
-        yp1=yo
-        ! find xp2, yp2
-        xp2=xp1+cos(theta/halfcirc*pi)
-        yp2=yp1+sin(theta/halfcirc*pi)
-        do i=1,nedge 
-            ! tip corods of edge i
-            x1=coords(1,edg(1,i))
-            y1=coords(2,edg(1,i))
-            x2=coords(1,edg(2,i))
-            y2=coords(2,edg(2,i))
-            iscross=0
-            xct=zero
-            yct=zero
-            call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
-            if (iscross.gt.0) then
-                nfailedge=nfailedge+1
-                ifedg(nfailedge)=i
-                ctip(:,nfailedge)=[xct,yct]
-             endif
-             if(nfailedge==2) exit ! found 2 broken edges already
-        end do
-
-
-        ! badly shaped element may have large angles; e.g.: 3 or all edges almost parallel to crack, then numerical error may
-        ! prevent the algorithm from finding any broken edge or only one broken edge
-
-        if(nfailedge==0) then
-        ! use trial lines: connecting midpoints of two edges and find the most parrallel-to-crack one
-
-            ! the following algorithm will find two broken edges
-            nfailedge=2
-            ! line equation constants of the crack
-            a2=sin(theta/halfcirc*pi)
-            b2=-cos(theta/halfcirc*pi)
-            ! connecting midpoints of two edges and find the most parrallel one
-            do i=1,nedge-1
-                ! tip coords of edge i
-                x1=coords(1,edg(1,i))
-                y1=coords(2,edg(1,i))
-                x2=coords(1,edg(2,i))
-                y2=coords(2,edg(2,i))
-                ! mid point of edge i
-                xmid1=half*(x1+x2)
-                ymid1=half*(y1+y2)
-                ! loop over midpoints of other edges
-                do j=i+1,nedge
-                    ! tip coords of edge j
-                    x1=coords(1,edg(1,j))
-                    y1=coords(2,edg(1,j))
-                    x2=coords(1,edg(2,j))
-                    y2=coords(2,edg(2,j))
-                    ! mid point of edge j
-                    xmid2=half*(x1+x2)
-                    ymid2=half*(y1+y2)
-                    ! line equation constants of midpoint1-midpoint2
-                    a1=ymid1-ymid2
-                    b1=xmid2-xmid1
-                    ! initialize detlc and intersection info
-                    if(i==1 .and. j==2) then
-                        detlc=a1*b2-a2*b1
-                        xct1=xmid1
-                        yct1=ymid1
-                        xct2=xmid2
-                        yct2=ymid2
-                    end if
-                    ! find the most parallel trial line and update stored info
-                    if(abs(a1*b2-a2*b1)<abs(detlc)) then
-                        xct1=xmid1
-                        yct1=ymid1
-                        xct2=xmid2
-                        yct2=ymid2
-                    endif
-                end do
-            end do
-            ctip(:,1)=[xct1,yct1] 
-            ctip(:,2)=[xct2,yct2]
-
-        else if(nfailedge==1) then                
-        ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
-
-            ! the following algorithm will find the second broken edge
-            nfailedge=2
-            ! existing crack tip coords
-            xp1=xct
-            yp1=yct
-            ! crack line equation constants
-            a2=sin(theta/halfcirc*pi)
-            b2=-cos(theta/halfcirc*pi)
-            ! find the midpoint which forms the most parrallel-to-crack line with (xp1,yp1)
-            do i=1,nedge
-                if (i==ifedg(1)) cycle
-                ! tip coords of edge i
-                x1=coords(1,edg(1,i))
-                y1=coords(2,edg(1,i))
-                x2=coords(1,edg(2,i))
-                y2=coords(2,edg(2,i))
-                ! mid point of edge i
-                xmid=half*(x1+x2)
-                ymid=half*(y1+y2)
-                ! line equation constants of midpoint-(xp1,yp1)
-                a1=ymid-yp1
-                b1=xp1-xmid
-                ! initialize detlc and intersection info
-                if(i==1 .or. (ifedg(1)==1 .and. i==2)) then
-                    detlc=a1*b2-a2*b1
-                    xct=xmid
-                    yct=ymid
-                end if
-                ! find the most parallel trial line and update stored info
-                if(abs(a1*b2-a2*b1)<abs(detlc)) then
-                    xct=xmid
-                    yct=ymid
-                endif
-            end do
-            ctip(:,2)=[xct,yct]
-        end if 
-
+        call elem_ctips_origin('wedge',theta,coords,edg,nedge,ctip)
         clength=sqrt((ctip(1,2)-ctip(1,1))**2+(ctip(2,2)-ctip(2,1))**2)
         
         !-----------------------------------------------------------!
