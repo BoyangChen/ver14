@@ -259,7 +259,7 @@
             sdv%i(2)=ffstat
             ! update ddsdde
             df=sdv%r(1) ! fibre stiffness degradation
-            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)   ! fibre damage also affects matrix
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
             ! update stress
             sig=matmul(dee,strain)
         end if
@@ -279,7 +279,12 @@
         ! update sdv
         if(mfstat>=mfonset) sdv%i(3)=mfstat
         
-        
+        !~! degrade matrix stiffness if fibres have all failed
+        !~if(ffstat==ffailed .and. mfstat>=mfonset) then
+        !~    call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)
+        !~    ! update stress
+        !~    sig=matmul(dee,strain)
+        !~end if
         
         ! update stress
         if(present(stress)) stress=sig
