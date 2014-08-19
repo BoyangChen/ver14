@@ -11,7 +11,8 @@
     include "elements/coh3d6_element_module.f90"                          
     include "elements/coh3d8_element_module.f90"                          
     include "elements/sub3d_element_module.f90"                           
-    include "elements/xbrick_element_module.f90"                          
+    include "elements/xbrick_element_module.f90"    
+    include "elements/xlam_element_module.f90"
     include "elements/element_module.f90"                                 
                                                                           
                                                                           
@@ -27,7 +28,8 @@
     use coh3d6_element_module                                             
     use coh3d8_element_module                                             
     use sub3d_element_module                                              
-    use xbrick_element_module                                             
+    use xbrick_element_module  
+    use xlam_element_module
     use element_module                                                    
                                                                           
     implicit none                                                         
@@ -42,7 +44,8 @@
     type(brick_element),    allocatable :: lib_brick(:)                   
     type(coh3d6_element),   allocatable :: lib_coh3d6(:)                  
     type(coh3d8_element),   allocatable :: lib_coh3d8(:)                  
-    type(xbrick_element),   allocatable :: lib_xbrick(:)     
+    type(xbrick_element),   allocatable :: lib_xbrick(:) 
+    type(xlam_element),     allocatable :: lib_xlam(:)
 
     contains
     
@@ -58,6 +61,7 @@
     if(allocated(lib_coh3d6)) deallocate(lib_coh3d6)                 
     if(allocated(lib_coh3d8)) deallocate(lib_coh3d8)                  
     if(allocated(lib_xbrick)) deallocate(lib_xbrick)
+    if(allocated(lib_xlam)) deallocate(lib_xlam)
     
     end subroutine empty_lib_elem
                                                         
