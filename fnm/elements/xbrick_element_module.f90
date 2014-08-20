@@ -1,5 +1,6 @@
 module xbrick_element_module
     use parameter_module
+    use glb_clock_module
     use toolkit_module                  ! global tools for element integration
     use lib_edge_module                 ! global edge library
     use lib_node_module                 ! global node library
@@ -25,7 +26,10 @@ module xbrick_element_module
         
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
-        integer :: ifailedge(nedge)=0       ! indices of failed edges
+        integer :: ifailedge(nedge)=0   ! indices of failed edges
+        
+        logical :: newpartition=.false. ! true when elem is changing partition, no failure should be considered then
+        integer :: nstep=0, ninc=0      ! to store curr step and increment no.
         
         type(sub3d_element), allocatable :: subelem(:)
         type(int_alloc_array), allocatable :: subcnc(:)      ! sub_elem connec to parent elem nodes
@@ -78,6 +82,10 @@ module xbrick_element_module
         elem%edgecnc=0
         elem%ifailedge=0
         
+        elem%newpartition=.false.
+        elem%nstep=0
+        elem%ninc=0
+        
         if(allocated(elem%subelem)) deallocate(elem%subelem)
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
 
@@ -104,7 +112,8 @@ module xbrick_element_module
     end subroutine prepare_xbrick_element
     
     
-    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc,ifailedge,subelem,subcnc)
+    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc, &
+    & ifailedge,newpartition,nstep,ninc,subelem,subcnc)
     
         type(xbrick_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
@@ -114,6 +123,8 @@ module xbrick_element_module
         integer,            allocatable,optional, intent(out) :: nodecnc(:)
         integer,            allocatable,optional, intent(out) :: edgecnc(:)
         integer,            allocatable,optional, intent(out) :: ifailedge(:)
+        logical,                        optional, intent(out) :: newpartition
+        integer,                        optional, intent(out) :: nstep, ninc
         type(sub3d_element),allocatable,optional, intent(out) :: subelem(:)
         type(int_alloc_array),allocatable,optional,intent(out):: subcnc(:)
 
@@ -136,6 +147,12 @@ module xbrick_element_module
             allocate(ifailedge(nedge))
             ifailedge=elem%ifailedge
         end if
+        
+        if(present(newpartition)) newpartition=elem%newpartition
+        
+        if(present(nstep)) nstep=elem%nstep
+        
+        if(present(ninc)) ninc=elem%ninc
         
         if(present(subelem)) then
             if(allocated(elem%subelem)) then
@@ -172,6 +189,10 @@ module xbrick_element_module
         integer, allocatable :: dofcnc(:)
         
         logical :: nofailure
+        
+        ! - glb clock step and increment no. extracted from glb clock module
+        integer :: curr_step, curr_inc
+        logical :: last_converged               ! true if last iteration has converged: a new increment/step has started
     
     
         ! initialize K & F
@@ -182,9 +203,23 @@ module xbrick_element_module
         i=0; j=0; l=0
         elstat=0
         nofailure=.false.
+        curr_step=0; curr_inc=0
+        last_converged=.false.
 
 
+        ! - extract curr step and inc values from glb clock module
+        call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
         
+        ! - check if last iteration has converged, and update the current step & increment no.
+        if(elem%nstep.ne.curr_step .or. elem%ninc.ne.curr_inc) then
+            last_converged=.true.
+            elem%nstep = curr_step
+            elem%ninc = curr_inc
+            elem%newpartition=.false.   ! last incr. partition has converged, failure can now be modelled
+        end if
+
+        ! extract nofailure value; if newpartition is true, nofailure is also true
+        nofailure=elem%newpartition
         
 
         !---------------------------------------------------------------------!
@@ -195,7 +230,7 @@ module xbrick_element_module
         if(elem%curr_status<elfail) then 
             elstat=elem%curr_status  
             call edge_status_partition(elem) 
-            ! if there's new partitions, wait until the next iteration to do failure
+            ! if there's new partitions, wait until the next increment to do failure
             if(elstat/=elem%curr_status) nofailure=.true.
         end if
         
@@ -307,7 +342,8 @@ module xbrick_element_module
             call exit_function
         end if
         
-         
+        ! update newpartition
+        elem%newpartition=nofailure
         
         !---------------------------------------------------------------------!
         !               deallocate local arrays 

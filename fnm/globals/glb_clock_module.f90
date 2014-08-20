@@ -13,7 +13,8 @@
     save
 
     integer       :: curr_step, curr_inc
-    real(kind=dp) :: curr_time, curr_dtime    
+    real(kind=dp) :: curr_time, curr_dtime 
+    real(kind=dp) :: curr_pnewdt
     
     
     public :: extract_glb_clock, update_glb_clock, initialize_glb_clock
@@ -32,15 +33,16 @@
         curr_inc=0
         curr_time=zero
         curr_dtime=zero
+        curr_pnewdt=one
     
     end subroutine
     
     
     
     
-    subroutine extract_glb_clock(kstep,kinc,time,dtime)
+    subroutine extract_glb_clock(kstep,kinc,time,dtime,pnewdt)
         integer, optional, intent(out) :: kstep, kinc
-        real(dp),optional, intent(out) :: time, dtime
+        real(dp),optional, intent(out) :: time, dtime, pnewdt
         
         if(present(kstep)) kstep=curr_step
         
@@ -49,14 +51,16 @@
         if(present(time)) time=curr_time
         
         if(present(dtime)) dtime=curr_dtime
+        
+        if(present(pnewdt)) pnewdt=curr_pnewdt
     
     end subroutine
     
     
     
-    subroutine update_glb_clock(kstep,kinc,time,dtime)
+    subroutine update_glb_clock(kstep,kinc,time,dtime,pnewdt)
         integer, optional, intent(in) :: kstep, kinc
-        real(dp),optional, intent(in) :: time, dtime
+        real(dp),optional, intent(in) :: time, dtime ,pnewdt
         
         if(present(kstep)) curr_step=kstep
         
@@ -65,6 +69,8 @@
         if(present(time)) curr_time=time
         
         if(present(dtime)) curr_dtime=dtime
+        
+        if(present(pnewdt)) curr_pnewdt=pnewdt
     
     end subroutine
     

@@ -39,10 +39,13 @@
     character(len=dirlength)    :: workdir
     integer                     :: lenworkdir
     integer                     :: freq
+    real(dp)                    :: prvdtime,crrpnewdt
 
         workdir=''
         lenworkdir=0
         freq=0
+        prvdtime=zero
+        crrpnewdt=zero
 
         ! output frequency x: once every x increments
         freq=10
@@ -73,7 +76,19 @@
 
         else if (lop .eq. 1) then
 !       start of the current increment
-            call update_glb_clock(kstep,kinc)
+            !~call extract_glb_clock(dtime=prvdtime)            
+            !~
+            !~if(abs(dtime-prvdtime)>tiny(one)) then
+            !~! a change in dtime, update pnewdt
+            !~    if(prvdtime>tiny(one)) then
+            !~        crrpnewdt=dtime/prvdtime
+            !~        call update_glb_clock(pnewdt=crrpnewdt)
+            !~    end if
+            !~end if
+            
+            call update_glb_clock(kstep,kinc,time(2),dtime)
+            
+            
         
         else if (lop .eq. 2) then
 !	    end of the increment 
@@ -145,6 +160,12 @@
     character(len=eltypelength) :: eltype
     integer                     :: typekey
     
+    ! curr status of this elem
+    integer                 :: elstat0, elstat1
+    
+    ! curr pnewdt of analysis
+    real(dp)                :: curr_pnewdt
+    
     ! nodal cnc of this elem
     integer, allocatable    :: cnc(:)
     
@@ -153,6 +174,8 @@
     
     uj=zero; duj=zero; vj=zero; aj=zero
     i=0; j=0; l=0
+    elstat0=0; elstat1=0
+    curr_pnewdt=one
     
     
     !---------------------------------------------------------------------------------!
@@ -165,11 +188,14 @@
     ! extract elname, eltype and typekey
     call extract(elem,elname,eltype,typekey)
     
+    ! extract current pnewdt
+    call extract_glb_clock(pnewdt=curr_pnewdt)
+    
     ! extract nodal cnc based on element type
     select case(eltype)
         case('xbrick')
             ! extract nodal cnc from this elem
-            call extract(lib_xbrick(typekey),nodecnc=cnc)
+            call extract(lib_xbrick(typekey),nodecnc=cnc,curr_status=elstat0)
         case('coh3d8')
             ! extract nodal cnc from this elem
             call extract(lib_coh3d8(typekey),connec=cnc)
@@ -203,6 +229,7 @@
     select case(eltype)
         case('xbrick')
             call integrate(lib_xbrick(typekey),Kmat,Fvec)
+            call extract(lib_xbrick(typekey),curr_status=elstat1)
         case('coh3d8')
             call integrate(lib_coh3d8(typekey),Kmat,Fvec)
         case default
@@ -210,8 +237,17 @@
             call exit_function
     end select  
     
-    
-    
+    !~! if failure has started in one elem, reduce the current time increment to 1/10
+    !~! abaqus will restart the curr increment with new dtime
+    !~! with this algorithm, dtime reduction will only be done once
+    !~if(elstat0/=elstat1) then
+    !~! elem has new partition
+    !~    if(abs(curr_pnewdt-one)<=tiny(one)) then
+    !~    ! time step has not been reduced yet
+    !~        pnewdt=one/ten
+    !~    end if
+    !~end if
+        
     
     
     !---------------------------------------------------------------------------------!
