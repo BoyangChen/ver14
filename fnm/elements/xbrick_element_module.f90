@@ -207,26 +207,37 @@ module xbrick_element_module
         last_converged=.false.
 
 
-!~        ! - extract curr step and inc values from glb clock module
-!~        call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
-!~        
-!~        ! - check if last iteration has converged, and update the current step & increment no.
-!~        if(elem%nstep.ne.curr_step .or. elem%ninc.ne.curr_inc) then
-!~            last_converged=.true.
-!~            elem%nstep = curr_step
-!~            elem%ninc = curr_inc
-!~            elem%newpartition=.false.   ! last incr. partition has converged, failure can now be modelled
-!~        end if
-!~
-!~        ! extract nofailure value; if newpartition is true, nofailure is also true
-!~        nofailure=elem%newpartition
+        ! - extract curr step and inc values from glb clock module
+        call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
+        
+        ! - check if last iteration has converged, and update the current step & increment no.
+        if(elem%nstep.ne.curr_step .or. elem%ninc.ne.curr_inc) then
+            last_converged=.true.
+            elem%nstep = curr_step
+            elem%ninc = curr_inc
+            elem%newpartition=.false.   ! last incr. partition has converged, failure can now be modelled
+        end if
+
+        ! extract nofailure value; if newpartition is true, nofailure is also true
+        nofailure=elem%newpartition
         
 
         !---------------------------------------------------------------------!
         !               update sub element definitions
         !---------------------------------------------------------------------!
+     
+        ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
+        if(elem%curr_status<elfail) then 
+            elstat=elem%curr_status  
+            call edge_status_partition(elem) 
+            ! if there's new partitions, wait until the next increment to do failure
+            if(elstat/=elem%curr_status) nofailure=.true.
+        end if
         
-        ! if elem is intact, assign sub elem if not yet done
+        !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
+
+
+        ! if elem is still intact after checking edge status (no broken edges), assign 1 brick subelem if not yet done
         if(elem%curr_status==intact) then 
             if(.not.allocated(elem%subelem)) then 
                 allocate(elem%subelem(1))
@@ -240,30 +251,7 @@ module xbrick_element_module
                 ! create sub elements
                 call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
             end if
-            
-            ! integrate and check failure
-            
-            ! if matrix failure, partition and reintegrate, sub elem no failure until cohesive failed
-            
-            ! if fibre failure, partition and reintegrate, sub elem no failure until next increment (stabilize); add df to matrix
-            
-            ! if no failure, check edge status variable
-            
         end if 
-        
-     
-        ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
-        if(elem%curr_status<elmfail) then 
-            elstat=elem%curr_status  
-            call edge_status_partition(elem) 
-            ! if there's new partitions, wait until the next increment to do failure
-            if(elstat/=elem%curr_status) nofailure=.true.
-        end if
-        
-        !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
-
-
-
         
         !******* reaching here, elem curr status can be any value from intact to failed, and in all cases, subelems have been created
 
@@ -275,7 +263,7 @@ module xbrick_element_module
         !---------------------------------------------------------------------!        
         
         ! if elem is not yet failed, integrate sub elem and check the failure criterion, and repartition if necessary
-        if(elem%curr_status<elmfail) then
+        if(elem%curr_status<elfail) then
             ! store current status value
             elstat=elem%curr_status
             
@@ -328,7 +316,7 @@ module xbrick_element_module
                 end do          
             end if
                
-        else if(elem%curr_status==elmfail) then
+        else if(elem%curr_status==elfail) then
         ! element is already failed, integrate and assemble subelem
             
         
@@ -651,7 +639,7 @@ module xbrick_element_module
                 elstat=elwake
             else if(edgstat(jbe1)>=cohcrack .and. edgstat(jbe2)>=cohcrack) then
             ! cracked elem, cohesive/stress-free crack
-                elstat=elmfail
+                elstat=elfail
             else ! unknown combination
                 write(msg_file,*)'unknown combination of 2 edge status!'
                 call exit_function
@@ -775,7 +763,7 @@ module xbrick_element_module
     !
     ! --------------------------------------------------------------------!
     
-        if(elem%curr_status==elmfail) return ! elem already failed, no need to proceed
+        if(elem%curr_status==elfail) return ! elem already failed, no need to proceed
     
         ! initialize local variables
         
@@ -1112,7 +1100,7 @@ module xbrick_element_module
                     xelm(3,edg(3,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
                     xelm(3,edg(4,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
                     
-                else if (elstat.gt.eltrans .and. elstat.lt.elmfail) then 
+                else if (elstat.gt.eltrans .and. elstat.lt.elfail) then 
                 ! element already has two edges partitioned; just update edge status var to coh crack status
 
                     nfailedge=4
@@ -1129,7 +1117,7 @@ module xbrick_element_module
           
           
             ! update the elstat to failed status value
-            elstat=elmfail
+            elstat=elfail
                         
 
     !       update element curr_status and sub-element cnc matrices

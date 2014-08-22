@@ -17,7 +17,7 @@
         integer, parameter :: intact=0
         
         ! element status variable values
-        integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elmfail=5, elffail=6
+        integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfail=5
         
         ! edge status variable values
         integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
