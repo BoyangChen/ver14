@@ -494,10 +494,10 @@
             ! fstat remains intact; dm, u0 and uf remain zero as initialized
                 continue
             end if
-        end if
+        !end if
         
         ! failure started
-        if(fstat==ffonset) then
+        else if(fstat==ffonset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure

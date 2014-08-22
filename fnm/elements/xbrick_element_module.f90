@@ -34,6 +34,8 @@ module xbrick_element_module
         type(sub3d_element), allocatable :: subelem(:)
         type(int_alloc_array), allocatable :: subcnc(:)      ! sub_elem connec to parent elem nodes
         
+        type(sdv_array), allocatable :: sdv(:)
+        
     end type xbrick_element
   
     interface empty
@@ -88,6 +90,7 @@ module xbrick_element_module
         
         if(allocated(elem%subelem)) deallocate(elem%subelem)
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
+        if(allocated(elem%sdv)) deallocate(elem%sdv)
 
     end subroutine empty_xbrick_element
   
@@ -113,7 +116,7 @@ module xbrick_element_module
     
     
     subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc, &
-    & ifailedge,newpartition,nstep,ninc,subelem,subcnc)
+    & ifailedge,newpartition,nstep,ninc,subelem,subcnc,sdv)
     
         type(xbrick_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
@@ -127,6 +130,7 @@ module xbrick_element_module
         integer,                        optional, intent(out) :: nstep, ninc
         type(sub3d_element),allocatable,optional, intent(out) :: subelem(:)
         type(int_alloc_array),allocatable,optional,intent(out):: subcnc(:)
+        type(sdv_array),    allocatable,optional, intent(out) :: sdv(:)
 
         if(present(curr_status)) curr_status=elem%curr_status
         if(present(key)) key=elem%key 
@@ -167,6 +171,13 @@ module xbrick_element_module
                 subcnc=elem%subcnc
             end if
         end if
+        
+        if(present(sdv)) then        
+            if(allocated(elem%sdv)) then
+                allocate(sdv(size(elem%sdv)))
+                sdv=elem%sdv
+            end if
+        end if
     
     end subroutine extract_xbrick_element
 
@@ -185,8 +196,10 @@ module xbrick_element_module
         type(int_alloc_array), allocatable  :: subglbcnc(:)     ! glb cnc of sub element, used when elem is intact
         real(kind=dp),allocatable           :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
         
-        integer :: i,j,l, elstat
+        integer :: i,j,l, elstat, subelstat
         integer, allocatable :: dofcnc(:)
+        
+        character(len=eltypelength) ::  subeltype
         
         logical :: nofailure
         
@@ -201,7 +214,7 @@ module xbrick_element_module
         
         ! initialize local variables
         i=0; j=0; l=0
-        elstat=0
+        elstat=0; subelstat=0; subeltype=''
         nofailure=.false.
         curr_step=0; curr_inc=0
         last_converged=.false.
@@ -215,44 +228,47 @@ module xbrick_element_module
             last_converged=.true.
             elem%nstep = curr_step
             elem%ninc = curr_inc
-            elem%newpartition=.false.   ! last incr. partition has converged, failure can now be modelled
+            elem%newpartition=.false.   ! last partition has converged; newpartition is false
         end if
 
-        ! extract nofailure value; if newpartition is true, nofailure is also true
-        nofailure=elem%newpartition
+        
         
 
         !---------------------------------------------------------------------!
-        !               update sub element definitions
+        !       update elem partition using edge status variable
         !---------------------------------------------------------------------!
      
         ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
         if(elem%curr_status<elfail) then 
+            ! store current status value
             elstat=elem%curr_status  
             call edge_status_partition(elem) 
-            ! if there's new partitions, wait until the next increment to do failure
-            if(elstat/=elem%curr_status) nofailure=.true.
+   
+            ! if elem is still intact after checking edge status (no broken edges), assign 1 brick subelem if not yet done
+            if(elem%curr_status==intact) then 
+                if(.not.allocated(elem%subelem)) then 
+                    allocate(elem%subelem(1))
+                    allocate(elem%subcnc(1))
+                    allocate(elem%subcnc(1)%array(nndrl))   ! brick elem
+                    allocate(subglbcnc(1))
+                    allocate(subglbcnc(1)%array(nndrl))
+                    ! sub elm 1 connec
+                    elem%subcnc(1)%array=[(i, i=1,nndrl)]
+                    subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+                    ! create sub elements
+                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+                end if
+            end if 
+         
+            if(elstat/=elem%curr_status) then 
+                nofailure=.true.            ! no failure criterion check for this iteration
+                elem%newpartition=.true.    ! new partition is true for this increment
+            end if         
+            
         end if
         
-        !****** after edge status update, elem curr status can be any value from intact to failed, but intact-case subelem hasn't been created
 
 
-        ! if elem is still intact after checking edge status (no broken edges), assign 1 brick subelem if not yet done
-        if(elem%curr_status==intact) then 
-            if(.not.allocated(elem%subelem)) then 
-                allocate(elem%subelem(1))
-                allocate(elem%subcnc(1))
-                allocate(elem%subcnc(1)%array(nndrl))   ! brick elem
-                allocate(subglbcnc(1))
-                allocate(subglbcnc(1)%array(nndrl))
-                ! sub elm 1 connec
-                elem%subcnc(1)%array=[(i, i=1,nndrl)]
-                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
-                ! create sub elements
-                call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
-            end if
-        end if 
-        
         !******* reaching here, elem curr status can be any value from intact to failed, and in all cases, subelems have been created
 
 
@@ -260,16 +276,17 @@ module xbrick_element_module
 
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays
+        !       and update elem partition using failure criterion
         !---------------------------------------------------------------------!        
         
         ! if elem is not yet failed, integrate sub elem and check the failure criterion, and repartition if necessary
         if(elem%curr_status<elfail) then
-            ! store current status value
-            elstat=elem%curr_status
-            
-            !print*,elem%curr_status
-              
+        
+            ! empty K and F for reuse
+            K_matrix=zero; F_vector=zero  
+         
             ! integrate sub elements and assemble into global matrix
+            ! if elem partition just changed in this iteration, no failure modelling at this iteration
             do i=1, size(elem%subelem)
                 call integrate(elem%subelem(i),Ki,Fi,nofailure)
                 if(allocated(dofcnc)) deallocate(dofcnc)
@@ -286,64 +303,67 @@ module xbrick_element_module
                 deallocate(dofcnc)
             end do
 
- 
-            !***** check failure criterion *****
-            call failure_criterion_partition(elem)
-            
-            !print*,elem%curr_status
-            
-            if(elem%curr_status/=elstat) then
-            ! elem status changed, elem failed, partition changed, reintegrate subelems
-                ! empty K and F for reuse
-                K_matrix=zero; F_vector=zero
-                ! no failure right after new partition
-                nofailure=.true.
-                ! integrate sub elements and assemble into global matrix
-                do i=1, size(elem%subelem)
-                    call integrate(elem%subelem(i),Ki,Fi,nofailure)
-                    if(allocated(dofcnc)) deallocate(dofcnc)
-                    allocate(dofcnc(size(Fi))); dofcnc=0
-                    do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
-                        do l=1, ndim
-                            ! dof indices of the jth node of sub elem i 
-                            dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
-                        end do
-                    end do
-                    call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
-                    deallocate(Ki)
-                    deallocate(Fi)
-                    deallocate(dofcnc)
-                end do          
+            if(.not.nofailure) then ! 2nd iteration after new partition
+                !***** check failure criterion *****
+                call failure_criterion_partition(elem)
+                
+                if(elem%curr_status==elfail) then
+                    elem%newpartition=.true.    ! new partition for this increment
+                end if
+                
             end if
-               
-        else if(elem%curr_status==elfail) then
+            
+        end if
+ 
+
+        !******* after the failure criterion check, elem may be repartitioned 
+
+       
+        if(elem%curr_status==elfail) then
         ! element is already failed, integrate and assemble subelem
             
-        
+            ! empty K and F for reuse
+            K_matrix=zero; F_vector=zero
+            
+            nofailure=.true.  ! no fibre failure modelling until cohesive sub elem starts to fail
+            
             ! integrate sub elements and assemble into global matrix
             do i=1, size(elem%subelem)
+            
+                ! during the increment of new partition, no fibre failure allowed
+                if(elem%newpartition) then
+                    continue    ! nofailure remains true
+                else
+                ! after that increment, fibre failure is considered only after coh sub elem starts failing
+                    call extract(elem%subelem(i),eltype=subeltype,curr_status=subelstat)
+                    if(subeltype=='coh3d6' .or. subeltype=='coh3d8') then
+                        if(subelstat > intact) nofailure=.false.
+                    end if
+                end if
+                
                 call integrate(elem%subelem(i),Ki,Fi,nofailure)  
+                
                 if(allocated(dofcnc)) deallocate(dofcnc)
                 allocate(dofcnc(size(Fi))); dofcnc=0
+                
                 do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
                     do l=1, ndim
                         ! dof indices of the jth node of sub elem i 
                         dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
                     end do
                 end do
+                
                 call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
+                
                 deallocate(Ki)
                 deallocate(Fi)
                 deallocate(dofcnc)
-            end do
-            
-        else
-            write(msg_file,*)'unsupported elem curr status value in xbrick!'
-            call exit_function
+                
+            end do 
+        
         end if
         
-        ! update newpartition
-        elem%newpartition=nofailure
+
         
         !---------------------------------------------------------------------!
         !               deallocate local arrays 
