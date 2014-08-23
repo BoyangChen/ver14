@@ -13,6 +13,12 @@ module xquad_element_module
     integer,parameter :: ndim=2, nndrl=4, nedge=4, nndfl=2*nedge, nnode=nndrl+nndfl, ndof=ndim*nnode
     ! Topology: nodes on each edge; 4 nodes per edge, 1-2 are end nodes, 3-4 are fl. nodes; assigned in lcl node numbers
     integer,parameter :: topo(4,nedge)=reshape([1,2,5,6,2,3,7,8,3,4,9,10,4,1,11,12],[4,nedge])
+    
+    ! element status variable values
+    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfail=5
+    
+    ! edge status variable values
+    integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
 
     type, public :: xquad_element             ! breakable quadrilateral
         private

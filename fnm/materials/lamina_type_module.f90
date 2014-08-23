@@ -5,7 +5,7 @@
     private
     
     ! parameters
-    integer, parameter :: mfailed=10, mfonset=5, ffailed=20, ffonset=15
+    integer, parameter, public :: mfailed=10, mfonset=5, ffailed=20, ffonset=15
 
     type,public :: lamina_modulus
         real(kind=dp) :: E1,E2,G12,G23,nu12,nu23 ! elastic moduli
@@ -247,7 +247,7 @@
         if(ffstat==ffailed) then
         ! already completely failed, no need to go through coh law; update dee and calculate stress
             df=sdv%r(1)
-            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)
             sig=matmul(dee,strain)
         else
             ! when fibres are intact, calculate stress for failure criterion check
@@ -259,7 +259,7 @@
             sdv%i(2)=ffstat
             ! update ddsdde
             df=sdv%r(1) ! fibre stiffness degradation
-            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df)
+            call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)
             ! update stress
             sig=matmul(dee,strain)
         end if
@@ -494,10 +494,10 @@
             ! fstat remains intact; dm, u0 and uf remain zero as initialized
                 continue
             end if
-        !end if
+        end if
         
         ! failure started
-        else if(fstat==ffonset) then
+        if(fstat==ffonset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure

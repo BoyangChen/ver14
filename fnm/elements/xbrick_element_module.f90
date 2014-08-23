@@ -15,6 +15,13 @@ module xbrick_element_module
     ! Topology: nodes on each edge; 4 nodes per edge, 1-2 are end nodes, 3-4 are fl. nodes; assigned in lcl node numbers
     integer,parameter :: topo(4,nedge)=reshape([1,2,9,10,2,3,11,12,3,4,13,14,4,1,15,16, &
                                               & 5,6,17,18,6,7,19,20,7,8,21,22,8,5,23,24],[4,nedge])
+                                              
+    ! element status variable values
+    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfailm=5, elfailf=6
+    
+    ! edge status variable values
+    integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
+    
 
     type, public :: xbrick_element             ! breakable brick
         private
@@ -239,7 +246,7 @@ module xbrick_element_module
         !---------------------------------------------------------------------!
      
         ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
-        if(elem%curr_status<elfail) then 
+        if(elem%curr_status<elfailm) then 
             ! store current status value
             elstat=elem%curr_status  
             call edge_status_partition(elem) 
@@ -280,7 +287,7 @@ module xbrick_element_module
         !---------------------------------------------------------------------!        
         
         ! if elem is not yet failed, integrate sub elem and check the failure criterion, and repartition if necessary
-        if(elem%curr_status<elfail) then
+        if(elem%curr_status<elfailm) then
         
             ! empty K and F for reuse
             K_matrix=zero; F_vector=zero  
@@ -307,7 +314,7 @@ module xbrick_element_module
                 !***** check failure criterion *****
                 call failure_criterion_partition(elem)
                 
-                if(elem%curr_status==elfail) then
+                if(elem%curr_status>=elfailm) then
                     elem%newpartition=.true.    ! new partition for this increment
                 end if
                 
@@ -319,7 +326,7 @@ module xbrick_element_module
         !******* after the failure criterion check, elem may be repartitioned 
 
        
-        if(elem%curr_status==elfail) then
+        if(elem%curr_status==elfailm) then
         ! element is already failed, integrate and assemble subelem
             
             ! empty K and F for reuse
@@ -334,7 +341,7 @@ module xbrick_element_module
                 if(elem%newpartition) then
                     continue    ! nofailure remains true
                 else
-                ! after that increment, fibre failure is considered only after coh sub elem starts failing
+                ! after that increment, fibre failure is considered for matrix fail partition only after coh sub elem starts failing
                     call extract(elem%subelem(i),eltype=subeltype,curr_status=subelstat)
                     if(subeltype=='coh3d6' .or. subeltype=='coh3d8') then
                         if(subelstat > intact) nofailure=.false.
@@ -363,6 +370,46 @@ module xbrick_element_module
         
         end if
         
+
+        if(elem%curr_status==elfailf) then
+        ! element is already failed, integrate and assemble subelem
+            
+            ! empty K and F for reuse
+            K_matrix=zero; F_vector=zero
+
+            ! during the increment of new partition, no fibre failure allowed
+            if(elem%newpartition) then
+                nofailure=.true.  ! no fibre failure modelling
+            else
+            ! after that increment, fibre failure is considered for fibre fail partition
+                nofailure=.false.
+            end if    
+            
+            ! integrate sub elements and assemble into global matrix
+            do i=1, size(elem%subelem)
+                            
+                call integrate(elem%subelem(i),Ki,Fi,nofailure)  
+                
+                if(allocated(dofcnc)) deallocate(dofcnc)
+                allocate(dofcnc(size(Fi))); dofcnc=0
+                
+                do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
+                    do l=1, ndim
+                        ! dof indices of the jth node of sub elem i 
+                        dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
+                    end do
+                end do
+                
+                call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
+                
+                deallocate(Ki)
+                deallocate(Fi)
+                deallocate(dofcnc)
+                
+            end do 
+        
+        end if
+       
 
         
         !---------------------------------------------------------------------!
@@ -659,7 +706,7 @@ module xbrick_element_module
                 elstat=elwake
             else if(edgstat(jbe1)>=cohcrack .and. edgstat(jbe2)>=cohcrack) then
             ! cracked elem, cohesive/stress-free crack
-                elstat=elfail
+                elstat=elfailm
             else ! unknown combination
                 write(msg_file,*)'unknown combination of 2 edge status!'
                 call exit_function
@@ -783,7 +830,7 @@ module xbrick_element_module
     !
     ! --------------------------------------------------------------------!
     
-        if(elem%curr_status==elfail) return ! elem already failed, no need to proceed
+        if(elem%curr_status>=elfailm) return ! elem already failed, no need to proceed
     
         ! initialize local variables
         
@@ -1120,7 +1167,7 @@ module xbrick_element_module
                     xelm(3,edg(3,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
                     xelm(3,edg(4,ifedg(4)))=half*(xelm(3,edg(1,ifedg(4)))+xelm(3,edg(2,ifedg(4))))
                     
-                else if (elstat.gt.eltrans .and. elstat.lt.elfail) then 
+                else if (elstat.gt.eltrans .and. elstat.lt.elfailm) then 
                 ! element already has two edges partitioned; just update edge status var to coh crack status
 
                     nfailedge=4
@@ -1137,8 +1184,12 @@ module xbrick_element_module
           
           
             ! update the elstat to failed status value
-            elstat=elfail
-                        
+            if(elstat==intact .and. subelstat>=ffonset) then
+            ! if intact elem reaches fibre failure onset, new elem partition is named elfailf
+                elstat=elfailf
+            else
+                elstat=elfailm
+            end if        
 
     !       update element curr_status and sub-element cnc matrices
 
