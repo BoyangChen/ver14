@@ -515,13 +515,18 @@ module xbrick_element_module
 !       procedure calculations (pure)
 !-----------------------------------------------------------------------!
     
-!       find and store the broken edges' variables when element is still intact
+!       find and store the broken edges' variables
         if(elstat==intact) then
             do i=1,nedge
                 if(edgstat(i)/=intact) then
                     nfailedge=nfailedge+1   ! update total no. of damaged edges
                     ifedg(nfailedge)=i  ! update the indices of damaged edges
                 end if
+            end do
+        else
+        ! once partitioned, only check the status of stored failed edges; newly failed edges are ignored
+            do i=1,size(ifedg)
+                if(ifedg(i)>0) nfailedge=nfailedge+1
             end do
         end if
 
@@ -693,6 +698,31 @@ module xbrick_element_module
             
             jbe1=ifedg(1)
             jbe2=ifedg(2)
+            
+            !~! check if the two crack tips belong to the same crack, or to two diff. cracks
+            !~if(elstat==intact) then
+            !~    
+            !~    xp1=coord(topo(3,jbe1))%array(1)
+            !~    yp1=coord(topo(3,jbe1))%array(2)
+            !~    
+            !~    xp2=coord(topo(3,jbe2))%array(1)
+            !~    yp2=coord(topo(3,jbe2))%array(2)
+            !~    
+            !~    lth=sqrt((xp2-xp1)**2+(yp2-yp1)**2)
+            !~    
+            !~    if(lth12>tiny(one)) then
+            !~        errx=abs(lth*cos(theta/halfcirc*pi))-abs(xp2-xp1)
+            !~        erry=abs(lth*sin(theta/halfcirc*pi))-abs(yp2-yp1)
+            !~        lerr=sqrt((errx)**2+(erry)**2)
+            !~        if(lerr/lth<=
+            !~    else
+            !~        write(msg_file,*)'sth wrong in xbrick edge status partition lth12'
+            !~        call exit_function
+            !~    end if
+            !~    
+            !~end if
+            !~
+            
             if(edgstat(jbe1)<=egref .and. edgstat(jbe2)<=egref) then
             ! refinement elem
                 elstat=elref
