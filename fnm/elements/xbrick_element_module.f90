@@ -532,10 +532,118 @@ module xbrick_element_module
 
 !       calculate elstat value from edge status variables
 
-10      if(nfailedge==0) then
-            ! no edge failed/damaged, do nothing
-            continue
+!****** if elem is intact, then sort out the most damaged edges first, before updating edge status and doing partitions later
+!****** and elem is always partitioned from the most damaged edge, then find the other broken edge along the crack direction
+!****** and stores the damaged edge indices of these two edges only; the other damaged edges are ignored; once elem is nolonger
+!****** intact (already partitioned along these two edges), no need to go through this sorting again
+
+        if(elstat==intact) then
+
+            if(nfailedge==0) then
+                ! no edge failed/damaged, do nothing
+                continue
+                
+            else if(nfailedge==2) then
+            ! one pair of edges broken, could be trans elem, not could repartition into ref, tip, wake and failm (matrix failed) elem
+                
+                ! the failed edge indices must be one pair of corresponding lower and upper edges
+                if(.not.((ifedg(2)-ifedg(1))==nedge/2)) then
+                    write(msg_file,*)'wrong failed edge indices for nfailedge=2 in xbrick edge status partition'
+                    call exit_function
+                end if
+                    
+            else if(nfailedge==4) then
+            ! two pairs of edges broken, could be failm (matrix cracked), wake, tip, refinement elem
             
+                ! the failed edge indices must be two pairs, with 1 and 2 being the failed lower edges, and 
+                ! 3 and 4 being the corresponding failed upper edges
+                if(.not.((ifedg(3)-ifedg(1))==nedge/2 .and. (ifedg(4)-ifedg(2))==nedge/2)) then
+                    write(msg_file,*)'wrong failed edge indices for nfailedge=4 in xbrick edge status partition'
+                    call exit_function
+                end if
+            
+                !**** the partitioning of xbrick elem is entirely based on the bottom four edges ****    
+         
+                ! if elem partition is intact, then partition accord. to the most damaged edge
+              
+                ! sort two edges according to their damage severity
+                if(edgstat(ifedg(2))>edgstat(ifedg(1))) then
+                    jbe1=ifedg(2)
+                    jbe2=ifedg(1)
+                else
+                    jbe1=ifedg(1)
+                    jbe2=ifedg(2)
+                end if            
+                nfailedge=2
+                ifedg=0
+                ifedg(1)=jbe1
+                ifedg(2)=jbe1+nedge/2
+
+                
+                ! update of elem status done afterwards
+       
+            else if( nfailedge==6 ) then
+            
+                if (.not.((ifedg(4)-ifedg(1))==nedge/2 .and. (ifedg(5)-ifedg(2))==nedge/2 .and. &
+                & (ifedg(6)-ifedg(3))==nedge/2)) then
+                    write(msg_file,*)'wrong failed edge indices for nfailedge=6 in xbrick edge status partition'
+                    call exit_function
+                end if
+                
+                ! if elem partition is intact, then partition accord. to the most damaged edge
+
+                ! find the most damaged edge
+                jbe1=ifedg(1)
+                do i=2,3
+                    if(edgstat(ifedg(i))>edgstat(jbe1)) then
+                        jbe1=ifedg(i)
+                    end if
+                end do
+                nfailedge=2
+                ifedg=0
+                ifedg(1)=jbe1
+                ifedg(2)=jbe1+nedge/2
+
+
+            else if( nfailedge==8 ) then
+            
+                if(.not. ((ifedg(5)-ifedg(1))==nedge/2 .and. (ifedg(6)-ifedg(2))==nedge/2 .and. &
+                & (ifedg(7)-ifedg(3))==nedge/2 .and. (ifedg(8)-ifedg(4))==nedge/2 )) then
+                    write(msg_file,*)'wrong failed edge indices for nfailedge=8 in xbrick edge status partition'
+                    call exit_function
+                end if
+
+                ! if elem partition is intact, then partition accord. to the most damaged edge
+                
+                ! find the most damaged edge
+                jbe1=ifedg(1)
+                do i=2,4
+                    if(edgstat(ifedg(i))>edgstat(jbe1)) then
+                        jbe1=ifedg(i)
+                    end if
+                end do   
+                nfailedge=2
+                ifedg=0
+                ifedg(1)=jbe1
+                ifedg(2)=jbe1+nedge/2
+                   
+              
+            else
+            
+                write(msg_file,*)'unsupported edge status partition in xbrick!'
+                write(msg_file,*) nfailedge, ifedg
+                call exit_function
+              
+            end if
+
+        end if
+        
+        
+!****** if elem is intact, after the above sorting/updating, nfailedge should be 0 or 2 only and they should be a pair of upper/lower edges
+!****** if elem is already partitioned, then nfailedge can be 2 or 4 only, and they should be two pairs of upper/lower edges
+        if(nfailedge==0 .and. elstat==intact) then
+        ! remains intact, do nothing
+            continue
         else if(nfailedge==2 .and. (ifedg(2)-ifedg(1))==nedge/2) then 
         ! could be 1st time wake elm, tip elm, ref elm and trans elm
         ! update the edge status, crack tip coords and elstat accordingly
@@ -549,10 +657,12 @@ module xbrick_element_module
               ! another edge must be partitioned to form a ref/tip/wake elem
               ! find the other edge to be partitioned
                 
-                ! first, find the index of the broken edges
-                jbe1=ifedg(1); jbe2=ifedg(2)
+                ! first, find the index of the lower broken edge
+                jbe1=ifedg(1)
                 
-                !**** the partitioning of xbrick elem is entirely based on the bottom four edges ****
+                ! move the corresponding upper broken edge to ifedg(3), s.t. ifedg(2) is free to take the 2nd broken lower edge
+                ifedg(3)=ifedg(2)
+                
                 
                 ! find the first (or the second also can) fl. node on the bottom broken edge 
                 jnode=topo(3,jbe1)
@@ -590,7 +700,7 @@ module xbrick_element_module
                     call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
                     if (iscross>0) then
                         nfailedge=nfailedge+1
-                        ifedg(nfailedge)=i  ! index of the 3rd broken edge is i
+                        ifedg(2)=i          ! index of the 2nd lower broken edge is i
                         zct=half*(z1+z2)    ! z1 should be the same as z2
                         coord(topo(3,i))%array=[xct,yct,zct]
                         coord(topo(4,i))%array=[xct,yct,zct]
@@ -603,7 +713,6 @@ module xbrick_element_module
 
                 if(nfailedge == 2) then
                 ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
-                    nfailedge=3
                     ! crack line equation constants
                     a2=sin(theta/halfcirc*pi)
                     b2=-cos(theta/halfcirc*pi)
@@ -626,41 +735,41 @@ module xbrick_element_module
                         ! initialize detlc and intersection info
                         if(i==1 .or. (jbe1==1 .and. i==2)) then
                             detlc=a1*b2-a2*b1
-                            ifedg(3)=i   ! store failed edge indices
+                            ifedg(2)=i   ! store failed edge indices
                             xct=xmid
                             yct=ymid
                             zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
                         end if
                         ! find the most parallel trial line and update stored info
                         if(abs(a1*b2-a2*b1)<abs(detlc)) then
-                            ifedg(3)=i   ! store failed edge indices
+                            ifedg(2)=i   ! store failed edge indices
                             xct=xmid
                             yct=ymid
                             zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
                         end if
                     end do
-                    coord(topo(3,ifedg(3)))%array=[xct,yct,zct]
-                    coord(topo(4,ifedg(3)))%array=[xct,yct,zct]
+                    coord(topo(3,ifedg(2)))%array=[xct,yct,zct]
+                    coord(topo(4,ifedg(2)))%array=[xct,yct,zct]
                 end if
                 
 
-                jbe3=ifedg(3)   ! store it in jbe3 (safer)
+                jbe2=ifedg(2)   ! store it in jbe2 (safer)
 
                 ! update edge status variables
                 if(edgstat(jbe1)==egref) then ! tip elem end, refinement elem. start (1st time)
                     elstat=elref               
                     ! change 2nd broken edge status to 1 (trans elem start)
-                    edgstat(jbe3)=egtrans
+                    edgstat(jbe2)=egtrans
              
                 else if(edgstat(jbe1)==egtip) then ! wake elem end, tip elem start (1st time)
                     elstat=eltip
                     ! change 2nd broken edge status to 2 (refinement start)
-                    edgstat(jbe3)=egref
+                    edgstat(jbe2)=egref
                
                 else if(edgstat(jbe1)>=cohcrack) then ! wake elem start (1st time)
                     elstat=elwake !wake elem               
                     ! change 2nd broken edge status to 3 (tip elem start)
-                    edgstat(jbe3)=egtip
+                    edgstat(jbe2)=egtip
                     
                 else ! unknown edge status
                     write(msg_file,*)'unknown edge status!'
@@ -669,11 +778,11 @@ module xbrick_element_module
 
                 !***** project var. values of the bottom broken edges to the top ones *****
                 
-                nfailedge=4                 ! no. of broken edge is now 4
-                ifedg(nfailedge)=jbe3+nedge/2  ! index of the 4th broken edge is i
+                nfailedge=4            ! no. of broken edge is now 4
+                ifedg(4)=jbe2+nedge/2  ! index of the 4th broken edge is i
                 
-                ! store it in jbe2 (safer)
-                jbe4=jbe3+nedge/2
+                ! store it in jbe4 (safer)
+                jbe4=ifedg(4)
                 
                 ! update the two fl. node coords on this edge
                 jnode=topo(1,jbe4); z1=coord(jnode)%array(3)
@@ -686,42 +795,18 @@ module xbrick_element_module
                 coord(jnode)%array=[xct,yct,zct]
 
                 ! update edge status var. value
-                edgstat(jbe4)=edgstat(jbe3)
+                edgstat(jbe4)=edgstat(jbe2)
         
             endif
-                
+            
         else if(nfailedge==4 .and. (ifedg(3)-ifedg(1))==nedge/2 .and. (ifedg(4)-ifedg(2))==nedge/2) then
         ! could be cracked, wake, tip, refinement elem
         ! only update the elstat, not the edge status, nor the crack tip coords
         
-            !**** the partitioning of xbrick elem is entirely based on the bottom four edges ****
+            !**** the partitioning of xbrick elem is entirely based on the bottom four edges ****         
             
             jbe1=ifedg(1)
             jbe2=ifedg(2)
-            
-            !~! check if the two crack tips belong to the same crack, or to two diff. cracks
-            !~if(elstat==intact) then
-            !~    
-            !~    xp1=coord(topo(3,jbe1))%array(1)
-            !~    yp1=coord(topo(3,jbe1))%array(2)
-            !~    
-            !~    xp2=coord(topo(3,jbe2))%array(1)
-            !~    yp2=coord(topo(3,jbe2))%array(2)
-            !~    
-            !~    lth=sqrt((xp2-xp1)**2+(yp2-yp1)**2)
-            !~    
-            !~    if(lth12>tiny(one)) then
-            !~        errx=abs(lth*cos(theta/halfcirc*pi))-abs(xp2-xp1)
-            !~        erry=abs(lth*sin(theta/halfcirc*pi))-abs(yp2-yp1)
-            !~        lerr=sqrt((errx)**2+(erry)**2)
-            !~        if(lerr/lth<=
-            !~    else
-            !~        write(msg_file,*)'sth wrong in xbrick edge status partition lth12'
-            !~        call exit_function
-            !~    end if
-            !~    
-            !~end if
-            !~
             
             if(edgstat(jbe1)<=egref .and. edgstat(jbe2)<=egref) then
             ! refinement elem
@@ -741,24 +826,11 @@ module xbrick_element_module
                 write(msg_file,*)'unknown combination of 2 edge status!'
                 call exit_function
             end if
-   
-        else if( nfailedge==6 .and. &
-        & (ifedg(4)-ifedg(1))==nedge/2 .and. (ifedg(5)-ifedg(2))==nedge/2 .and. &
-        & (ifedg(6)-ifedg(3))==nedge/2 ) then
-            continue    ! not yet properly treated; use failure criterion partition for this case
-
-        else if( nfailedge==8 .and. &
-        & (ifedg(5)-ifedg(1))==nedge/2 .and. (ifedg(6)-ifedg(2))==nedge/2 .and. &
-        & (ifedg(7)-ifedg(3))==nedge/2 .and. (ifedg(8)-ifedg(4))==nedge/2 ) then
-            continue    ! not yet properly treated; use failure criterion partition for this case       
-          
+            
         else
-        
-            write(msg_file,*)'unsupported edge status partition in xbrick!'
-            call exit_function
-          
-        end if
-             
+            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in xbrick edge stat partition!'
+            call exit_function 
+        end if     
 
 !-----------------------------------------------------------------------!
 !                   UPDATE INTERFACE
