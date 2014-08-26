@@ -276,7 +276,7 @@ module xbrick_element_module
         
 
 
-        !******* reaching here, elem curr status can be any value from intact to failed, and in all cases, subelems have been created
+        !******* reaching here, elem curr status can be any value from intact to matrix failed (elfailm), and in all cases, subelems have been created
 
 
 
@@ -286,7 +286,7 @@ module xbrick_element_module
         !       and update elem partition using failure criterion
         !---------------------------------------------------------------------!        
         
-        ! if elem is not yet failed, integrate sub elem and check the failure criterion, and repartition if necessary
+        ! if elem matrix is not yet failed, integrate sub elem and check the failure criterion, and repartition if necessary
         if(elem%curr_status<elfailm) then
         
             ! empty K and F for reuse
@@ -327,7 +327,7 @@ module xbrick_element_module
 
        
         if(elem%curr_status==elfailm) then
-        ! element is already failed, integrate and assemble subelem
+        ! element matrix is already failed, integrate and assemble subelem
             
             ! empty K and F for reuse
             K_matrix=zero; F_vector=zero
@@ -372,7 +372,7 @@ module xbrick_element_module
         
 
         if(elem%curr_status==elfailf) then
-        ! element is already failed, integrate and assemble subelem
+        ! element fibre is already failed, integrate and assemble subelem
             
             ! empty K and F for reuse
             K_matrix=zero; F_vector=zero
