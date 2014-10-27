@@ -102,8 +102,34 @@ elcount=[]  # count of elements of each type in the mesh
 
 bcd=[]      # list of all edges with b.c.d
 
+rawlayup=[]    # layup of the laminate in its basic format (list of fibre angles of all plies)
+blklayup=[]    # layup of ply blocks, used in xlam element; an xlayup class is needed
 
 
+# ask for layup from user
+
+# ask for no. of plies
+nply=input('number of plies for xlam element (must be integer, 0 if not applicable):')
+# check if nply is integer
+while (not isinstance(nply,int)):
+    nply=input('number of plies must be integer, re-enter (0 if not applicable):')
+
+# ask for layups if nply >0
+if (nply>0):
+    # ask for a list of ply angles
+    rawlayup=input('layup of laminate is (fibre angle (int/float) of each ply, separated by comma):')
+    # check if it is a list and if all elements in the list are numbers
+    while ((not isinstance(rawlayup, (list,tuple))) or (not all(isinstance(item, (int,float)) for item in rawlayup))):
+        rawlayup=input('layup of laminate is (fibre angle (int/float) of each ply, separated by comma):')      
+        
+    # find blocked plies and update blklayup
+    blklayup.append(xlayup(angle=rawlayup[0],ratio=1.0/nply)) # initiate blklayup
+    for i in range(1,nply):
+        if (rawlayup[i]==blklayup[-1].angle):
+            blklayup[-1].ratio+=1.0/nply
+        else:
+            blklayup.append(xlayup(angle=rawlayup[i],ratio=1.0/nply))
+        
 
 
 
