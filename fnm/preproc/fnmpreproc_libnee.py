@@ -129,7 +129,9 @@ if (nply>0):
             blklayup[-1].ratio+=1.0/nply
         else:
             blklayup.append(xlayup(angle=rawlayup[i],ratio=1.0/nply))
-        
+else:
+    print 'input no. of plies is smaller/equal to zero; assume a UD lamina'
+    blklayup.append(xlayup(angle=0.0,ratio=1.0))
 
 
 
@@ -155,29 +157,33 @@ for ln, line in enumerate(lines):
         iselem=True
         cycle=True
         
-        if 'C2D3' in line:
-            eltype.append('xtri')
-            elcount.append(0)
-        elif 'C2D4' in line:
-            eltype.append('xquad')
-            elcount.append(0)
-        elif 'COH2D4' in line:
-            eltype.append('coh2d')  # change to x version in future
-            elcount.append(0)
-        elif ('C3D6' in line) or ('SC6' in line):
-            eltype.append('xwedge')
-            elcount.append(0)
-        elif ('C3D8' in line) or ('SC8' in line):
-            eltype.append('xbrick')
-            elcount.append(0)
-        elif 'COH3D6' in line:
-            eltype.append('coh3d6') # change to x version in future
-            elcount.append(0)
-        elif 'COH3D8' in line:
-            eltype.append('coh3d8') # change to x version in future
+        #if 'C2D3' in line:
+        #    eltype.append('xtri')
+        #    elcount.append(0)
+        #elif 'C2D4' in line:
+        #    eltype.append('xquad')
+        #    elcount.append(0)
+        #elif 'COH2D4' in line:
+        #    eltype.append('coh2d')  # change to x version in future
+        #    elcount.append(0)
+        #elif ('C3D6' in line) or ('SC6' in line):
+        #    eltype.append('xwedge')
+        #    elcount.append(0)
+        #elif ('C3D8' in line) or ('SC8' in line):
+        #    eltype.append('xbrick')
+        #    elcount.append(0)
+        #elif 'COH3D6' in line:
+        #    eltype.append('coh3d6') # change to x version in future
+        #    elcount.append(0)
+        #elif 'COH3D8' in line:
+        #    eltype.append('coh3d8') # change to x version in future
+        #    elcount.append(0)
+        if ('C3D8' in line) or ('SC8' in line):
+            eltype.append('xlam')
             elcount.append(0)
         else:
             print 'warning: abaqus element type in line:', ln, 'is not supported in fnm.'
+            print 'supported abaqus element types are: C3D8(R), SC8(R)'
 
     elif(len(line)>=9 and line[0:9]=='*End Part'):
         iselem=False
@@ -283,24 +289,31 @@ for ln, line in enumerate(lines):
 #***************************************************************        
 #       Write Nodes
 #***************************************************************
+nplyblk=len(blklayup)
+plynnd=len(nodes)
+plynedge=len(edges)
+
 fnminp.write('*Node\n')
-lib_node.write('        nnode='+str(len(nodes))+'   \n')
+lib_node.write('        nnode='+str(nplyblk*plynnd)+'   \n')
 lib_node.write('        allocate(lib_node(nnode))   \n')
 
-for cntr0, nd in enumerate(nodes):
-    cntr=cntr0+1
-    if ndim==2:
-        fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+'\n')
-        lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp],u=[zero,zero])\n')
-    else:
-        fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+', '+str(nd.z)+'\n')
-        lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp,'+str(nd.z)+'_dp],u=[zero,zero,zero])\n')
+
+for iply in range(nplyblk):
+    
+    for cntr0, nd in enumerate(nodes):
+        cntr=cntr0+1+iply*plynnd
+        if ndim==2:
+            fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+'\n')
+            lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp],u=[zero,zero])\n')
+        else:
+            fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+', '+str(nd.z)+'\n')
+            lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp,'+str(nd.z)+'_dp],u=[zero,zero,zero])\n')
 
 
 #***************************************************************        
 #       Write Edges
 #***************************************************************
-lib_edge.write('        nedge='+str(len(edges))+'   \n')
+lib_edge.write('        nedge='+str(nplyblk*plynedge)+'   \n')
 lib_edge.write('        allocate(lib_edge(nedge))   \n')
 lib_edge.write('        lib_edge=0                  \n')
 
@@ -308,17 +321,19 @@ lib_edge.write('        lib_edge=0                  \n')
 #***************************************************************        
 #       Write Elements
 #***************************************************************
+# get total no. of elements in the mesh
 nelem=sum(elcount)
+# allocate lib_elem accordingly
 lib_elem.write('        nelem='+str(nelem)+'            \n')
 lib_elem.write('        allocate(lib_elem(nelem))       \n')
 
-
+# write elem connectivities in abaqus input and fnm modules for each elem type
 for eli, elt in enumerate(eltype):
 
     # determine no. of nodes and uel element integer type
     # uel element integer type:
     #   1st digit: ndim
-    #   2nd digit: 0: bulk elem; 1: coh elem; 2: x elem
+    #   2nd digit: 0: bulk elem; 1: coh elem; 2: x(brick/wedge) elem; 3: xlam elem
     #   3rd onwards: no. of real nodes
     if ndim == 2:
         if elt == 'xtri':
@@ -355,6 +370,12 @@ for eli, elt in enumerate(eltype):
         elif elt == 'coh3d8':
             nnode=8
             eltuel=318
+        elif elt == 'xlam':
+            nndrl=8*nplyblk         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
+            nedge=8*nplyblk         # no. of breakable edges in this element
+            nndfl=2*nedge
+            nnode=nndrl+nndfl
+            eltuel=338
     
     # write user element definition in abaqus fnm input file
     fnminp.write('*USER ELEMENT, TYPE=U'+str(eltuel)+', NODES='+str(nnode)+', COORDINATES='+str(ndim)+
@@ -382,43 +403,70 @@ for eli, elt in enumerate(eltype):
     
     # write elem nodal connec of elements of the same type
     for cntr0, el in enumerate(elems[elstart:elend]):
-        cntr=cntr0+1
+        cntr=cntr0+1    # index of this elem in its own type library lib_elt
         
         # elem line to be printed in abaqus fnm input file
         #eline=str(cntr+elstart) 
-        eline=str(el.index)
+        eline=str(el.index)+','
         
-        # elem node and edge cnc to be printed in fnm lib_elem module
+        # elem node and edge cnc to be printed in fnm lib_elem module (in string format)
         nodecnc=''
         edgecnc=''
         
+        # elem ply node and edge cnc stored in lists
+        plynodelist=[]
+        plyedgelist=[]
+        
         # include real nodes in lists
         for k in el.nodes:
-            eline=eline+', '+str(k)
+            eline=eline+str(k)+','
             nodecnc=nodecnc+str(k)+','
+            plynodelist.append(k)
             
-        # include edge fl. nodes in lists for x-version elements
+        # include edge fl. nodes for x-version elements
         if (elt[0] == 'x'):    
             for m in el.edges:
+                # update edge cnc and plyedgelist
                 edgecnc=edgecnc+str(abs(m))+','
+                plyedgelist.append(abs(m))
+                # update edge fl. nodes in eline, nodecnc and plynodelist
                 if m>0:     # elem edge's endnodes are in the same order as the definition of the edge
-                    eline=eline+', '+str(edges[m-1].nodes[2])+', '+str(edges[m-1].nodes[3])
-                    nodecnc=nodecnc+str(edges[m-1].nodes[2])+', '+str(edges[m-1].nodes[3])+','
+                    eline=eline+str(edges[m-1].nodes[2])+','+str(edges[m-1].nodes[3])+','
+                    nodecnc=nodecnc+str(edges[m-1].nodes[2])+','+str(edges[m-1].nodes[3])+','
+                    plynodelist.append(edges[m-1].nodes[2])
+                    plynodelist.append(edges[m-1].nodes[3])
                 elif m<0:   # elem edge's endnodes are in the reverse order as the definition of the edge
-                    eline=eline+', '+str(edges[-m-1].nodes[3])+', '+str(edges[-m-1].nodes[2])
-                    nodecnc=nodecnc+str(edges[-m-1].nodes[3])+', '+str(edges[-m-1].nodes[2])+','
+                    eline=eline+str(edges[-m-1].nodes[3])+','+str(edges[-m-1].nodes[2])+','
+                    nodecnc=nodecnc+str(edges[-m-1].nodes[3])+','+str(edges[-m-1].nodes[2])+','
+                    plynodelist.append(edges[-m-1].nodes[3])
+                    plynodelist.append(edges[-m-1].nodes[2])
                 else:
                     print 'warning: edges in elem ',cntr,' are empty'
         
-        # wrap up eline and print in abaqus fnm input file
-        eline=eline+'\n'
-        fnminp.write(eline)
+        # duplicate elem nodes and edges according to blklayup
+        for ip in range(1,nplyblk):
+            eline=eline+'\n'    # print in a newline to avoid line being too long
+            for nd in plynodelist:
+                # add nodes for the ip_th ply into eline and nodecnc strings
+                eline=eline+str(nd+ip*plynnd)+','
+                nodecnc=nodecnc+str(nd+ip*plynnd)+','
+            for eg in plyedgelist:
+                # add edges for the ip_th ply into edgecnc string
+                edgecnc=edgecnc+str(eg+ip*plynedge)+','
+            
+
+        
+        # wrap up eline (omit the last comma and append \n) and print in abaqus fnm input file
+        fnminp.write(eline[:-1]+'\n')
         
         
         # write node cnc and edge cnc (for x version elems only) to the respective type arrays in fnm lib_elem module
-        if (elt[0] == 'x'):
+        if (elt == 'xlam'):
+            # write elem type and key
             lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(el.index)+', & \n')
-            #lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
+            # write elem associated material keys
+            lib_elem.write('& bulkmat=, cohmat= , interfmat= , & \n')    # update matkeys later accord. to mat section assignment
+            # write elem nodal connectivity
             if len(nodecnc) <= 100:
                 lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
             else:
@@ -428,13 +476,17 @@ for eli, elt in enumerate(eltype):
                         break
                 lib_elem.write('& nodecnc=['+nodecnc[:ic]+' & \n')
                 lib_elem.write('& '+nodecnc[ic:-1]+'], & \n')
-
+            # write elem edge connectivity
             lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
-            lib_elem.write('& bulkmat=1, cohmat=5 ) \n')    # update matkeys later accord. to mat section assignment
+            # write elem layup
+            lib_elem.write('& layup=['+ +']) \n') # need to write layup into strings of corresponding format
+            
         else:
-            lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(el.index)+', & \n')
-            lib_elem.write('& connec=['+nodecnc[:-1]+'], & \n')
-            lib_elem.write('& matkey=1 ) \n')   # update matkey later accord. to mat section assignment
+            print 'unsupported fnm elem type:', elt, 'for preprocessing!'
+            print 'currently supported fnm elem types: xlam'
+            #lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(el.index)+', & \n')
+            #lib_elem.write('& connec=['+nodecnc[:-1]+'], & \n')
+            #lib_elem.write('& matkey=1 ) \n')   # update matkey later accord. to mat section assignment
         
         # write elem type and typekey (elem index in its own type array) 
         lib_elem.write('        call update(lib_elem('+str(el.index)+'),elname="'+elt+'",eltype="'+elt+'",typekey='+str(cntr)+') \n')
