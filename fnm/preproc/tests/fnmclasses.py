@@ -103,4 +103,10 @@ class element:
         self.index=index
         self.nodes=nodes
         self.edges=edges
+        
+class xlayup:
+
+    def __init__(self, angle, ratio):
+        self.angle=angle
+        self.ratio=ratio
 

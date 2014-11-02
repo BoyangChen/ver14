@@ -3,7 +3,10 @@
 ##  writing lib_node, lib_edge and lib_elem modules           ##
 ################################################################
 
-from fnmclasses import* # glb objects defined for FNM
+# glb objects defined for FNM
+from fnmclasses import*
+# material definitions for this analysis (currently for laminates only)
+from fnmpreproc_libmat import ply_mkey,mcrack_mkey,delam_mkey
 import math
 
 
@@ -22,8 +25,9 @@ fnminputfile='fnm-'+jobname+'.inp'  # fnm uel input file
 #   define model information
 #***************************************************************
 
-ndim=3          # dimension
+ndim=3          # dimension; currently only support 3D
 
+# non-useful variables defined to conform with abaqus formats
 nprops=1        # no. of input material properties used in uel code (min 1)
 nsvars=1        # no. of sol. dpdnt var. used and ouput by uel code to be determined (min 1)
 
@@ -34,53 +38,6 @@ nsvars=1        # no. of sol. dpdnt var. used and ouput by uel code to be determ
 lib_node=open('init_lib_node.f90','w')  # array of all nodes
 lib_edge=open('init_lib_edge.f90','w')  # array of all edges
 lib_elem=open('init_lib_elem.f90','w')  # array of all elements
-
-
-
-
-#***************************************************************
-#       write lib_node_module.f90
-#***************************************************************    
-lib_node.write('    subroutine initialize_lib_node()          \n')
-lib_node.write('                                              \n')
-lib_node.write('        integer :: nnode=0                    \n')   
-lib_node.write('        integer :: i=0                        \n')
-
-
-
-
-
-#***************************************************************
-#       write lib_edge_module.f90
-#***************************************************************
-lib_edge.write('    subroutine initialize_lib_edge()          \n')
-lib_edge.write('                                              \n')
-lib_edge.write('        integer :: nedge=0                    \n')
-lib_edge.write('        integer :: i=0                        \n')
-lib_edge.write('                                              \n')
-
-
-
-
-
-
-
-#***************************************************************
-#       write lib_elem_module.f90
-#***************************************************************    
-lib_elem.write('    subroutine initialize_lib_elem()                                      \n')
-lib_elem.write('                                                                          \n') 
-lib_elem.write('        integer ::  nelem=0, ntri=0, nquad=0, nwedge=0, nbrick=0 &        \n')
-lib_elem.write('        &          ,ncoh2d=0, ncoh3d6=0, ncoh3d8=0, nsub2d=0, nsub3d=0 &  \n')
-lib_elem.write('        &          ,nxquad=0, nxbrick=0                                   \n')
-lib_elem.write('        integer :: i=0                                                    \n')
-
-
-
-
-
-
-
 
 
 #***************************************************************
@@ -133,6 +90,40 @@ else:
     print 'input no. of plies is smaller/equal to zero; assume a UD lamina'
     blklayup.append(xlayup(angle=0.0,ratio=1.0))
 
+# put layup info in a string for later output purpose
+layupstr=''
+for lp in blklayup:
+    layupstr=layupstr+str(lp.angle)+','+str(lp.ratio)+','
+
+
+#***************************************************************
+#       write lib_node_module.f90 common codes
+#***************************************************************    
+lib_node.write('    subroutine initialize_lib_node()          \n')
+lib_node.write('                                              \n')
+lib_node.write('        integer :: nnode=0                    \n')   
+lib_node.write('        integer :: i=0                        \n')
+
+
+#***************************************************************
+#       write lib_edge_module.f90 common codes
+#***************************************************************
+lib_edge.write('    subroutine initialize_lib_edge()          \n')
+lib_edge.write('                                              \n')
+lib_edge.write('        integer :: nedge=0                    \n')
+lib_edge.write('        integer :: i=0                        \n')
+lib_edge.write('                                              \n')
+
+
+#***************************************************************
+#       write lib_elem_module.f90 common codes
+#***************************************************************    
+lib_elem.write('    subroutine initialize_lib_elem()                                      \n')
+lib_elem.write('                                                                          \n') 
+lib_elem.write('        integer ::  nelem=0, nxlam=0                                      \n')
+lib_elem.write('        integer :: i=0                                                    \n')
+
+
 
 
 #***************************************************************
@@ -157,27 +148,6 @@ for ln, line in enumerate(lines):
         iselem=True
         cycle=True
         
-        #if 'C2D3' in line:
-        #    eltype.append('xtri')
-        #    elcount.append(0)
-        #elif 'C2D4' in line:
-        #    eltype.append('xquad')
-        #    elcount.append(0)
-        #elif 'COH2D4' in line:
-        #    eltype.append('coh2d')  # change to x version in future
-        #    elcount.append(0)
-        #elif ('C3D6' in line) or ('SC6' in line):
-        #    eltype.append('xwedge')
-        #    elcount.append(0)
-        #elif ('C3D8' in line) or ('SC8' in line):
-        #    eltype.append('xbrick')
-        #    elcount.append(0)
-        #elif 'COH3D6' in line:
-        #    eltype.append('coh3d6') # change to x version in future
-        #    elcount.append(0)
-        #elif 'COH3D8' in line:
-        #    eltype.append('coh3d8') # change to x version in future
-        #    elcount.append(0)
         if ('C3D8' in line) or ('SC8' in line):
             eltype.append('xlam')
             elcount.append(0)
@@ -201,7 +171,8 @@ for ln, line in enumerate(lines):
                     pass
 
             if ndim==2:
-                nodes.append(node(x=l[1], y=l[2], z=0.0))
+                # nodes.append(node(x=l[1], y=l[2], z=0.0))
+                print 'error: ndim = 2 not supported!' 
             else:
                 nodes.append(node(x=l[1], y=l[2], z=l[3]))  
 
@@ -231,30 +202,7 @@ for ln, line in enumerate(lines):
             elems.append(element(index=id,nodes=nds,edges=[]))
             
             if ndim==2:
-            # in 2D, all edges are breakable
-                for i in range(len(nds)):
-                    row=nds[i]-1
-                    
-                    if i==len(nds)-1:
-                        col=nds[0]-1
-                    else:
-                        col=nds[i+1]-1
-                        
-                    if ndedg[row][col]==0:
-                    # this pair of nodes hasn't been assigned to an edge
-                        fn1=len(nodes)                          # indices of 2 fl. nodes on this new edge
-                        fn2=fn1+1
-                        for nf in range(2):                     # create floating nodes on this edge
-                            nodes.append(node(0.0,0.0,0.0))
-                            
-                        edges.append(edge(nodes=[row+1,col+1,fn1+1,fn2+1]))     # create this edge (for output in Fortran)
-                        ndedg[row][col]=len(edges)              # fill the new edge index in the ndedg matrix
-                        ndedg[col][row]=-(len(edges))           # nodes in rev. order makes the same edge in rev. dir.
-                        elems[-1].edges.append(ndedg[row][col]) # append this edge no. in this elem
-                    else:
-                    # this pair of nodes has been assigned to an edge
-                        elems[-1].edges.append(ndedg[row][col]) # append this edge no. in this elem
-                        
+                print 'error: ndim = 2 not supported!'             
             else:
             # in 3D FNM for composites, only edges parallel to shell plane are breakable
                 for j in range(2):
@@ -303,8 +251,9 @@ for iply in range(nplyblk):
     for cntr0, nd in enumerate(nodes):
         cntr=cntr0+1+iply*plynnd
         if ndim==2:
-            fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+'\n')
-            lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp],u=[zero,zero])\n')
+            #fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+'\n')
+            #lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp],u=[zero,zero])\n')
+            print 'error: ndim = 2 not supported!' 
         else:
             fnminp.write(str(cntr)+', '+str(nd.x)+', '+str(nd.y)+', '+str(nd.z)+'\n')
             lib_node.write('        call update(lib_node('+str(cntr)+'),x=['+str(nd.x)+'_dp,'+str(nd.y)+'_dp,'+str(nd.z)+'_dp],u=[zero,zero,zero])\n')
@@ -336,52 +285,23 @@ for eli, elt in enumerate(eltype):
     #   2nd digit: 0: bulk elem; 1: coh elem; 2: x(brick/wedge) elem; 3: xlam elem
     #   3rd onwards: no. of real nodes
     if ndim == 2:
-        if elt == 'xtri':
-            nndrl=3         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
-            nedge=3         # no. of breakable edges in this element
-            nndfl=2*nedge
-            nnode=nndrl+nndfl
-            eltuel=223
-        elif elt == 'xquad':
-            nndrl=4         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
-            nedge=4         # no. of breakable edges in this element
-            nndfl=2*nedge
-            nnode=nndrl+nndfl
-            eltuel=224
-        elif elt == 'coh2d':
-            nnode=4
-            eltuel=214
-    elif ndim == 3:
-        if elt == 'xwedge':
-            nndrl=6         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
-            nedge=6         # no. of breakable edges in this element
-            nndfl=2*nedge
-            nnode=nndrl+nndfl
-            eltuel=326
-        elif elt == 'xbrick':
-            nndrl=8         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
-            nedge=8         # no. of breakable edges in this element
-            nndfl=2*nedge
-            nnode=nndrl+nndfl
-            eltuel=328
-        elif elt == 'coh3d6':
-            nnode=6
-            eltuel=316
-        elif elt == 'coh3d8':
-            nnode=8
-            eltuel=318
-        elif elt == 'xlam':
+            print 'error: fnm 2D elem type not supported for use!'
+    elif ndim == 3:      
+        if elt == 'xlam':
             nndrl=8*nplyblk         # no. of (real)nodes in the element. (here, 8 for linear brick elmt)
             nedge=8*nplyblk         # no. of breakable edges in this element
             nndfl=2*nedge
             nnode=nndrl+nndfl
             eltuel=338
+        else:
+            print 'error: fnm 3D elem type not supported for use!'
     
     # write user element definition in abaqus fnm input file
     fnminp.write('*USER ELEMENT, TYPE=U'+str(eltuel)+', NODES='+str(nnode)+', COORDINATES='+str(ndim)+
         ', PROPERTIES='+str(nprops)+', VARIABLES='+str(nsvars)+'\n')
     if ndim==2:
-        fnminp.write('1,2\n')
+        #fnminp.write('1,2\n')
+        print 'error: ndim = 2 not supported!' 
     else:
         fnminp.write('1,2,3\n')
       
@@ -462,24 +382,48 @@ for eli, elt in enumerate(eltype):
         
         # write node cnc and edge cnc (for x version elems only) to the respective type arrays in fnm lib_elem module
         if (elt == 'xlam'):
-            # write elem type and key
+            # write elem type and keys (key to its type library lib_xlam is cntr; key to its glb library lib_elem is el.index)
             lib_elem.write('        call prepare(lib_'+elt+'('+str(cntr)+'),key='+str(el.index)+', & \n')
-            # write elem associated material keys
-            lib_elem.write('& bulkmat=, cohmat= , interfmat= , & \n')    # update matkeys later accord. to mat section assignment
+            # write elem associated material keys (three matkeys are needed, for ply, matrix crack and delamination respectively)
+            lib_elem.write('& bulkmat='+str(ply_mkey)+', cohmat='+str(mcrack_mkey)+', interfmat='+str(delam_mkey)+', & \n')    # update matkeys later accord. to mat section assignment
             # write elem nodal connectivity
             if len(nodecnc) <= 100:
                 lib_elem.write('& nodecnc=['+nodecnc[:-1]+'], & \n')
             else:
-                
+                iclist=[0]
+                ic0=-1
                 for ic, c in enumerate(nodecnc):
-                    if ic >= 90 and c==',':
-                        break
-                lib_elem.write('& nodecnc=['+nodecnc[:ic]+' & \n')
-                lib_elem.write('& '+nodecnc[ic:-1]+'], & \n')
+                    ic0=ic0+1
+                    if ic0 >= 80 and c==',':
+                        iclist.append(ic)
+                        ic0=-1
+                lib_elem.write('& nodecnc=[ & \n')
+                for i, ic in enumerate(iclist[:-1]):
+                    istart=ic
+                    iend=iclist[i+1]
+                    lib_elem.write('& '+nodecnc[istart:iend]+' & \n')
+                lib_elem.write('& '+nodecnc[iend:-1]+'], & \n')
+                
             # write elem edge connectivity
-            lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
+            if len(edgecnc) <= 100:
+                lib_elem.write('& edgecnc=['+edgecnc[:-1]+'], & \n')
+            else:
+                iclist=[0]
+                ic0=-1
+                for ic, c in enumerate(edgecnc):
+                    ic0=ic0+1
+                    if ic0 >= 80 and c==',':
+                        iclist.append(ic)
+                        ic0=-1
+                lib_elem.write('& edgecnc=[ & \n')
+                for i, ic in enumerate(iclist[:-1]):
+                    istart=ic
+                    iend=iclist[i+1]
+                    lib_elem.write('& '+edgecnc[istart:iend]+' & \n')
+                lib_elem.write('& '+edgecnc[iend:-1]+'], & \n')
+                
             # write elem layup
-            lib_elem.write('& layup=['+ +']) \n') # need to write layup into strings of corresponding format
+            lib_elem.write('& layup=reshape(['+layupstr[:-1]+'],[2,'+str(nplyblk)+']) )\n') # need to write layup into strings of corresponding format
             
         else:
             print 'unsupported fnm elem type:', elt, 'for preprocessing!'
