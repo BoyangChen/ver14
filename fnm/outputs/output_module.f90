@@ -34,10 +34,9 @@
         integer                     :: nnode, nelem
         
         ! no. of elems of each elem type
-        integer                     :: ntri, nquad, ntetra, nwedge, nbrick, ncoh2d, ncoh3d6, ncoh3d8
-        integer                     :: nsub2d, nsubtri, nsubquad, nsubcoh2d
         integer                     :: nsub3d, nsubwedge, nsubbrick, nsubcoh3d6, nsubcoh3d8
         integer                     :: nxbrick
+        integer                     :: nxlam,nplyblk,ninterf
         
         ! sub element type variable
         character(len=eltypelength) :: subtype
@@ -63,7 +62,8 @@
         type(coh3d6_element),allocatable :: subcoh3d6(:)
         type(coh3d8_element),allocatable :: subcoh3d8(:)
         type(sub3d_element),allocatable :: sub3d(:)
-        
+        type(xbrick_element),allocatable :: subplyblk(:)
+        type(coh3d8_element),allocatable :: subinterf(:)
         
         ! integration points
         type(integration_point), allocatable :: igpnt(:) ! intg point array
@@ -94,11 +94,8 @@
         
         outunit=0; outfile=''; outnum=''; fmat=''; subtype=''
         nnode=0; nelem=0
-        ntri=0; nquad=0; ntetra=0; nwedge=0; nbrick=0
-        ncoh2d=0; ncoh3d6=0; ncoh3d8=0
-        nsub2d=0; nsubtri=0; nsubquad=0; nsubcoh2d=0
         nsub3d=0; nsubwedge=0; nsubbrick=0; nsubcoh3d6=0; nsubcoh3d8=0
-        nxbrick=0
+        nxbrick=0; nxlam=0; nplyblk=0; ninterf=0
         nsize=0; elnode=0
         x3d=zero; disp3d=zero
         sigtsr=zero; epstsr=zero
@@ -182,37 +179,49 @@
         !                   write elements' connec (order matters)
         
         ! get no. of elems of each type
-        
-        if(allocated(lib_xbrick)) then
-            nxbrick=size(lib_xbrick)
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)
-                do j=1,nsub3d
-                    call extract(sub3d(j),eltype=subtype)
-                    select case(subtype)
-                        case('wedge')
-                            nsubwedge=nsubwedge+1
-                        case('brick')
-                            nsubbrick=nsubbrick+1
-                        case('coh3d6')
-                            nsubcoh3d6=nsubcoh3d6+1
-                        case('coh3d8')
-                            nsubcoh3d8=nsubcoh3d8+1
-                        case default
-                            continue
-                    end select
-                end do
-                deallocate(sub3d)
+              
+        if(allocated(lib_xlam)) then
+            nxlam=size(lib_xlam)
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        do j=1,nsub3d
+                            call extract(sub3d(j),eltype=subtype)
+                            select case(subtype)
+                                case('wedge')
+                                    nsubwedge=nsubwedge+1
+                                case('brick')
+                                    nsubbrick=nsubbrick+1
+                                case('coh3d6')
+                                    nsubcoh3d6=nsubcoh3d6+1
+                                case('coh3d8')
+                                    nsubcoh3d8=nsubcoh3d8+1
+                                case default
+                                    continue
+                            end select
+                        end do
+                        deallocate(sub3d)
+                    end do
+                end if
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)
+                end if
+                
             end do
         end if
         ! .... and other elem types ....
         
         ! total no. of elems
-        nelem=nsubwedge+nsubbrick+nsubcoh3d6+nsubcoh3d8
+        nelem=nsubwedge+nsubbrick+nsubcoh3d6+nsubcoh3d8+ninterf
         
         ! calculate total no. of nodes to print; each row has 1+elnode no. of indices to print
-        nsize=nsubwedge*(1+6)+nsubbrick*(1+8)+nsubcoh3d6*(1+6)+nsubcoh3d8*(1+8)
+        nsize=nsubwedge*(1+6)+nsubbrick*(1+8)+nsubcoh3d6*(1+6)+nsubcoh3d8*(1+8)+ninterf*(1+8)
         
         ! write a summary of output
         write(outunit,'(a, i10, i10)')'CELLS ', nelem, nsize
