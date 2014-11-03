@@ -18,6 +18,8 @@
             
             character(len=eltypelength)     :: eltype=''    ! can be all types of 2D elements
             integer                         :: matkey=0     ! material index in glb material array
+            
+            real(dp)                        :: plyangle=zero! ply angle for composite lamina (rotation around z axis) 
 
 
             integer,allocatable             :: glbcnc(:)    ! sub_elem connec to global node library
@@ -75,6 +77,7 @@
             elem%curr_status=0
             elem%eltype=''    ! can be all types of 2D elements
             elem%matkey=0     ! material index in glb material array
+            elem%plyangle=zero
 
             
             if(allocated(elem%glbcnc))      deallocate(elem%glbcnc)
@@ -96,12 +99,13 @@
         
         
         
-        subroutine prepare_sub3d_element(elem,eltype,matkey,glbcnc,Tmatrix,mnode)
+        subroutine prepare_sub3d_element(elem,eltype,matkey,plyangle,glbcnc,Tmatrix,mnode)
         
             type(sub3d_element), intent(inout) :: elem
             
             character(len=*),intent(in)             :: eltype       ! can be all types of 2D elements
             integer,intent(in)                      :: matkey       ! material index in glb material array
+            real(dp),intent(in)                     :: plyangle
             
             integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
             
@@ -116,7 +120,8 @@
                        
             
             elem%eltype=eltype   
-            elem%matkey=matkey     
+            elem%matkey=matkey    
+            elem%plyangle=plyangle
              
             if(allocated(elem%glbcnc))  then
                 if(size(elem%glbcnc)/=size(glbcnc)) then
@@ -183,13 +188,13 @@
         
         
         
-        subroutine extract_sub3d_element(elem,eltype,curr_status,matkey,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
+        subroutine extract_sub3d_element(elem,eltype,curr_status,matkey,plyangle,glbcnc,wedge,brick,coh3d6,coh3d8,Tmatrix,mnode)
         
             type(sub3d_element), intent(in) :: elem
             
             character(len=eltypelength),  intent(out),optional    :: eltype       ! can be all types of 2D elements
             integer,                    intent(out),optional    :: curr_status,matkey       ! material index in glb material array
-
+            real(dp),                   intent(out),optional    :: plyangle
             
             integer,        allocatable,intent(out),optional    :: glbcnc(:)    ! sub_elem connec to global node library
                         
@@ -207,7 +212,7 @@
             if(present(eltype)) eltype=elem%eltype
             if(present(curr_status)) curr_status=elem%curr_status
             if(present(matkey)) matkey=elem%matkey
-
+            if(present(plyangle)) plyangle=elem%plyangle
             
             
             if(present(glbcnc)) then
@@ -304,7 +309,7 @@
                     if(.not.allocated(elem%wedge)) then
                         allocate(elem%wedge(1))
                         call empty(elem%wedge(1))
-                        call prepare(elem%wedge(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
+                        call prepare(elem%wedge(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,plyangle=elem%plyangle)
                     end if
                     
                     call integrate(elem%wedge(1),Kmatrix,Fvector,nofail)
@@ -316,7 +321,7 @@
                     if(.not.allocated(elem%brick)) then
                         allocate(elem%brick(1))
                         call empty(elem%brick(1))
-                        call prepare(elem%brick(1),key=0,connec=elem%glbcnc,matkey=elem%matkey)
+                        call prepare(elem%brick(1),key=0,connec=elem%glbcnc,matkey=elem%matkey,plyangle=elem%plyangle)
                     end if
                     
                     call integrate(elem%brick(1),Kmatrix,Fvector,nofail)

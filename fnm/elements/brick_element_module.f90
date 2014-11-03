@@ -20,6 +20,8 @@
         integer :: key=0 ! glb index of this element
         integer :: connec(nnode)=0 ! node indices in their global arrays
         integer :: matkey=0 ! material index in the global material arrays
+        
+        real(dp):: plyangle=zero        ! ply angle for composite lamina (rotation around z axis) 
 
         real(dp) :: stress(nst)=zero ! stresses for output
         real(dp) :: strain(nst)=zero ! strains for output
@@ -75,6 +77,7 @@
         elem%key=0
         elem%connec=0
         elem%matkey=0
+        elem%plyangle=zero        
         elem%stress=zero
         elem%strain=zero
 
@@ -91,11 +94,12 @@
     
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_brick_element(elem,key,connec,matkey)
+    subroutine prepare_brick_element(elem,key,connec,matkey,plyangle)
     
         type(brick_element),    intent(inout)   :: elem
         integer,                intent(in)      :: connec(nnode)
         integer,                intent(in)      :: key,matkey
+        real(dp),               intent(in)      :: plyangle
 
         
         real(kind=dp)   :: x(ndim),u(ndim),stress(nst),strain(nst)
@@ -106,7 +110,7 @@
         elem%key=key
         elem%connec=connec
         elem%matkey=matkey
-
+        elem%plyangle=plyangle
         
         do i=1,nig
             call update(elem%ig_point(i),x=x,u=u,stress=stress,strain=strain)
@@ -117,11 +121,12 @@
     
     
     
-    subroutine extract_brick_element(elem,curr_status,key,connec,matkey,stress,strain,ig_point,sdv)
+    subroutine extract_brick_element(elem,curr_status,key,connec,matkey,plyangle,stress,strain,ig_point,sdv)
     
         type(brick_element), intent(in) :: elem
         
         integer,                              optional, intent(out) :: curr_status,key, matkey
+        real(dp),                             optional, intent(out) :: plyangle
         real(dp),                allocatable, optional, intent(out) :: stress(:), strain(:)
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
@@ -133,7 +138,8 @@
         
         if(present(matkey)) matkey=elem%matkey
         
-
+        if(present(plyangle)) plyangle=elem%plyangle
+        
         if(present(stress)) then
             allocate(stress(nst))
             stress=elem%stress
@@ -266,7 +272,10 @@
         
         ! extract material values from global material array
         mat=lib_mat(elem%matkey)
-        call extract(mat,matname,mattype,typekey,theta)
+        call extract(mat,matname,mattype,typekey)
+        
+        ! extract ply angle from element definition
+        theta=elem%plyangle
         
         ! - extract curr step and inc values from glb clock module
         call extract_glb_clock(kstep=curr_step,kinc=curr_inc)

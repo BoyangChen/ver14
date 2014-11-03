@@ -11,7 +11,7 @@ module xlam_element_module
     private
     
     ! parameters for no. nodes of ply-block element (xbrick) and interface element (coh3d8)
-    integer, parameter :: ndim=3, nndplyblk=24, nedgplyblk=8, nndinterf=8
+    integer, parameter :: ndim=3, nndplyblk=24, nedgplyblk=8, nndinterf=8, ncorner=8
     
 
     type, public :: xlam_element
@@ -241,12 +241,18 @@ module xlam_element_module
         
         ! lcl arrays to store temporarily the cnc of dofs of each sub elem to parent elem dofs
         integer, allocatable :: dofcnc(:)
-       
+        
+        ! temp. coordinates of corner nodes (used to update the z-coord of corner nodes of each plyblk)
+        type(real_alloc_array) :: coord(ncorner)
+        
+        ! corner edge thickness of this laminate (no. of corner edges = half * no. of corner nodes)
+        real(dp) :: shellthickness(ncorner/2)
         
         ! initialize local variables
         i=0; j=0; l=0
         ndof=0; nplyblk=0; ninterf=0
         plyblknode=0; plyblkedge=0; interfnode=0
+        shellthickness=zero
         
         
         ! check if the elem has been prepared (by checking layup; note that in prepare subroutine all attributes 
@@ -260,7 +266,8 @@ module xlam_element_module
         nplyblk=size(elem%layup(1,:))
         ninterf=nplyblk-1
         ndof=ndim*size(elem%nodecnc)
-        
+
+     
 
         !---------------------------------------------------------------------!
         !       prepare sub elements
@@ -298,6 +305,20 @@ module xlam_element_module
             end do
             
             
+            ! extract elem corner nodes' coords from glb node library
+            do j=1, ncorner ! first ncorner nodes of this elem
+                call extract(lib_node(elem%nodecnc(j)),x=coord(j)%array)
+                if(.not.allocated(coord(j)%array)) then
+                    write(msg_file,*)'error: corner node coords undefined!'
+                    call exit_function
+                end if
+            end do
+            ! compute shell thickness at the corner edges (ncorner/2 edges)
+            do j=1, ncorner/2
+                shellthickness(j)=coord(j+ncorner/2)%array(3)-coord(j)%array(3)
+            end do
+
+
             
             ! prepare plyblk elems
             do i=1, nplyblk
@@ -305,9 +326,31 @@ module xlam_element_module
                 plyblknode(:)=elem%nodecnc(elem%plyblknodecnc(i)%array(:))
                 plyblkedge(:)=elem%edgecnc(elem%plyblkedgecnc(i)%array(:))
                 
+                ! update corner node coords (z coords) of this plyblk accord. to plyblk thickness ratio
+                ! coord(:) is updated to store corner nodes coords of each plyblk
+                if (i==1) then
+                    do j=1, ncorner/2
+                        ! 1st ply top nodes = 1st ply bottom nodes + 1stplyratio* shellthickness
+                        coord(j+ncorner/2)%array(3)=coord(j)%array(3)+elem%layup(2,i)*shellthickness(j)
+                        ! update 1st ply top node coords into glb lib_node array
+                        call update(lib_node(plyblknode(j+ncorner/2)),x=coord(j+ncorner/2)%array)
+                    end do
+                else
+                    do j=1, ncorner/2
+                        ! ith ply bottom nodes = (i-1)th ply top nodes (already stored in coord(j+ncorner/2))
+                        coord(j)%array(3)=coord(j+ncorner/2)%array(3)
+                        ! update ith ply bottom node coords into glb lib_node array
+                        call update(lib_node(plyblknode(j)),x=coord(j)%array)
+                        ! ith ply top nodes = ith ply bottom nodes + ithplyratio*shellthickness
+                        coord(j+ncorner/2)%array(3)=coord(j)%array(3)+elem%layup(2,i)*shellthickness(j)
+                        ! update ith ply top node coords into glb lib_node array
+                        call update(lib_node(plyblknode(j+ncorner/2)),x=coord(j+ncorner/2)%array)
+                    end do                    
+                end if
+                
                 ! prepare each plyblk elem (here xbrick elem type)
                 call prepare(elem%plyblk(i),key=0,bulkmat=elem%bulkmat,cohmat=elem%cohmat, &
-                & nodecnc=plyblknode,edgecnc=plyblkedge)
+                & plyangle=elem%layup(1,i), nodecnc=plyblknode,edgecnc=plyblkedge)               
             end do
             
             ! prepare interf elems

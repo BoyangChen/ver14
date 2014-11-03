@@ -106,9 +106,9 @@ list_interface.append(laminate_Delamination)
 # -----------------------------------------------------------------------
 # append current analysis materials in the global material list
 # -----------------------------------------------------------------------
-list_mat.append(material(name="'laminate Ply'",          type="'lamina'",      typekey=1, theta=0.0))
-list_mat.append(material(name="'laminate Matrix Crack'",   type="'interface'",   typekey=1, theta=0.0))
-list_mat.append(material(name="'laminate Delamination'",   type="'interface'",   typekey=2, theta=0.0))
+list_mat.append(material(name="'laminate Ply'",          type="'lamina'",      typekey=1))
+list_mat.append(material(name="'laminate Matrix Crack'",   type="'interface'",   typekey=1))
+list_mat.append(material(name="'laminate Delamination'",   type="'interface'",   typekey=2))
 
 
 
@@ -145,7 +145,7 @@ lib_mat.write('        if(ninterface>0) allocate(lib_interface(ninterface))     
 if(nmat>0):
     for i in range(nmat):
         lib_mat.write('        call update(lib_mat('+str(i+1)+'),matname='+list_mat[i].name+\
-        ',mattype='+list_mat[i].type+',typekey='+str(list_mat[i].typekey)+',theta='+str(list_mat[i].theta)+'_dp'+')\n')
+        ',mattype='+list_mat[i].type+',typekey='+str(list_mat[i].typekey)+')\n')
 
 
 # write lamina material properties

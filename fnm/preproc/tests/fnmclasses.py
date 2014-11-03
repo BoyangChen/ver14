@@ -76,11 +76,10 @@ class interface:
 
 class material:
 
-    def __init__(self, name, type, typekey, theta):
+    def __init__(self, name, type, typekey):
         self.name = name
         self.type = type
         self.typekey  = typekey
-        self.theta= theta
 
 
 class node:

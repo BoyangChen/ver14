@@ -9,9 +9,9 @@
         if(niso>0) allocate(lib_iso(niso))                       
         if(nlamina>0) allocate(lib_lamina(nlamina))              
         if(ninterface>0) allocate(lib_interface(ninterface))     
-        call update(lib_mat(1),matname='laminate Ply',mattype='lamina',typekey=1,theta=0.0_dp)
-        call update(lib_mat(2),matname='laminate Matrix Crack',mattype='interface',typekey=1,theta=0.0_dp)
-        call update(lib_mat(3),matname='laminate Delamination',mattype='interface',typekey=2,theta=0.0_dp)
+        call update(lib_mat(1),matname='laminate Ply',mattype='lamina',typekey=1)
+        call update(lib_mat(2),matname='laminate Matrix Crack',mattype='interface',typekey=1)
+        call update(lib_mat(3),matname='laminate Delamination',mattype='interface',typekey=2)
         call update(lib_lamina(1), & 
       & lamina_modulus(& 
       & E1=161000.0_dp,& 

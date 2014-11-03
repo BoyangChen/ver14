@@ -13,7 +13,6 @@
         character(len=matnamelength) :: matname=''  ! user-given name from input
         character(len=mattypelength) :: mattype=''  ! defined material types: isotropic, lamina, interlayer, etc.
         integer :: typekey=0                         ! index in the respective array of the associated material type
-        real(dp):: theta=zero                       ! material angle (fibre angle)
         
     end type
     
@@ -49,40 +48,35 @@
         mat%matname=''
         mat%mattype=''
         mat%typekey=0
-        mat%theta=zero
     
     end subroutine empty_material
     
     
     ! this subroutine is used in the preprocessing to fill in the
     ! material information in the global material library lib_mat
-    subroutine update_material(mat,matname,mattype,typekey,theta)
+    subroutine update_material(mat,matname,mattype,typekey)
         type(material),intent(inout):: mat
         character(len=*),optional,intent(in) :: matname 
         character(len=*),optional,intent(in) :: mattype 
         integer,optional,intent(in) :: typekey
-        real(dp),optional,intent(in):: theta
         
         if(present(matname)) mat%matname=matname
         if(present(mattype)) mat%mattype=mattype
         if(present(typekey)) mat%typekey=typekey
-        if(present(theta)) mat%theta=theta
     
     end subroutine update_material
     
     
     ! this subroutine is used anywhere to extract material information
-    subroutine extract_material(mat,matname,mattype,typekey,theta)
+    subroutine extract_material(mat,matname,mattype,typekey)
         type(material),intent(in):: mat
         character(len=matnamelength),optional,intent(out) :: matname 
         character(len=mattypelength),optional,intent(out) :: mattype 
         integer,optional,intent(out) :: typekey
-        real(dp),optional,intent(out):: theta
         
         if(present(matname)) matname=mat%matname
         if(present(mattype)) mattype=mat%mattype
         if(present(typekey)) typekey=mat%typekey
-        if(present(theta)) theta=mat%theta
     
     end subroutine extract_material
     

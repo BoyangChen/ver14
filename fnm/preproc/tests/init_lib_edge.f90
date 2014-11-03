@@ -3,7 +3,7 @@
         integer :: nedge=0                    
         integer :: i=0                        
                                               
-        nedge=16   
+        nedge=24   
         allocate(lib_edge(nedge))   
         lib_edge=0                  
     end subroutine initialize_lib_edge        

@@ -31,6 +31,8 @@ module xbrick_element_module
         integer :: bulkmat=0
         integer :: cohmat=0
         
+        real(dp):: plyangle=zero        ! ply angle for composite lamina (rotation around z axis) 
+        
         integer :: nodecnc(nnode)=0     ! cnc to glb node arrays for accessing nodal variables (x, u, du, v, dof ...)
         integer :: edgecnc(nedge)=0     ! cnc to glb edge arrays for accessing edge variables (failure status)
         integer :: ifailedge(nedge)=0   ! indices of failed edges
@@ -86,6 +88,7 @@ module xbrick_element_module
         elem%key=0 
         elem%bulkmat=0
         elem%cohmat=0
+        elem%plyangle=zero
         
         elem%nodecnc=0
         elem%edgecnc=0
@@ -105,24 +108,26 @@ module xbrick_element_module
   
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xbrick_element(elem,key,bulkmat,cohmat,nodecnc,edgecnc)
+    subroutine prepare_xbrick_element(elem,key,bulkmat,cohmat,plyangle,nodecnc,edgecnc)
     
         type(xbrick_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: bulkmat, cohmat
+        real(dp),               intent(in)      :: plyangle
         integer,                intent(in)      :: nodecnc(nnode)
         integer,                intent(in)      :: edgecnc(nedge)
 
         elem%key=key 
         elem%bulkmat=bulkmat
         elem%cohmat=cohmat
+        elem%plyangle=plyangle
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
     
     end subroutine prepare_xbrick_element
     
     
-    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,nodecnc,edgecnc, &
+    subroutine extract_xbrick_element(elem,curr_status,key,bulkmat,cohmat,plyangle,nodecnc,edgecnc, &
     & ifailedge,newpartition,nstep,ninc,subelem,subcnc,sdv)
     
         type(xbrick_element),                      intent(in)  :: elem
@@ -130,6 +135,7 @@ module xbrick_element_module
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: bulkmat
         integer,                        optional, intent(out) :: cohmat
+        real(dp),                       optional, intent(out) :: plyangle
         integer,            allocatable,optional, intent(out) :: nodecnc(:)
         integer,            allocatable,optional, intent(out) :: edgecnc(:)
         integer,            allocatable,optional, intent(out) :: ifailedge(:)
@@ -143,6 +149,7 @@ module xbrick_element_module
         if(present(key)) key=elem%key 
         if(present(bulkmat)) bulkmat=elem%bulkmat
         if(present(cohmat)) cohmat=elem%cohmat
+        if(present(plyangle)) plyangle=elem%plyangle
         
         if(present(nodecnc)) then 
             allocate(nodecnc(nnode))
@@ -263,7 +270,8 @@ module xbrick_element_module
                     elem%subcnc(1)%array=[(i, i=1,nndrl)]
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     ! create sub elements
-                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, &
+                    & plyangle=elem%plyangle, glbcnc=subglbcnc(1)%array)
                 end if
             end if 
          
@@ -1452,9 +1460,9 @@ module xbrick_element_module
             subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
 
             ! create sub elements
-            call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
-            call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
-            call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array)
+            call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, plyangle=elem%plyangle, glbcnc=subglbcnc(1)%array)
+            call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, plyangle=elem%plyangle, glbcnc=subglbcnc(2)%array)
+            call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, plyangle=elem%plyangle, glbcnc=subglbcnc(3)%array)
          
 
  
@@ -1581,8 +1589,8 @@ module xbrick_element_module
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
-                    call prepare(elem%subelem(2),eltype='brick', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
+                    call prepare(elem%subelem(1),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(2)%array)
                     
                     if(iscoh) then
                     
@@ -1690,10 +1698,10 @@ module xbrick_element_module
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(1)%array)
-                    call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(2)%array)
-                    call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(3)%array)
-                    call prepare(elem%subelem(4),eltype='wedge', matkey=elem%bulkmat, glbcnc=subglbcnc(4)%array)
+                    call prepare(elem%subelem(1),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(2)%array)
+                    call prepare(elem%subelem(3),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(3)%array)
+                    call prepare(elem%subelem(4),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(4)%array)
                     
                     if(iscoh) then
                     

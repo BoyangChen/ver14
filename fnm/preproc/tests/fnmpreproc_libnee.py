@@ -2,6 +2,24 @@
 ################# Preprocessing for the FNM ####################
 ##  writing lib_node, lib_edge and lib_elem modules           ##
 ################################################################
+##
+##
+################################################################
+##  so far, only works on models with a single part, meshed
+##  with 3D brick-type elements (C3D8(R) or SC8(R)); it prepares
+##  a new input file and fnm modules with xlam element type only.
+################################################################
+##
+##
+################################################################
+##  Applicable abaqus input file:
+##  - single 3D part meshed with either C3D8(R) or SC8(R) elements
+##  - part definition can only include *Node and *Element
+##  - assembly definition can only include *Instance and *Nset
+##  - boundary conditions can only be applied to assembly node sets
+################################################################
+
+
 
 # glb objects defined for FNM
 from fnmclasses import*
@@ -63,10 +81,13 @@ rawlayup=[]    # layup of the laminate in its basic format (list of fibre angles
 blklayup=[]    # layup of ply blocks, used in xlam element; an xlayup class is needed
 
 
-# ask for layup from user
+#***************************************************************
+#       ask for layup from user
+#***************************************************************
 
 # ask for no. of plies
 nply=input('number of plies for xlam element (must be integer, 0 if not applicable):')
+
 # check if nply is integer
 while (not isinstance(nply,int)):
     nply=input('number of plies must be integer, re-enter (0 if not applicable):')
@@ -75,6 +96,7 @@ while (not isinstance(nply,int)):
 if (nply>0):
     # ask for a list of ply angles
     rawlayup=input('layup of laminate is (fibre angle (int/float) of each ply, separated by comma):')
+    
     # check if it is a list and if all elements in the list are numbers
     while ((not isinstance(rawlayup, (list,tuple))) or (not all(isinstance(item, (int,float)) for item in rawlayup))):
         rawlayup=input('layup of laminate is (fibre angle (int/float) of each ply, separated by comma):')      
@@ -93,7 +115,17 @@ else:
 # put layup info in a string for later output purpose
 layupstr=''
 for lp in blklayup:
-    layupstr=layupstr+str(lp.angle)+','+str(lp.ratio)+','
+    if ('.' in str(lp.angle)):
+        layupstr=layupstr+str(lp.angle)+'_dp,'
+    else:
+        layupstr=layupstr+str(lp.angle)+'._dp,'
+        
+    if ('.' in str(lp.ratio)):
+        layupstr=layupstr+str(lp.ratio)+'_dp,'
+    else:
+        layupstr=layupstr+str(lp.ratio)+'._dp,'
+
+
 
 
 #***************************************************************

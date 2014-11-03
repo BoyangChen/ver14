@@ -2,7 +2,7 @@
                                               
         integer :: nnode=0                    
         integer :: i=0                        
-        nnode=48   
+        nnode=72   
         allocate(lib_node(nnode))   
         call update(lib_node(1),x=[-1.0_dp,-1.0_dp,0.0_dp],u=[zero,zero,zero])
         call update(lib_node(2),x=[1.0_dp,-1.0_dp,0.0_dp],u=[zero,zero,zero])
@@ -52,4 +52,28 @@
         call update(lib_node(46),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
         call update(lib_node(47),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
         call update(lib_node(48),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(49),x=[-1.0_dp,-1.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(50),x=[1.0_dp,-1.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(51),x=[-1.0_dp,1.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(52),x=[1.0_dp,1.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(53),x=[-1.0_dp,-1.0_dp,0.25_dp],u=[zero,zero,zero])
+        call update(lib_node(54),x=[1.0_dp,-1.0_dp,0.25_dp],u=[zero,zero,zero])
+        call update(lib_node(55),x=[-1.0_dp,1.0_dp,0.25_dp],u=[zero,zero,zero])
+        call update(lib_node(56),x=[1.0_dp,1.0_dp,0.25_dp],u=[zero,zero,zero])
+        call update(lib_node(57),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(58),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(59),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(60),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(61),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(62),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(63),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(64),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(65),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(66),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(67),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(68),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(69),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(70),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(71),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
+        call update(lib_node(72),x=[0.0_dp,0.0_dp,0.0_dp],u=[zero,zero,zero])
     end subroutine initialize_lib_node        
