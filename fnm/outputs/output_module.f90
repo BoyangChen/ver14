@@ -207,10 +207,12 @@
                         end do
                         deallocate(sub3d)
                     end do
+                    deallocate(subplyblk)
                 end if
                 
                 if(allocated(subinterf)) then
                     ninterf=size(subinterf)
+                    deallocate(subinterf)
                 end if
                 
             end do
@@ -262,7 +264,8 @@
                         end if
                         
                         deallocate(sub3d)
-                    end do             
+                    end do 
+                    deallocate(subplyblk)
                 end if
 
 
@@ -281,11 +284,12 @@
                             write(outunit,'(a)')''
                             deallocate(connec)
                         end do
-                    end if    
+                    end if 
+                    deallocate(subinterf)
                 end if
             
-                deallocate(subplyblk)
-                deallocate(subinterf)
+                
+                
             
             ! loop over all xlam elems
             end do
@@ -337,7 +341,8 @@
                         end if
                         
                         deallocate(sub3d)
-                    end do             
+                    end do 
+                    deallocate(subplyblk)
                 end if
 
 
@@ -349,11 +354,12 @@
                         do i=1,ninterf
                             write(outunit,'(i2)') 12 ! 12 for coh3d8
                         end do
-                    end if    
+                    end if   
+                    deallocate(subinterf)
                 end if
             
-                deallocate(subplyblk)
-                deallocate(subinterf)
+                
+                
             
             ! loop over all xlam elems
             end do
@@ -408,87 +414,127 @@
         write(outunit,'(a)')'TENSORS stress float'
 
 
-        if(nxbrick > 0) then
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)        
-                if (nsub3d > 0) then
-                    do i=1,nsub3d
-                        call extract(sub3d(i),eltype=subtype)
-                        select case(subtype)                
-                            case('wedge')
-                                ! extract wedge sub elem
-                                call extract(sub3d(i),wedge=subwedge)
-                                sigtsr=zero ! empty sig & eps tensor for reuse  
-                                call extract(subwedge(1),stress=sig)
-                                sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                                sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                                sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                                sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                                sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                                sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                                sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                                sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                                sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                                do l=1,3
-                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element
-                                
-                                deallocate(sig)
-                                deallocate(subwedge)
-                                
-                            case('brick')
-                                ! extract brick sub elem
-                                call extract(sub3d(i),brick=subbrick)
-                                sigtsr=zero ! empty sig & eps tensor for reuse 
-                                call extract(subbrick(1),stress=sig)
-                                sigtsr(1,1)=sigtsr(1,1)+sig(1)
-                                sigtsr(2,2)=sigtsr(2,2)+sig(2)
-                                sigtsr(3,3)=sigtsr(3,3)+sig(3)
-                                sigtsr(1,2)=sigtsr(1,2)+sig(4)
-                                sigtsr(1,3)=sigtsr(1,3)+sig(5)
-                                sigtsr(2,3)=sigtsr(2,3)+sig(6)
-                                sigtsr(2,1)=sigtsr(2,1)+sig(4)
-                                sigtsr(3,1)=sigtsr(3,1)+sig(5)
-                                sigtsr(3,2)=sigtsr(3,2)+sig(6)
-                                do l=1,3
-                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element 
-                                
-                                deallocate(sig)
-                                deallocate(subbrick)
-            
-                            case('coh3d6')
-                                ! extract coh3d6 sub elem
-                                call extract(sub3d(i),coh3d6=subcoh3d6)
-                                sigtsr=zero ! empty sig & eps tensor for reuse
-                                do l=1,3
-                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element 
-                                
-                                deallocate(subcoh3d6)
-                                
-                            case('coh3d8')
-                                ! extract coh3d8 sub elem
-                                call extract(sub3d(i),coh3d8=subcoh3d8)
-                                sigtsr=zero ! empty sig & eps tensor for reuse
-                                do l=1,3
-                                    write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element
-                                
-                                deallocate(subcoh3d8)
-           
-                            case default
-                                continue                       
-                        end select    
-                    end do   
+
+        if(nxlam > 0) then
+            ! loop over all xlam elems
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                
+                ! write stress tensors of plyblk elems
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)                   
+                    ! loop over all plyblks (type xbrick)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        
+                        if(nsub3d > 0) then                        
+                            ! loop over all sub elems of xbrick and write each sub elem's stress individually
+                            do i=1,nsub3d
+                                call extract(sub3d(i),eltype=subtype)
+                                select case(subtype)                
+                                    case('wedge')
+                                        ! extract wedge sub elem
+                                        call extract(sub3d(i),wedge=subwedge)
+                                        sigtsr=zero ! empty sig & eps tensor for reuse  
+                                        call extract(subwedge(1),stress=sig)
+                                        sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                        sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                        sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                        sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                        sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                        sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                        sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                        sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                        sigtsr(3,2)=sigtsr(3,2)+sig(6)
+                                        do l=1,3
+                                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element
+                                        
+                                        deallocate(sig)
+                                        deallocate(subwedge)
+                                        
+                                    case('brick')
+                                        ! extract brick sub elem
+                                        call extract(sub3d(i),brick=subbrick)
+                                        sigtsr=zero ! empty sig & eps tensor for reuse 
+                                        call extract(subbrick(1),stress=sig)
+                                        sigtsr(1,1)=sigtsr(1,1)+sig(1)
+                                        sigtsr(2,2)=sigtsr(2,2)+sig(2)
+                                        sigtsr(3,3)=sigtsr(3,3)+sig(3)
+                                        sigtsr(1,2)=sigtsr(1,2)+sig(4)
+                                        sigtsr(1,3)=sigtsr(1,3)+sig(5)
+                                        sigtsr(2,3)=sigtsr(2,3)+sig(6)
+                                        sigtsr(2,1)=sigtsr(2,1)+sig(4)
+                                        sigtsr(3,1)=sigtsr(3,1)+sig(5)
+                                        sigtsr(3,2)=sigtsr(3,2)+sig(6)
+                                        do l=1,3
+                                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element 
+                                        
+                                        deallocate(sig)
+                                        deallocate(subbrick)
+                    
+                                    case('coh3d6')
+                                        ! extract coh3d6 sub elem
+                                        !call extract(sub3d(i),coh3d6=subcoh3d6)
+                                        sigtsr=zero ! empty sig & eps tensor for reuse
+                                        do l=1,3
+                                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element 
+                                        
+                                        !deallocate(subcoh3d6)
+                                        
+                                    case('coh3d8')
+                                        ! extract coh3d8 sub elem
+                                        !call extract(sub3d(i),coh3d8=subcoh3d8)
+                                        sigtsr=zero ! empty sig & eps tensor for reuse
+                                        do l=1,3
+                                            write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element
+                                        
+                                        !deallocate(subcoh3d8)
+                   
+                                    case default
+                                        continue                       
+                                end select    
+                            end do                       
+                        end if
+                        
+                        deallocate(sub3d)
+                    end do  
+                    deallocate(subplyblk)
                 end if
-                deallocate(sub3d)
+
+
+                ! write stress tensors of interface elems (all zero; coh elems only output failure)
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)                
+                    if(ninterf > 0) then
+                        do i=1,ninterf
+                            sigtsr=zero ! empty sig & eps tensor for reuse
+                            do l=1,3
+                                write(outunit,*) sigtsr(1,l), sigtsr(2,l), sigtsr(3,l)
+                            end do
+                            write(outunit,'(a)')'' ! separate from next element
+                        end do
+                    end if 
+                    deallocate(subinterf)
+                end if
+            
+                
+                
+            
+            ! loop over all xlam elems
             end do
+            
         end if
         
         
@@ -504,92 +550,133 @@
 
 
 
-        if(nxbrick > 0) then
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)        
-                if (nsub3d > 0) then
-                    do i=1,nsub3d
-                        call extract(sub3d(i),eltype=subtype)
-                        select case(subtype)                
-                            case('wedge')
-                                ! extract wedge sub elem
-                                call extract(sub3d(i),wedge=subwedge)
-                                epstsr=zero ! empty eps & eps tensor for reuse  
-                                call extract(subwedge(1),strain=eps)
-                                epstsr(1,1)=epstsr(1,1)+eps(1)
-                                epstsr(2,2)=epstsr(2,2)+eps(2)
-                                epstsr(3,3)=epstsr(3,3)+eps(3)
-                                epstsr(1,2)=epstsr(1,2)+eps(4)
-                                epstsr(1,3)=epstsr(1,3)+eps(5)
-                                epstsr(2,3)=epstsr(2,3)+eps(6)
-                                epstsr(2,1)=epstsr(2,1)+eps(4)
-                                epstsr(3,1)=epstsr(3,1)+eps(5)
-                                epstsr(3,2)=epstsr(3,2)+eps(6)
-                                do l=1,3
-                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element
-                                
-                                deallocate(subwedge)
-                                deallocate(eps)
-                                
-                            case('brick')
-                                ! extract brick sub elem
-                                call extract(sub3d(i),brick=subbrick)
-                                epstsr=zero ! empty eps & eps tensor for reuse  
-                                call extract(subbrick(1),strain=eps)
-                                epstsr(1,1)=epstsr(1,1)+eps(1)
-                                epstsr(2,2)=epstsr(2,2)+eps(2)
-                                epstsr(3,3)=epstsr(3,3)+eps(3)
-                                epstsr(1,2)=epstsr(1,2)+eps(4)
-                                epstsr(1,3)=epstsr(1,3)+eps(5)
-                                epstsr(2,3)=epstsr(2,3)+eps(6)
-                                epstsr(2,1)=epstsr(2,1)+eps(4)
-                                epstsr(3,1)=epstsr(3,1)+eps(5)
-                                epstsr(3,2)=epstsr(3,2)+eps(6)
-                                do l=1,3
-                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element 
-                                
-                                deallocate(subbrick)
-                                deallocate(eps)
-            
-                            case('coh3d6')
-                                ! extract coh3d6 sub elem
-                                call extract(sub3d(i),coh3d6=subcoh3d6)
-                                epstsr=zero ! empty eps & eps tensor for reuse
-                                do l=1,3
-                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element 
-                                
-                                deallocate(subcoh3d6)
-                                
-                            case('coh3d8')
-                                ! extract coh3d8 sub elem
-                                call extract(sub3d(i),coh3d8=subcoh3d8)
-                                epstsr=zero ! empty eps & eps tensor for reuse
-                                do l=1,3
-                                    write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
-                                end do
-                                write(outunit,'(a)')'' ! separate from next element
-                                
-                                deallocate(subcoh3d8)
-           
-                            case default
-                                continue                       
-                        end select    
-                    end do   
+
+
+        if(nxlam > 0) then
+            ! loop over all xlam elems
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                
+                ! write strain tensors of plyblk elems
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)                   
+                    ! loop over all plyblks (type xbrick)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        
+                        if(nsub3d > 0) then                        
+                            ! loop over all sub elems of xbrick and write each sub elem's strains individually
+                            do i=1,nsub3d
+                                call extract(sub3d(i),eltype=subtype)
+                                select case(subtype)                
+                                    case('wedge')
+                                        ! extract wedge sub elem
+                                        call extract(sub3d(i),wedge=subwedge)
+                                        epstsr=zero ! empty eps & eps tensor for reuse  
+                                        call extract(subwedge(1),strain=eps)
+                                        epstsr(1,1)=epstsr(1,1)+eps(1)
+                                        epstsr(2,2)=epstsr(2,2)+eps(2)
+                                        epstsr(3,3)=epstsr(3,3)+eps(3)
+                                        epstsr(1,2)=epstsr(1,2)+eps(4)
+                                        epstsr(1,3)=epstsr(1,3)+eps(5)
+                                        epstsr(2,3)=epstsr(2,3)+eps(6)
+                                        epstsr(2,1)=epstsr(2,1)+eps(4)
+                                        epstsr(3,1)=epstsr(3,1)+eps(5)
+                                        epstsr(3,2)=epstsr(3,2)+eps(6)
+                                        do l=1,3
+                                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element
+                                        
+                                        deallocate(subwedge)
+                                        deallocate(eps)
+                                        
+                                    case('brick')
+                                        ! extract brick sub elem
+                                        call extract(sub3d(i),brick=subbrick)
+                                        epstsr=zero ! empty eps & eps tensor for reuse  
+                                        call extract(subbrick(1),strain=eps)
+                                        epstsr(1,1)=epstsr(1,1)+eps(1)
+                                        epstsr(2,2)=epstsr(2,2)+eps(2)
+                                        epstsr(3,3)=epstsr(3,3)+eps(3)
+                                        epstsr(1,2)=epstsr(1,2)+eps(4)
+                                        epstsr(1,3)=epstsr(1,3)+eps(5)
+                                        epstsr(2,3)=epstsr(2,3)+eps(6)
+                                        epstsr(2,1)=epstsr(2,1)+eps(4)
+                                        epstsr(3,1)=epstsr(3,1)+eps(5)
+                                        epstsr(3,2)=epstsr(3,2)+eps(6)
+                                        do l=1,3
+                                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element 
+                                        
+                                        deallocate(subbrick)
+                                        deallocate(eps)
+                    
+                                    case('coh3d6')
+                                        ! extract coh3d6 sub elem
+                                        !call extract(sub3d(i),coh3d6=subcoh3d6)
+                                        epstsr=zero ! empty eps & eps tensor for reuse
+                                        do l=1,3
+                                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element 
+                                        
+                                        !deallocate(subcoh3d6)
+                                        
+                                    case('coh3d8')
+                                        ! extract coh3d8 sub elem
+                                        !call extract(sub3d(i),coh3d8=subcoh3d8)
+                                        epstsr=zero ! empty eps & eps tensor for reuse
+                                        do l=1,3
+                                            write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                                        end do
+                                        write(outunit,'(a)')'' ! separate from next element
+                                        
+                                        !deallocate(subcoh3d8)
+                   
+                                    case default
+                                        continue                       
+                                end select    
+                            end do                       
+                        end if
+                        
+                        deallocate(sub3d)
+                    end do
+                    deallocate(subplyblk)
                 end if
-                deallocate(sub3d)
+
+
+                ! write strain tensors of interface elems (all zero; coh elems only output failure)
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)                
+                    if(ninterf > 0) then
+                        do i=1,ninterf
+                            epstsr=zero ! empty eps & eps tensor for reuse
+                            do l=1,3
+                                write(outunit,*) epstsr(1,l), epstsr(2,l), epstsr(3,l)
+                            end do
+                            write(outunit,'(a)')'' ! separate from next element
+                        end do
+                    end if  
+                    deallocate(subinterf)
+                end if
+                
+                
+            
+            ! loop over all xlam elems
             end do
+            
         end if
-
-
-
-
+        
+       
+       
+       
+       
 
         ! -----------------------------------------------------------------!
         !                     write failure status
@@ -601,89 +688,133 @@
         
 
 
-        if(nxbrick > 0) then
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)
-                if (nsub3d > 0) then
-                    do i=1,nsub3d
-                        call extract(sub3d(i),eltype=subtype)
-                        select case(subtype)
-                            case('wedge')
-                                call extract(sub3d(i),wedge=subwedge)
-                                call extract(subwedge(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subwedge)
-                                
-                            case('brick')
-                                call extract(sub3d(i),brick=subbrick)
-                                call extract(subbrick(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subbrick)
-                                
-                            case('coh3d6')
-                                call extract(sub3d(i),coh3d6=subcoh3d6)
-                                call extract(subcoh3d6(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subcoh3d6)
-                                
-                            case('coh3d8')
-                                call extract(sub3d(i),coh3d8=subcoh3d8)
-                                call extract(subcoh3d8(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subcoh3d8)
-                                
-                            case default
-                                continue
-                        end select    
-                    end do
+        if(nxlam > 0) then
+            ! loop over all xlam elems
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                
+                ! write failure status of plyblk elems
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)                   
+                    ! loop over all plyblks (type xbrick)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        
+                        if(nsub3d > 0) then                        
+                            ! loop over all sub elems of xbrick and write each sub elem's failure status individually
+                            do i=1,nsub3d
+                                call extract(sub3d(i),eltype=subtype)
+                                select case(subtype)
+                                    case('wedge')
+                                        call extract(sub3d(i),wedge=subwedge)
+                                        call extract(subwedge(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average failure status in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subwedge)
+                                        
+                                    case('brick')
+                                        call extract(sub3d(i),brick=subbrick)
+                                        call extract(subbrick(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average failure status in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subbrick)
+                                        
+                                    case('coh3d6')
+                                        call extract(sub3d(i),coh3d6=subcoh3d6)
+                                        call extract(subcoh3d6(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average failure status in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subcoh3d6)
+                                        
+                                    case('coh3d8')
+                                        call extract(sub3d(i),coh3d8=subcoh3d8)
+                                        call extract(subcoh3d8(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average failure status in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subcoh3d8)
+                                        
+                                    case default
+                                        continue
+                                end select    
+                            end do
+                        end if
+                        
+                        deallocate(sub3d)
+                    end do  
+
+                    deallocate(subplyblk)
                 end if
-                deallocate(sub3d)
+
+
+                ! write failure status of interface elems
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)                
+                    if(ninterf > 0) then
+                        do i=1,ninterf
+                            call extract(subinterf(i),ig_point=igpnt)
+                            fvar=zero
+                            do j=1,size(igpnt)
+                                call extract(igpnt(j),sdv=fsdv)
+                                if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                if(allocated(fsdv)) deallocate(fsdv)
+                            end do 
+                            ! average failure status in the element
+                            fvar=fvar/size(igpnt)
+                            write(outunit,*) fvar
+                            
+                            deallocate(igpnt)
+                        end do
+                    end if 
+
+                    deallocate(subinterf)
+                end if
+                
+            
+            ! loop over all xlam elems
             end do
+            
         end if
-
-
-
+        
 
 
         ! -----------------------------------------------------------------!
@@ -696,86 +827,140 @@
         
 
 
-        if(nxbrick > 0) then
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)
-                if (nsub3d > 0) then
-                    do i=1,nsub3d
-                        call extract(sub3d(i),eltype=subtype)
-                        select case(subtype)
-                            case('wedge')
-                                call extract(sub3d(i),wedge=subwedge)
-                                call extract(subwedge(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subwedge)
-                                
-                            case('brick')
-                                call extract(sub3d(i),brick=subbrick)
-                                call extract(subbrick(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subbrick)
-                                
-                            case('coh3d6')
-                                call extract(sub3d(i),coh3d6=subcoh3d6)
-                                call extract(subcoh3d6(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subcoh3d6)
-                                
-                            case('coh3d8')
-                                call extract(sub3d(i),coh3d8=subcoh3d8)
-                                call extract(subcoh3d8(1),ig_point=igpnt)
-                                fvar=zero
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average strain in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                                deallocate(subcoh3d8)
-                                
-                            case default
-                                continue
-                        end select    
-                    end do
+        if(nxlam > 0) then
+            ! loop over all xlam elems
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                
+                ! write damage variable of plyblk elems
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)                   
+                    ! loop over all plyblks (type xbrick)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        
+                        if(nsub3d > 0) then                        
+                            ! loop over all sub elems of xbrick and write each sub elem's damage variable individually
+                        
+                            do i=1,nsub3d
+                                call extract(sub3d(i),eltype=subtype)
+                                select case(subtype)
+                                    case('wedge')
+                                        call extract(sub3d(i),wedge=subwedge)
+                                        call extract(subwedge(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average damage variable in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subwedge)
+                                        
+                                    case('brick')
+                                        call extract(sub3d(i),brick=subbrick)
+                                        call extract(subbrick(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average damage variable in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subbrick)
+                                        
+                                    case('coh3d6')
+                                        call extract(sub3d(i),coh3d6=subcoh3d6)
+                                        call extract(subcoh3d6(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average damage variablen in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subcoh3d6)
+                                        
+                                    case('coh3d8')
+                                        call extract(sub3d(i),coh3d8=subcoh3d8)
+                                        call extract(subcoh3d8(1),ig_point=igpnt)
+                                        fvar=zero
+                                        do j=1,size(igpnt)
+                                            call extract(igpnt(j),sdv=fsdv)
+                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                            if(allocated(fsdv)) deallocate(fsdv)
+                                        end do 
+                                        ! average damage variable in the element
+                                        fvar=fvar/size(igpnt)
+                                        write(outunit,*) fvar
+                                        
+                                        deallocate(igpnt)
+                                        deallocate(subcoh3d8)
+                                        
+                                    case default
+                                        continue
+                                end select    
+                            end do
+         
+                        end if
+                        
+                        deallocate(sub3d)
+                    end do  
+
+                    deallocate(subplyblk)
                 end if
-                deallocate(sub3d)
+
+
+                ! write damage variable of interface elems
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)                
+                    if(ninterf > 0) then
+                        do i=1,ninterf
+                            call extract(subinterf(i),ig_point=igpnt)
+                            fvar=zero
+                            do j=1,size(igpnt)
+                                call extract(igpnt(j),sdv=fsdv)
+                                if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                if(allocated(fsdv)) deallocate(fsdv)
+                            end do 
+                            ! average damage variable in the element
+                            fvar=fvar/size(igpnt)
+                            write(outunit,*) fvar
+                            
+                            deallocate(igpnt)
+                        end do
+                    end if 
+
+                    deallocate(subinterf)
+                end if
+                
+            
+            ! loop over all xlam elems
             end do
+            
         end if
+        
+
+
+
+
+
         
 
 
