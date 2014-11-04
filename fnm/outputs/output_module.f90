@@ -230,24 +230,66 @@
         ! ------ write x elements ---------
         
         
-        if(nxbrick > 0) then
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)
-                if(nsub3d > 0) then
-                    do i=1,nsub3d ! write each element's connec individually
-                        call extract(sub3d(i),glbcnc=connec) ! extract connec
-                        ! print connec in vtk; note that in vtk node no. starts from 0
-                        connec=connec-1
-                        write(outunit,fmatcnc,advance="no") size(connec)
-                        do j=1,size(connec)
-                            write(outunit,fmatcnc,advance="no") connec(j)
-                        end do
-                        write(outunit,'(a)')''
-                        deallocate(connec)
-                    end do
+        if(nxlam > 0) then
+            ! loop over all xlam elems
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                
+                ! write nodal cnc of plyblk elems
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)                   
+                    ! loop over all plyblks (type xbrick)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        
+                        if(nsub3d > 0) then                        
+                            ! loop over all sub elems of xbrick and write each sub elem's connec individually
+                            do i=1,nsub3d
+                                ! extract connec
+                                call extract(sub3d(i),glbcnc=connec) 
+                                ! print connec in vtk; note that in vtk node no. starts from 0
+                                connec=connec-1
+                                write(outunit,fmatcnc,advance="no") size(connec)
+                                do j=1,size(connec)
+                                    write(outunit,fmatcnc,advance="no") connec(j)
+                                end do
+                                write(outunit,'(a)')''
+                                deallocate(connec)
+                            end do                       
+                        end if
+                        
+                        deallocate(sub3d)
+                    end do             
                 end if
+
+
+                ! write nodal cnc of interface elems
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)                
+                    if(ninterf > 0) then
+                        do i=1,ninterf
+                            call extract(subinterf(i),connec=connec)
+                            connec=connec-1
+                            write(outunit,fmatcnc,advance="no") size(connec)
+                            do j=1,size(connec)
+                                write(outunit,fmatcnc,advance="no") connec(j)
+                            end do
+                            write(outunit,'(a)')''
+                            deallocate(connec)
+                        end do
+                    end if    
+                end if
+            
+                deallocate(subplyblk)
+                deallocate(subinterf)
+            
+            ! loop over all xlam elems
             end do
+            
         end if
         
         write(outunit,'(a)')''
@@ -260,31 +302,64 @@
         write(outunit,'(a, i10)')'CELL_TYPES ', nelem
             
 
-        if(nxbrick > 0) then
-            do m=1,nxbrick
-                call extract(lib_xbrick(m),subelem=sub3d)
-                nsub3d=size(sub3d)     
-                if (nsub3d > 0) then
-                    do i=1,nsub3d
-                        call extract(sub3d(i),eltype=subtype)
-                        select case(subtype)
-                            case('wedge')
-                                write(outunit,'(i2)') 13 ! 13 for wedge
-                            case('brick')
-                                write(outunit,'(i2)') 12 ! 12 for brick
-                            case('coh3d6')
-                                write(outunit,'(i2)') 13 ! 13 for coh3d6
-                            case('coh3d8')
-                                write(outunit,'(i2)') 12 ! 12 for coh3d8
-                            case default
-                                continue
-                        end select    
-                    end do
+        if(nxlam > 0) then
+            ! loop over all xlam elems
+            do nxl=1,nxlam
+                call extract(lib_xlam(nxl),plyblk=subplyblk,interf=subinterf)
+                
+                
+                ! write typekeys of plyblk elems
+                
+                if(allocated(subplyblk)) then
+                    nplyblk=size(subplyblk)                   
+                    ! loop over all plyblks (type xbrick)
+                    do m=1,nplyblk
+                        call extract(subplyblk(m),subelem=sub3d)
+                        nsub3d=size(sub3d)
+                        
+                        if(nsub3d > 0) then                        
+                            ! loop over all sub elems of xbrick and write each sub elem's typekey individually
+                            do i=1,nsub3d
+                                call extract(sub3d(i),eltype=subtype)
+                                select case(subtype)
+                                    case('wedge')
+                                        write(outunit,'(i2)') 13 ! 13 for wedge
+                                    case('brick')
+                                        write(outunit,'(i2)') 12 ! 12 for brick
+                                    case('coh3d6')
+                                        write(outunit,'(i2)') 13 ! 13 for coh3d6
+                                    case('coh3d8')
+                                        write(outunit,'(i2)') 12 ! 12 for coh3d8
+                                    case default
+                                        continue
+                                end select
+                            end do                       
+                        end if
+                        
+                        deallocate(sub3d)
+                    end do             
                 end if
-                deallocate(sub3d)
+
+
+                ! write typekeys of interface elems
+                
+                if(allocated(subinterf)) then
+                    ninterf=size(subinterf)                
+                    if(ninterf > 0) then
+                        do i=1,ninterf
+                            write(outunit,'(i2)') 12 ! 12 for coh3d8
+                        end do
+                    end if    
+                end if
+            
+                deallocate(subplyblk)
+                deallocate(subinterf)
+            
+            ! loop over all xlam elems
             end do
+            
         end if
-     
+       
         write(outunit,'(a)')''
 
 
