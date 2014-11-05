@@ -514,7 +514,7 @@ module xbrick_element_module
         end do
 
         ! extract material orientation (fibre angle)
-        call extract(lib_mat(elem%bulkmat),theta=theta)
+        theta=elem%plyangle
 
         ! extract elem failed edges' indices
         ifedg=elem%ifailedge
@@ -987,7 +987,7 @@ module xbrick_element_module
         edg=topo
 
         ! extract material orientation (fibre angle)
-        call extract(lib_mat(elem%bulkmat),theta=theta)
+        theta=elem%plyangle
         
         elstat=elem%curr_status
 
@@ -1589,8 +1589,10 @@ module xbrick_element_module
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(1)%array)
-                    call prepare(elem%subelem(2),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(2)%array)
+                    call prepare(elem%subelem(1),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
+                    &glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
+                    &glbcnc=subglbcnc(2)%array)
                     
                     if(iscoh) then
                     
@@ -1698,10 +1700,14 @@ module xbrick_element_module
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
                     
                     ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(1)%array)
-                    call prepare(elem%subelem(2),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(2)%array)
-                    call prepare(elem%subelem(3),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(3)%array)
-                    call prepare(elem%subelem(4),eltype='wedge',matkey=elem%bulkmat,plyangle=elem%plyangle,glbcnc=subglbcnc(4)%array)
+                    call prepare(elem%subelem(1),eltype='wedge',matkey=elem%bulkmat,&
+                    &plyangle=elem%plyangle,glbcnc=subglbcnc(1)%array)
+                    call prepare(elem%subelem(2),eltype='wedge',matkey=elem%bulkmat,&
+                    &plyangle=elem%plyangle,glbcnc=subglbcnc(2)%array)
+                    call prepare(elem%subelem(3),eltype='wedge',matkey=elem%bulkmat,&
+                    &plyangle=elem%plyangle,glbcnc=subglbcnc(3)%array)
+                    call prepare(elem%subelem(4),eltype='wedge',matkey=elem%bulkmat,&
+                    &plyangle=elem%plyangle,glbcnc=subglbcnc(4)%array)
                     
                     if(iscoh) then
                     

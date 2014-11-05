@@ -201,7 +201,7 @@ module xlam_element_module
             call exit_function
         end if
         
-        if (size(edgcnc)/=nedgplyblk*size(layup(1,:))) then
+        if (size(edgecnc)/=nedgplyblk*size(layup(1,:))) then
             write(msg_file,*)'layup and no. edges do not match in prepare_xlam!'
             call exit_function
         end if
@@ -287,8 +287,8 @@ module xlam_element_module
             do i=1, nplyblk
                 allocate(elem%plyblknodecnc(i)%array(nndplyblk))
                 allocate(elem%plyblkedgecnc(i)%array(nedgplyblk))
-                elem%plyblknodecnc(i)%array=[(i-1)*nndplyblk+1 : i*nndplyblk]
-                elem%plyblkedgecnc(i)%array=[(i-1)*nedgplyblk+1 : i*nedgplyblk]
+                elem%plyblknodecnc(i)%array=[( j, j=(i-1)*nndplyblk+1 , i*nndplyblk )]
+                elem%plyblkedgecnc(i)%array=[( j, j=(i-1)*nedgplyblk+1 , i*nedgplyblk )]
             end do
             
             ! ...and interface node cnc arrays
@@ -296,12 +296,12 @@ module xlam_element_module
             
             do i=1, ninterf
                 allocate(elem%interfcnc(i)%array(nndinterf))               
-                ! 1st half of interface nodes comes from bottom plyblk elem top surface
+                ! 1st half of interface nodes comes from bottom plyblk elem top surface (nodes 5-8)
                 elem%interfcnc(i)%array(1 : nndinterf/2)=&
-                & [(i-1)*nndplyblk+nndplyblk/2+1 : (i-1)*nndplyblk+nndplyblk/2+nndinterf/2]
-                ! 2nd half of interface nodes comes from top plyblk elem bottom surface
+                & [( j, j=(i-1)*nndplyblk+nndinterf/2+1 , (i-1)*nndplyblk+nndinterf )]
+                ! 2nd half of interface nodes comes from top plyblk elem bottom surface (nodes 1-4)
                 elem%interfcnc(i)%array(nndinterf/2+1 : nndinterf)=&
-                & [i*nndplyblk+1 : i*nndplyblk+nndinterf/2]           
+                & [( j, j=i*nndplyblk+1 , i*nndplyblk+nndinterf/2 )]           
             end do
             
             

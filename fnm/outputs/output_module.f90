@@ -77,7 +77,7 @@
         type(sdv_array),allocatable :: fsdv(:)  ! failure variables extracted from ig point sdv array
         
         ! counters
-        integer                     :: i, j, l, m, n
+        integer                     :: i, j, l, m, n, nxl
 
       
       
@@ -100,7 +100,7 @@
         x3d=zero; disp3d=zero
         sigtsr=zero; epstsr=zero
         fvar=zero
-        i=0; j=0; l=0; m=0; n=0
+        i=0; j=0; l=0; m=0; n=0; nxl=0
         
         ! obtain nnode value from glb libraries
         nnode=size(lib_node)

@@ -105,7 +105,7 @@
             
             character(len=*),intent(in)             :: eltype       ! can be all types of 2D elements
             integer,intent(in)                      :: matkey       ! material index in glb material array
-            real(dp),intent(in)                     :: plyangle
+            real(dp),intent(in),optional            :: plyangle
             
             integer,intent(in)                      :: glbcnc(:)    ! sub_elem connec to global node library
             

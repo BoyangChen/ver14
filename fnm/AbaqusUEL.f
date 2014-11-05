@@ -193,12 +193,9 @@
     
     ! extract nodal cnc based on element type
     select case(eltype)
-        case('xbrick')
+        case('xlam')
             ! extract nodal cnc from this elem
-            call extract(lib_xbrick(typekey),nodecnc=cnc,curr_status=elstat0)
-        case('coh3d8')
-            ! extract nodal cnc from this elem
-            call extract(lib_coh3d8(typekey),connec=cnc)
+            call extract(lib_xlam(typekey),nodecnc=cnc)
         case default
             write(msg_file,*)'unsupported element type'
             call exit_function
@@ -227,11 +224,8 @@
     !---------------------------------------------------------------------------------!
     ! integrate this element
     select case(eltype)
-        case('xbrick')
-            call integrate(lib_xbrick(typekey),Kmat,Fvec)
-            call extract(lib_xbrick(typekey),curr_status=elstat1)
-        case('coh3d8')
-            call integrate(lib_coh3d8(typekey),Kmat,Fvec)
+        case('xlam')
+            call integrate(lib_xlam(typekey),Kmat,Fvec)
         case default
             write(msg_file,*)'unsupported element type'
             call exit_function
