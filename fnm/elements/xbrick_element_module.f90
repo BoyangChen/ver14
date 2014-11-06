@@ -320,7 +320,9 @@ module xbrick_element_module
 
             if(.not.nofailure) then ! 2nd iteration after new partition
                 !***** check failure criterion *****
+                
                 call failure_criterion_partition(elem)
+                
                 
                 if(elem%curr_status>=elfailm) then
                     elem%newpartition=.true.    ! new partition for this increment
@@ -998,15 +1000,18 @@ module xbrick_element_module
 !           check failure criterion on all sub elements
 !   elem is judged failed a.l.a. 1 sub elem has reached failure onset
 !-----------------------------------------------------------------------!
+
         do i=1, size(elem%subelem)
             call extract(elem%subelem(i),curr_status=subelstat)
             if(subelstat>intact) failed=.true.
             if(failed) exit
         end do
+
         
             
         if(failed) then
         ! element failed, find newly broken edge and update edge status vars
+            
         
           ! find xp1, yp1
             if(elstat .eq. intact) then ! element originally intact
@@ -1291,7 +1296,7 @@ module xbrick_element_module
               
             end if
           
-          
+           
           
             ! update the elstat to failed status value
             if(elstat==intact .and. subelstat>=ffonset) then
@@ -1304,7 +1309,8 @@ module xbrick_element_module
     !       update element curr_status and sub-element cnc matrices
 
             elem%curr_status=elstat 
-            elem%ifailedge=ifedg                      
+            elem%ifailedge=ifedg 
+
             call update_subcnc(elem,edgstat,ifedg,nfailedge)
 
 
@@ -1472,6 +1478,8 @@ module xbrick_element_module
             do i=1, 4
                 if(ifedg(i)<=nedge/2) ibe2=max(ibe2,ifedg(i))! local edge index of 2nd broken edge
             end do  
+            
+            
 
             ! ibe1 must be between 1 to 3, and ibe2 between 2 to 4, with ibe2 > ibe1
             if(ibe1>=nedge/2 .or. ibe1==0 .or. ibe2<=1 .or. ibe2<=ibe1) then
@@ -1589,10 +1597,12 @@ module xbrick_element_module
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
                     ! create sub bulk elements
+                    
                     call prepare(elem%subelem(1),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
                     &glbcnc=subglbcnc(1)%array)
                     call prepare(elem%subelem(2),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
                     &glbcnc=subglbcnc(2)%array)
+                    
                     
                     if(iscoh) then
                     
@@ -1611,7 +1621,9 @@ module xbrick_element_module
                     
                     subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
                     
-                    call prepare(elem%subelem(3),eltype='coh3d8', matkey=elem%cohmat, glbcnc=subglbcnc(3)%array)
+                    
+                    call prepare(elem%subelem(3),eltype='coh3d8',matkey=elem%cohmat,glbcnc=subglbcnc(3)%array)
+                    
                     
                     end if
                     

@@ -326,6 +326,7 @@ module xlam_element_module
                 plyblknode(:)=elem%nodecnc(elem%plyblknodecnc(i)%array(:))
                 plyblkedge(:)=elem%edgecnc(elem%plyblkedgecnc(i)%array(:))
                 
+                
                 ! update corner node coords (z coords) of this plyblk accord. to plyblk thickness ratio
                 ! coord(:) is updated to store corner nodes coords of each plyblk
                 if (i==1) then
@@ -350,7 +351,8 @@ module xlam_element_module
                 
                 ! prepare each plyblk elem (here xbrick elem type)
                 call prepare(elem%plyblk(i),key=0,bulkmat=elem%bulkmat,cohmat=elem%cohmat, &
-                & plyangle=elem%layup(1,i), nodecnc=plyblknode,edgecnc=plyblkedge)               
+                & plyangle=elem%layup(1,i), nodecnc=plyblknode,edgecnc=plyblkedge)     
+          
             end do
             
             ! prepare interf elems
@@ -376,9 +378,12 @@ module xlam_element_module
         ! integrate plyblock elements and assemble into global matrix
 
         do i=1, nplyblk
+
             call integrate(elem%plyblk(i),Ki,Fi)
+
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
+            
             do j=1, nndplyblk ! no. of nodes in sub elem i
                 do l=1, ndim
                     ! dof indices of the jth node of sub elem i 
@@ -397,6 +402,7 @@ module xlam_element_module
             call integrate(elem%interf(i),Ki,Fi)
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
+            print*,elem%interfcnc(i)%array
             do j=1, nndinterf ! no. of nodes in sub elem i
                 do l=1, ndim
                     ! dof indices of the jth node of sub elem i 

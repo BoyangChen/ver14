@@ -121,7 +121,8 @@
             
             elem%eltype=eltype   
             elem%matkey=matkey    
-            elem%plyangle=plyangle
+            
+            if(present(plyangle)) elem%plyangle=plyangle
              
             if(allocated(elem%glbcnc))  then
                 if(size(elem%glbcnc)/=size(glbcnc)) then

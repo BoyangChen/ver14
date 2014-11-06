@@ -6,11 +6,11 @@
         
         integer, parameter :: msg_file=6 ! I/O file index for message file
         
-        integer, parameter :: matnamelength=20 ! character length of a user-input material name
-        integer, parameter :: mattypelength=20 ! character length of a system material type name
-        integer, parameter :: elnamelength=20 ! character length of a user-input element name
-        integer, parameter :: eltypelength=20 ! character length of a system element type name
-        integer, parameter :: setnamelength=20 ! character length of a set name
+        integer, parameter :: matnamelength=30 ! character length of a user-input material name
+        integer, parameter :: mattypelength=30 ! character length of a system material type name
+        integer, parameter :: elnamelength=30 ! character length of a user-input element name
+        integer, parameter :: eltypelength=30 ! character length of a system element type name
+        integer, parameter :: setnamelength=30 ! character length of a set name
         integer, parameter :: dirlength=256 ! character length of a directory name
         
         ! generic parameter for intact state (elem, edge, material, etc.)
@@ -49,9 +49,9 @@
         contains
         
         subroutine exit_function
-            !stop"**exit function reached**"
-            write(msg_file,*) "**exit function reached**"
-            CALL XIT    ! abaqus exit function
+            stop"**exit function reached**"
+            !~write(msg_file,*) "**exit function reached**"
+            !~CALL XIT    ! abaqus exit function
         end subroutine 
      
        end module parameter_module

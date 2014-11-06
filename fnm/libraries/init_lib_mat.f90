@@ -1,19 +1,17 @@
     subroutine initialize_lib_mat()                            
                                                                
         integer :: i=0, nmat=0, niso=0, nlamina=0, ninterface=0
-        nmat=5                                            
+        nmat=3                                            
         niso=0                                            
         nlamina=1                                      
-        ninterface=1                                
+        ninterface=2                                
         if(nmat>0) allocate(lib_mat(nmat))                       
         if(niso>0) allocate(lib_iso(niso))                       
         if(nlamina>0) allocate(lib_lamina(nlamina))              
         if(ninterface>0) allocate(lib_interface(ninterface))     
-        call update(lib_mat(1),matname='IM7-8552 0 ply',mattype='lamina',typekey=1,theta=0.0_dp)
-        call update(lib_mat(2),matname='IM7-8552 45 ply',mattype='lamina',typekey=1,theta=45.0_dp)
-        call update(lib_mat(3),matname='IM7-8552 90 ply',mattype='lamina',typekey=1,theta=90.0_dp)
-        call update(lib_mat(4),matname='IM7-8552 -45 ply',mattype='lamina',typekey=1,theta=-45.0_dp)
-        call update(lib_mat(5),matname='IM7-8552 Matrix Crack',mattype='interface',typekey=1,theta=0.0_dp)
+        call update(lib_mat(1),matname='laminate Ply',mattype='lamina',typekey=1)
+        call update(lib_mat(2),matname='laminate Matrix Crack',mattype='interface',typekey=1)
+        call update(lib_mat(3),matname='laminate Delamination',mattype='interface',typekey=2)
         call update(lib_lamina(1), & 
       & lamina_modulus(& 
       & E1=161000.0_dp,& 
@@ -43,6 +41,21 @@
       & tau_nc=60.0_dp,& 
       & tau_tc=90.0_dp,& 
       & tau_lc=90.0_dp),& 
+      & interface_toughness(& 
+      & Gnc=0.293_dp,& 
+      & Gtc=0.631_dp,& 
+      & Glc=0.631_dp,& 
+      & eta=1.0_dp)) 
+
+        call update(lib_interface(2), & 
+      & interface_modulus(& 
+      & Dnn=1000000.0_dp,& 
+      & Dtt=1000000.0_dp,& 
+      & Dll=1000000.0_dp),& 
+      & interface_strength(& 
+      & tau_nc=30.0_dp,& 
+      & tau_tc=45.0_dp,& 
+      & tau_lc=45.0_dp),& 
       & interface_toughness(& 
       & Gnc=0.293_dp,& 
       & Gtc=0.631_dp,& 
