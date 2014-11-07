@@ -197,7 +197,7 @@
 
         
         ! if jump or sdv are not passed in, only linear elasticity can be done
-        if((.not.present(strain)) .or. (.not.present(sdv))) then
+        if(.not.present(strain)) then
             !write(msg_file,*) 'WARNING: strain and sdv are not present in lamina type!'
             !write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.' 
             return ! exit the program
@@ -213,6 +213,11 @@
             return ! exit the program
         end if
         
+        if(.not.present(sdv)) then
+            !write(msg_file,*) 'WARNING: strain and sdv are not present in lamina type!'
+            !write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.' 
+            return ! exit the program
+        end if
 
 
         ! --------------------------------------------------------- !
