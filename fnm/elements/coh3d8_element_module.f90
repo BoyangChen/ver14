@@ -333,7 +333,6 @@
         
         
         
-        
         !------------------------------------------------!
         !   compute Q matrix (rotation) and determinat 
         !------------------------------------------------!
@@ -364,8 +363,8 @@
             Qmatrix(1,j)=normal(j)
             Qmatrix(2,j)=tangent1(j)
             Qmatrix(3,j)=tangent2(j)
-        end do
-        
+        end do      
+
         ! - transform midcoords matrix into local isoplanar coordinates
         midcoords=matmul(Qmatrix,midcoords)
         
@@ -381,6 +380,8 @@
         else                          
             call init_ig(igxi,igwt)
         end if
+
+        
          
         !-calculate strain,stress,stiffness,sdv etc. at each int point
       	do kig=1,nig 
@@ -394,6 +395,7 @@
             
             !- get shape function matrix and their derivatives (used to calculate jacobian)
             call init_shape(igxi(:,kig),fn,dn)
+
             
             ! - calculate jacobian; midcoords 1st row are now zero (out-of-plane coordinates of the elem nodes)
             jac=matmul(midcoords(2:3,:),dn(1:nnode/2,:)) ! only the first half of nodes' shape func are used
@@ -410,8 +412,12 @@
 	   	    ! calculate ujump: disp. jump of the two crack surface, in global coords
             ujump=matmul(Nmatrix,u)
             
+            
             ! calculate separation delta in local coords: delta=Qmatrix*ujump
             delta=matmul(Qmatrix,ujump)
+
+
+            
             
             ! - extract sdvs from integration points; ig_sdv automatically deallocated when passed in
             call extract(elem%ig_point(kig),sdv=ig_sdv)
@@ -441,8 +447,9 @@
                     write(msg_file,*) 'material type not supported for cohesive element!'
                     call exit_function
             end select
-            
-            
+
+           
+
 
             !------------------------------------------------!
             !  add this ig point contributions to K and F
@@ -453,6 +460,7 @@
             DQN     =   matmul(Dee, QN)
             NtQtDQN =   matmul(NtQt, DQN)
             NtQtTau =   matmul(NtQt, Tau)
+
 		
             do j=1, ndof
                 do k=1, ndof
@@ -485,10 +493,12 @@
             igstat=0
             if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
             elem%curr_status=max(elem%curr_status,igstat)
+
             
             deallocate(ig_sdv)
             
        	end do !-looped over all int points. ig=nig
+
 
         if(allocated(xj)) deallocate(xj) 
         if(allocated(uj)) deallocate(uj) 
@@ -541,7 +551,7 @@
                 xi(2,4)= root3
             else
                 xi(1,1)=-one
-                xi(1,1)=-one
+                xi(2,1)=-one
                 
                 xi(1,2)=one
                 xi(2,2)=-one
@@ -571,6 +581,9 @@
         real(kind=dp) :: xi, eta ! local variables
         xi=zero
         eta=zero
+
+        xi=igxi(1)
+        eta=igxi(2)
 
         f(1)=quarter*(one-xi)*(one-eta)
         f(2)=quarter*(one+xi)*(one-eta)

@@ -524,7 +524,7 @@
 
             if(present(gauss).and.gauss) then
                 xi(1,1)=half
-                xi(1,1)=half
+                xi(2,1)=half
                 
                 xi(1,2)=half
                 xi(2,2)=zero
@@ -533,7 +533,7 @@
                 xi(2,3)=half
             else
                 xi(1,1)=zero
-                xi(1,1)=zero
+                xi(2,1)=zero
                 
                 xi(1,2)=one
                 xi(2,2)=zero
