@@ -2,7 +2,7 @@
 ####### Preprocessing for writing FNM lib_mat module ###########
 ################################################################
 
-from fnmclasses import* # glb objects defined for FNM
+from fnm_classes import* # glb objects defined for FNM
 import math
 
 

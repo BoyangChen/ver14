@@ -22,10 +22,14 @@
 
 
 # glb objects defined for FNM
-from fnmclasses import*
+from fnm_classes import*
 # material definitions for this analysis (currently for laminates only)
-from fnmpreproc_libmat import ply_mkey,mcrack_mkey,delam_mkey
+from fnm_materials import ply_mkey,mcrack_mkey,delam_mkey
 import math
+# operating system module
+import os
+# shutil module has functions for different kinds of copying
+import shutil
 
 
 #***************************************************************
@@ -495,3 +499,28 @@ lib_elem.write('    end subroutine initialize_lib_elem        \n')
 lib_elem.close()
 
 
+
+#*************************************************************** 
+# copy fnm input file to main directory
+#*************************************************************** 
+
+# get current working directory
+cwd=os.getcwd()
+# parent directory of cwd
+pwd=os.path.dirname(cwd)
+# copy fnm input file to parent directory of preprocessing directory (which is assumed to be the working directory)
+shutil.copy (fnminputfile,pwd)
+
+
+
+#***************************************************************
+# copy fnm libraries to library directory
+#***************************************************************
+
+# directory name for libraries
+libdir=pwd+'/libraries'
+# copy library initialization files to libraries directory
+shutil.copy ('init_lib_node.f90',libdir)
+shutil.copy ('init_lib_edge.f90',libdir)
+shutil.copy ('init_lib_elem.f90',libdir)
+shutil.copy ('init_lib_mat.f90',libdir)
