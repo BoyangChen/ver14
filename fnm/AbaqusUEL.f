@@ -14,6 +14,7 @@
     include 'libraries/lib_edge_module.f90'
     include 'libraries/lib_mat_module.f90'
     include 'libraries/lib_elem_module.f90'
+    include 'libraries/lib_bcd_module.f90'
     include 'libraries/initialize_lib_module.f90'
     include 'outputs/output_module.f90'
 !------------------------------------------------------
@@ -60,6 +61,7 @@
             call initialize_lib_edge
             call initialize_lib_elem
             call initialize_lib_mat 
+            call initialize_lib_bcd
              
             ! get output directory (global variable defined in output module)
             
@@ -103,6 +105,7 @@
             call empty_lib_node
             call empty_lib_edge
             call empty_lib_elem
+            call empty_lib_bcd
             
       
         end if

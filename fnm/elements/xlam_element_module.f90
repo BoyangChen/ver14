@@ -4,6 +4,7 @@ module xlam_element_module
     use lib_edge_module                 ! global edge library
     use lib_node_module                 ! global node library
     use lib_mat_module                  ! global material library
+    use lib_bcd_module                  ! global bcd library
     use xbrick_element_module
     use coh3d8_element_module
 
@@ -248,11 +249,18 @@ module xlam_element_module
         ! corner edge thickness of this laminate (no. of corner edges = half * no. of corner nodes)
         real(dp) :: shellthickness(ncorner/2)
         
+        ! penalty stiffness to enforce boundary conditions
+        real(dp) :: Kpn
+        
         ! initialize local variables
         i=0; j=0; l=0
         ndof=0; nplyblk=0; ninterf=0
         plyblknode=0; plyblkedge=0; interfnode=0
         shellthickness=zero
+        Kpn=zero
+        
+        ! penalty stiffness = 1GPa
+        Kpn=1000000._dp
         
         
         ! check if the elem has been prepared (by checking layup; note that in prepare subroutine all attributes 
@@ -416,6 +424,15 @@ module xlam_element_module
         end do
         
         
+        ! add internal constrains between nodes to satisfy bcd
+        do i=1, ncorner/2
+            ! check if the bcd nodes contain vertical edges of the elem
+            if(any(lib_bcdnodes)==elem%nodecnc(i) .and. any(lib_bcdnodes)==elem%nodecnc(i+ncorner/2)) then
+                ! constrain all nodes along this vertical edge to the disp. of these two nodes
+                
+                ! in the future, interpolate the disp. of floating nodes on bcd edges
+            end if
+        end do
         
         !---------------------------------------------------------------------!
         !               deallocate local arrays 

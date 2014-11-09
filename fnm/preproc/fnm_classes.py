@@ -106,18 +106,18 @@ class element:
    
 class nset:
 
-    def __init__(self, name, instance='', nodes)
+    def __init__(self, name, nodes, instance=''):
         self.name=name
-        self.instance=instance
         self.nodes=nodes
+        self.instance=instance
 
 
 class elset:
 
-    def __init__(self, name, instance='', elems)
+    def __init__(self, name, elems, instance=''):
         self.name=name
-        self.instance=instance
         self.elems=elems
+        self.instance=instance
     
         
 class part:
@@ -130,9 +130,9 @@ class part:
         self.elsets=elsets
 
 
-class bcd
+class bcd:
 
-    def __init__(self, name, type, nsets, firstdof, lastdof=0, value=0.)
+    def __init__(self, name, type, nsets, firstdof=0, lastdof=0, value=0.):
         self.name=name
         self.type=type
         self.nsets=nsets
@@ -143,7 +143,7 @@ class bcd
     
 class instance:
 
-    def __init__(self, name, part, translation=[0.,0.,0.])
+    def __init__(self, name, part, translation=[0.,0.,0.]):
         self.name=name
         self.part=part
         self.translation=translation
@@ -151,7 +151,7 @@ class instance:
     
 class assembly:
 
-    def __init__(self, name='Assembly', instances, nsets, elsets)
+    def __init__(self, name, instances, nsets, elsets):
         self.name=name
         self.instances=instances
         self.nsets=nsets

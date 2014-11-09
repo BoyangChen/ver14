@@ -60,6 +60,7 @@ nsvars=1        # no. of sol. dpdnt var. used and ouput by uel code to be determ
 lib_node=open('init_lib_node.f90','w')  # array of all nodes
 lib_edge=open('init_lib_edge.f90','w')  # array of all edges
 lib_elem=open('init_lib_elem.f90','w')  # array of all elements
+lib_bcd=open('init_lib_bcd.f90','w')    # array of nodes with bcd
 
 
 #***************************************************************
@@ -78,8 +79,6 @@ elems=[]    # list of all elements in the mesh
 ndedg=[]    # matrix of node_i-to-node_j edge no. 
 eltype=[]   # list of all element types in the mesh
 elcount=[]  # count of elements of each type in the mesh
-
-bcd=[]      # list of all edges with b.c.d
 
 rawlayup=[]    # layup of the laminate in its basic format (list of fibre angles of all plies)
 blklayup=[]    # layup of ply blocks, used in xlam element; an xlayup class is needed
@@ -158,6 +157,18 @@ lib_elem.write('    subroutine initialize_lib_elem()                            
 lib_elem.write('                                                                          \n') 
 lib_elem.write('        integer ::  nelem=0, nxlam=0                                      \n')
 lib_elem.write('        integer :: i=0                                                    \n')
+
+
+
+
+#***************************************************************
+#       write lib_bcd_module.f90 common codes
+#***************************************************************
+lib_bcd.write('    subroutine initialize_lib_bcd()           \n')
+lib_bcd.write('                                              \n')
+lib_bcd.write('        integer :: nbcdnodes=0                \n')
+lib_bcd.write('        integer :: i=0                        \n')
+lib_bcd.write('                                              \n')
 
 
 
@@ -481,11 +492,77 @@ for eli, elt in enumerate(eltype):
 #       Write the rest
 #***************************************************************
 
-for line in lines[ln:]:
-    fnminp.write(line)
+# list of node sets in the assembly
+nsets=[]
+# list of nsets with boundary conditions
+bcds=[]
 
+#for line in lines[ln:]:
+for l in range(ln+1,len(lines)):
+    line=lines[l]
+    if(len(line)>=5 and line[0:5]=='*Nset'):
+        fnminp.write(line)
+        # get nset name
+        nm=''
+        for c in line[12:]:
+            if(c!=','):
+                nm=nm+c
+            else:
+                break
+        # read for nset nodes in next line
+        nds = []
+        j=l+1
+        line1=lines[j]
+        while (line1[0]!='*'):
+            for t in line1.split(','):
+                try:
+                    nds.append(int(t))
+                except ValueError:
+                    pass
+            j=j+1
+            line1=lines[j]
+        if('generate' in line):
+            nsets.append(nset(name=nm,nodes=[i for i in range(nds[0],nds[1]+1,nds[2])]))
+        else: 
+            nsets.append(nset(name=nm,nodes=nds))
+    elif(len(line)>=9 and line[0:9]=='*Boundary'):
+        fnminp.write(line)
+        # create a new bcd in list bcds
+        bcds.append(bcd(name='',type='',nsets=[]))
+        # read for nset names on the next lines
+        j=l+1
+        line1=lines[j]
+        while (line1[0]!='*'):
+            # get nset name
+            nm=''
+            for c in line1:
+                if(c!=','):
+                    nm=nm+c
+                else:
+                    break
+            bcds[-1].nsets.append(nm)
+            j=j+1
+            line1=lines[j]
+        
+    else:
+        fnminp.write(line)
 
+# build a dictionary of nsets
+dictsets={}
+for ns in nsets:
+    dictsets.update({ns.name: ns.nodes})
 
+# list of nodes with boundary conditions
+bcdnds=[]
+for b in bcds:
+    for nsname in b.nsets:
+        bcdnds=bcdnds+dictsets[nsname]
+
+lib_bcd.write('     nbcdnodes='+str(len(bcdnds))+'\n')
+lib_bcd.write('     allocate(lib_bcdnodes(nbcdnodes))\n')
+lib_bcd.write('     lib_bcdnodes=0\n')
+for n,nd in enumerate(bcdnds):
+    lib_bcd.write('     lib_bcdnodes('+str(n+1)+')='+str(nd)+'\n')
 
 
 #   close lib_node_module.f90
@@ -497,6 +574,13 @@ lib_edge.close()
 #   close lib_elem_module.f90
 lib_elem.write('    end subroutine initialize_lib_elem        \n')
 lib_elem.close()
+#   close lib_bcd_module.f90
+lib_bcd.write('    end subroutine initialize_lib_bcd        \n')
+lib_bcd.close()
+
+
+
+
 
 
 
@@ -524,3 +608,4 @@ shutil.copy ('init_lib_node.f90',libdir)
 shutil.copy ('init_lib_edge.f90',libdir)
 shutil.copy ('init_lib_elem.f90',libdir)
 shutil.copy ('init_lib_mat.f90',libdir)
+shutil.copy ('init_lib_bcd.f90',libdir)
