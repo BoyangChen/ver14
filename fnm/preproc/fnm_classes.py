@@ -102,6 +102,61 @@ class element:
         self.index=index
         self.nodes=nodes
         self.edges=edges
+
+   
+class nset:
+
+    def __init__(self, name, instance='', nodes)
+        self.name=name
+        self.instance=instance
+        self.nodes=nodes
+
+
+class elset:
+
+    def __init__(self, name, instance='', elems)
+        self.name=name
+        self.instance=instance
+        self.elems=elems
+    
+        
+class part:
+
+    def __init__(self, name, nodes, elems, nsets=[], elsets=[]):
+        self.name=name
+        self.nodes=nodes
+        self.elems=elems
+        self.nsets=nsets
+        self.elsets=elsets
+
+
+class bcd
+
+    def __init__(self, name, type, nsets, firstdof, lastdof=0, value=0.)
+        self.name=name
+        self.type=type
+        self.nsets=nsets
+        self.firstdof=firstdof
+        self.lastdof=lastdof
+        self.value=value
+    
+    
+class instance:
+
+    def __init__(self, name, part, translation=[0.,0.,0.])
+        self.name=name
+        self.part=part
+        self.translation=translation
+
+    
+class assembly:
+
+    def __init__(self, name='Assembly', instances, nsets, elsets)
+        self.name=name
+        self.instances=instances
+        self.nsets=nsets
+        self.elsets=elsets
+        
         
 class xlayup:
 
