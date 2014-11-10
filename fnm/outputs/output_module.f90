@@ -211,7 +211,7 @@
                 end if
                 
                 if(allocated(subinterf)) then
-                    ninterf=size(subinterf)
+                    ninterf=ninterf+size(subinterf)
                     deallocate(subinterf)
                 end if
                 

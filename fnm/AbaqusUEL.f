@@ -49,7 +49,7 @@
         crrpnewdt=zero
 
         ! output frequency x: once every x increments
-        freq=10
+        freq=1
 
         if (lop .eq. 0) then
 !       start of the analysis
