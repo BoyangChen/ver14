@@ -252,12 +252,17 @@ module xlam_element_module
         ! penalty stiffness to enforce boundary conditions
         real(dp) :: Kpn
         
+        ! variables for imposing penalty constrains on bcd nodes
+        integer :: nd1, nd2, dof0, dof1, dof2
+        real(dp), allocatable :: u0(:), u1(:), u2(:)
+        
         ! initialize local variables
         i=0; j=0; l=0
         ndof=0; nplyblk=0; ninterf=0
         plyblknode=0; plyblkedge=0; interfnode=0
         shellthickness=zero
         Kpn=zero
+        nd1=0; nd2=0; dof0=0; dof1=0; dof2=0
         
         ! penalty stiffness = 1GPa
         Kpn=1000000._dp
@@ -291,6 +296,7 @@ module xlam_element_module
             ! allocate plyblk node and edge cnc arrays...
             allocate(elem%plyblknodecnc(nplyblk))
             allocate(elem%plyblkedgecnc(nplyblk))
+
             
             do i=1, nplyblk
                 allocate(elem%plyblknodecnc(i)%array(nndplyblk))
@@ -311,6 +317,7 @@ module xlam_element_module
                 elem%interfcnc(i)%array(nndinterf/2+1 : nndinterf)=&
                 & [( j, j=i*nndplyblk+1 , i*nndplyblk+nndinterf/2 )]           
             end do
+            
             
             
             ! extract elem corner nodes' coords from glb node library
@@ -375,6 +382,7 @@ module xlam_element_module
         end if
         
 
+
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays
         !---------------------------------------------------------------------!
@@ -410,7 +418,7 @@ module xlam_element_module
             call integrate(elem%interf(i),Ki,Fi)
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
-            print*,elem%interfcnc(i)%array
+            
             do j=1, nndinterf ! no. of nodes in sub elem i
                 do l=1, ndim
                     ! dof indices of the jth node of sub elem i 
@@ -422,17 +430,53 @@ module xlam_element_module
             deallocate(Fi)
             deallocate(dofcnc)
         end do
-        
-        
-        ! add internal constrains between nodes to satisfy bcd
+
+
+        ! check if nodes are applied bcd
         do i=1, ncorner/2
             ! check if the bcd nodes contain vertical edges of the elem
-            if(any(lib_bcdnodes)==elem%nodecnc(i) .and. any(lib_bcdnodes)==elem%nodecnc(i+ncorner/2)) then
+            if(any(lib_bcdnodes==elem%nodecnc(i)) .and. any(lib_bcdnodes==elem%nodecnc(i+ncorner/2))) then
                 ! constrain all nodes along this vertical edge to the disp. of these two nodes
-                
+                if(nplyblk > 1) then
+                    do j=2, nplyblk
+                        ! find corresponding nodes along this vertical edge of all plyblks
+                        nd1=i+nndplyblk*(j-1)
+                        nd2=i+ncorner/2+nndplyblk*(j-1)   
+                        
+                        
+                        ! constrain node 1 to node i (use penalty stiffness Kpn)
+                        dof0=(i-1)*ndim
+                        dof1=(nd1-1)*ndim
+                        call extract(lib_node(elem%nodecnc(i)),u=u0)
+                        call extract(lib_node(elem%nodecnc(nd1)),u=u1)
+                        do l=1, ndim
+                            K_matrix(dof0+l,dof0+l)=K_matrix(dof0+l,dof0+l)+Kpn
+                            K_matrix(dof1+l,dof1+l)=K_matrix(dof1+l,dof1+l)+Kpn
+                            K_matrix(dof0+l,dof1+l)=K_matrix(dof0+l,dof1+l)-Kpn
+                            K_matrix(dof1+l,dof0+l)=K_matrix(dof1+l,dof0+l)-Kpn
+                            F_vector(dof0+l)=F_vector(dof0+l)+Kpn*(u0(l)-u1(l))
+                            F_vector(dof1+l)=F_vector(dof1+l)-Kpn*(u0(l)-u1(l))
+                        end do
+                         
+                        ! constrain node 2 to node i+ncorner/2
+                        dof0=(i+ncorner/2-1)*ndim
+                        dof2=(nd2-1)*ndim
+                        call extract(lib_node(elem%nodecnc(i+ncorner/2)),u=u0)
+                        call extract(lib_node(elem%nodecnc(nd2)),u=u2)
+                        do l=1, ndim
+                            K_matrix(dof0+l,dof0+l)=K_matrix(dof0+l,dof0+l)+Kpn
+                            K_matrix(dof2+l,dof2+l)=K_matrix(dof2+l,dof2+l)+Kpn
+                            K_matrix(dof0+l,dof2+l)=K_matrix(dof0+l,dof2+l)-Kpn
+                            K_matrix(dof2+l,dof0+l)=K_matrix(dof2+l,dof0+l)-Kpn
+                            F_vector(dof0+l)=F_vector(dof0+l)+Kpn*(u0(l)-u2(l))
+                            F_vector(dof2+l)=F_vector(dof2+l)-Kpn*(u0(l)-u2(l))
+                        end do   
+                    end do
+                end if
                 ! in the future, interpolate the disp. of floating nodes on bcd edges
             end if
-        end do
+        end do        
+        
         
         !---------------------------------------------------------------------!
         !               deallocate local arrays 
@@ -440,6 +484,9 @@ module xlam_element_module
         if(allocated(Ki)) deallocate(Ki)
         if(allocated(Fi)) deallocate(Fi)
         if(allocated(dofcnc)) deallocate(dofcnc)
+        if(allocated(u0)) deallocate(u0)
+        if(allocated(u1)) deallocate(u1)
+        if(allocated(u2)) deallocate(u2)
     
  
     end subroutine integrate_xlam_element

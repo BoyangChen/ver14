@@ -498,7 +498,7 @@ nsets=[]
 bcds=[]
 
 #for line in lines[ln:]:
-for l in range(ln+1,len(lines)):
+for l in range(ln,len(lines)):
     line=lines[l]
     if(len(line)>=5 and line[0:5]=='*Nset'):
         fnminp.write(line)
@@ -577,6 +577,8 @@ lib_elem.close()
 #   close lib_bcd_module.f90
 lib_bcd.write('    end subroutine initialize_lib_bcd        \n')
 lib_bcd.close()
+#   close fnm input file
+fnminp.close()
 
 
 

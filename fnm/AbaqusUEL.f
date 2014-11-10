@@ -13,8 +13,8 @@
     include 'libraries/lib_node_module.f90'
     include 'libraries/lib_edge_module.f90'
     include 'libraries/lib_mat_module.f90'
-    include 'libraries/lib_elem_module.f90'
     include 'libraries/lib_bcd_module.f90'
+    include 'libraries/lib_elem_module.f90'
     include 'libraries/initialize_lib_module.f90'
     include 'outputs/output_module.f90'
 !------------------------------------------------------

@@ -217,6 +217,7 @@
         ! all inputs are compulsary here, no optional args
         ! --------------------------------------------------------- !
 
+
         Call CohesiveLaw(sdv,Dee,sigma,this_mat%strength, &
         & this_mat%toughness,jump,dmax)
         
@@ -272,6 +273,7 @@
         do i=1, nst
             Dres(i,i)= Kres
         end do
+
 
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
@@ -386,7 +388,7 @@
         
         ! failure started
         if(fstat==onset) then
-        
+
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
                 dm=dmax
@@ -397,6 +399,7 @@
                 else        
                     u_eff=sqrt(max(zero,jump(1))**2+jump(2)**2+jump(3)**2)
                 end if
+
                 ! linear cohesive softening law 
                 if(u_eff > tiny(one)) then
                     dm2=uf/u_eff*(u_eff-u0)/(uf-u0)
