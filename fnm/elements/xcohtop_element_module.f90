@@ -1,4 +1,4 @@
-module xcoh_element_module
+module xcohtop_element_module
     use parameter_module
     use glb_clock_module
     use toolkit_module                  ! global tools for element integration
@@ -11,10 +11,9 @@ module xcoh_element_module
     implicit none
     private
 
-    integer,parameter :: ndim=3, nndrl=8, nedge=8, nndfl=2*nedge, nnode=nndrl+nndfl, ndof=ndim*nnode
+    integer,parameter :: ndim=3, nndrl=8, nedge=4, nndfl=2*nedge, nnode=nndrl+nndfl, ndof=ndim*nnode
     ! Topology: nodes on each edge; 4 nodes per edge, 1-2 are end nodes, 3-4 are fl. nodes; assigned in lcl node numbers
-    integer,parameter :: topo(4,nedge)=reshape([1,2,9,10,2,3,11,12,3,4,13,14,4,1,15,16, &
-                                              & 5,6,17,18,6,7,19,20,7,8,21,22,8,5,23,24],[4,nedge])
+    integer,parameter :: topo(4,nedge)=reshape([5,6,9,10,6,7,11,12,7,8,13,14,8,5,15,16],[4,nedge])
                                               
     ! element status variable values
     integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfailm=5, elfailf=6
@@ -23,7 +22,7 @@ module xcoh_element_module
     integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
     
 
-    type, public :: xcoh_element             ! breakable brick
+    type, public :: xcohtop_element             ! breakable brick
         private
         
         integer :: curr_status=0        ! 0 means intact
@@ -42,26 +41,26 @@ module xcoh_element_module
         
         type(sdv_array), allocatable :: sdv(:)
         
-    end type xcoh_element
+    end type xcohtop_element
   
     interface empty
-        module procedure empty_xcoh_element
+        module procedure empty_xcohtop_element
     end interface
   
     interface prepare
-        module procedure prepare_xcoh_element
+        module procedure prepare_xcohtop_element
     end interface
     
     !~interface precrack
-    !~    module procedure precrack_xcoh_element
+    !~    module procedure precrack_xcohtop_element
     !~end interface
     
     interface integrate
-        module procedure integrate_xcoh_element
+        module procedure integrate_xcohtop_element
     end interface
     
     interface extract
-        module procedure extract_xcoh_element
+        module procedure extract_xcohtop_element
     end interface
 
 
@@ -77,9 +76,9 @@ module xcoh_element_module
 
 
     ! empty a breakable quadrilateral
-    subroutine empty_xcoh_element(elem)
+    subroutine empty_xcohtop_element(elem)
   
-        type(xcoh_element),intent(out) :: elem
+        type(xcohtop_element),intent(out) :: elem
         
         elem%curr_status=0
         elem%key=0 
@@ -97,15 +96,17 @@ module xcoh_element_module
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
         if(allocated(elem%sdv)) deallocate(elem%sdv)
 
-    end subroutine empty_xcoh_element
+    end subroutine empty_xcohtop_element
+  
+  
   
   
   
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xcoh_element(elem,key,matkey,nodecnc,edgecnc)
+    subroutine prepare_xcohtop_element(elem,key,matkey,nodecnc,edgecnc)
     
-        type(xcoh_element),    intent(inout)   :: elem
+        type(xcohtop_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: matkey
         integer,                intent(in)      :: nodecnc(nnode)
@@ -116,13 +117,28 @@ module xcoh_element_module
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
     
-    end subroutine prepare_xcoh_element
+    end subroutine prepare_xcohtop_element
+ 
+
+
+
+    ! this subroutine is used to update the ifailedge array of the element
+    subroutine update_xcohtop_element(elem,ifailedge)
     
+        type(xcohtop_element),    intent(inout)   :: elem
+        integer,                  intent(in)      :: ifailedge(nedge)
+
+        elem%ifailedge=ifailedge
     
-    subroutine extract_xcoh_element(elem,curr_status,key,matkey,nodecnc,edgecnc, &
+    end subroutine update_xcohtop_element
+
+
+   
+    
+    subroutine extract_xcohtop_element(elem,curr_status,key,matkey,nodecnc,edgecnc, &
     & ifailedge,newpartition,nstep,ninc,subelem,subcnc,sdv)
     
-        type(xcoh_element),                      intent(in)  :: elem
+        type(xcohtop_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: matkey
@@ -181,16 +197,16 @@ module xcoh_element_module
             end if
         end if
     
-    end subroutine extract_xcoh_element
+    end subroutine extract_xcohtop_element
 
 
 
 
 
 
-    subroutine integrate_xcoh_element(elem, K_matrix, F_vector)
+    subroutine integrate_xcohtop_element(elem, K_matrix, F_vector)
     
-        type(xcoh_element),intent(inout)       :: elem 
+        type(xcohtop_element),intent(inout)       :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
     
     
@@ -299,7 +315,7 @@ module xcoh_element_module
         if(allocated(dofcnc)) deallocate(dofcnc)
     
  
-    end subroutine integrate_xcoh_element
+    end subroutine integrate_xcohtop_element
     
     
     
@@ -311,7 +327,7 @@ module xcoh_element_module
 
     
     ! passed-in variables
-    type(xcoh_element), intent(inout) :: elem
+    type(xcohtop_element), intent(inout) :: elem
 
 
     ! extracted variables, from glb libraries
@@ -333,7 +349,7 @@ module xcoh_element_module
     real(dp) :: x1, y1, z1, x2, y2, z2  ! (x,y) of node 1 and node 2 of an element edge
     real(dp) :: xct, yct, zct           ! (x,y) of a crack tip on an edge, i.e., intersection of crack line & edge
     real(dp) :: detlc,a1,b1,a2,b2,xmid,ymid
-    real(dp) :: theta
+
     
     ! --------------------------------------------------------------------!
     !       *** workings of edgstat, nfailedge, ifedg ***
@@ -365,7 +381,7 @@ module xcoh_element_module
 
         detlc=zero; a1=zero; b1=zero; a2=zero; b2=zero; xmid=zero; ymid=zero
 
-        theta=zero
+
 
 
 !-----------------------------------------------------------------------!
@@ -384,7 +400,7 @@ module xcoh_element_module
         end do
 
 
-        ! extract elem failed edges' indices
+        ! extract elem failed edges' indices (this info is passed from adj. ply elem)
         ifedg=elem%ifailedge
 
 !-----------------------------------------------------------------------!
@@ -392,137 +408,16 @@ module xcoh_element_module
 !-----------------------------------------------------------------------!
     
 !       find and store the broken edges' variables
-        if(elstat==intact) then
-            do i=1,nedge
-                if(edgstat(i)/=intact) then
-                    nfailedge=nfailedge+1   ! update total no. of damaged edges
-                    ifedg(nfailedge)=i  ! update the indices of damaged edges
-                end if
-            end do
-        else
-        ! once partitioned, only check the status of stored failed edges; newly failed edges are ignored
-            do i=1,size(ifedg)
-                if(ifedg(i)>0) nfailedge=nfailedge+1
-            end do
-        end if
-
-!       calculate elstat value from edge status variables
-
-!****** if elem is intact, then sort out the most damaged edges first, before updating edge status and doing partitions later
-!****** and elem is always partitioned from the most damaged edge, then find the other broken edge along the crack direction
-!****** and stores the damaged edge indices of these two edges only; the other damaged edges are ignored; once elem is nolonger
-!****** intact (already partitioned along these two edges), no need to go through this sorting again
-
-        if(elstat==intact) then
-
-            if(nfailedge==0) then
-                ! no edge failed/damaged, do nothing
-                continue
-                
-            else if(nfailedge==2) then
-            ! one pair of edges broken, could be trans elem, not could repartition into ref, tip, wake and failm (matrix failed) elem
-                
-                ! the failed edge indices must be one pair of corresponding lower and upper edges
-                if(.not.((ifedg(2)-ifedg(1))==nedge/2)) then
-                    write(msg_file,*)'wrong failed edge indices for nfailedge=2 in xcoh edge status partition'
-                    call exit_function
-                end if
-                    
-            else if(nfailedge==4) then
-            ! two pairs of edges broken, could be failm (matrix cracked), wake, tip, refinement elem
-            
-                ! the failed edge indices must be two pairs, with 1 and 2 being the failed lower edges, and 
-                ! 3 and 4 being the corresponding failed upper edges
-                if(.not.((ifedg(3)-ifedg(1))==nedge/2 .and. (ifedg(4)-ifedg(2))==nedge/2)) then
-                    write(msg_file,*)'wrong failed edge indices for nfailedge=4 in xcoh edge status partition'
-                    call exit_function
-                end if
-            
-                !**** the partitioning of xcoh elem is entirely based on the bottom four edges ****    
-         
-                ! if elem partition is intact, then partition accord. to the most damaged edge
-              
-                ! sort two edges according to their damage severity
-                if(edgstat(ifedg(2))>edgstat(ifedg(1))) then
-                    jbe1=ifedg(2)
-                    jbe2=ifedg(1)
-                else
-                    jbe1=ifedg(1)
-                    jbe2=ifedg(2)
-                end if            
-                nfailedge=2
-                ifedg=0
-                ifedg(1)=jbe1
-                ifedg(2)=jbe1+nedge/2
-
-                
-                ! update of elem status done afterwards
-       
-            else if( nfailedge==6 ) then
-            
-                if (.not.((ifedg(4)-ifedg(1))==nedge/2 .and. (ifedg(5)-ifedg(2))==nedge/2 .and. &
-                & (ifedg(6)-ifedg(3))==nedge/2)) then
-                    write(msg_file,*)'wrong failed edge indices for nfailedge=6 in xcoh edge status partition'
-                    call exit_function
-                end if
-                
-                ! if elem partition is intact, then partition accord. to the most damaged edge
-
-                ! find the most damaged edge
-                jbe1=ifedg(1)
-                do i=2,3
-                    if(edgstat(ifedg(i))>edgstat(jbe1)) then
-                        jbe1=ifedg(i)
-                    end if
-                end do
-                nfailedge=2
-                ifedg=0
-                ifedg(1)=jbe1
-                ifedg(2)=jbe1+nedge/2
-
-
-            else if( nfailedge==8 ) then
-            
-                if(.not. ((ifedg(5)-ifedg(1))==nedge/2 .and. (ifedg(6)-ifedg(2))==nedge/2 .and. &
-                & (ifedg(7)-ifedg(3))==nedge/2 .and. (ifedg(8)-ifedg(4))==nedge/2 )) then
-                    write(msg_file,*)'wrong failed edge indices for nfailedge=8 in xcoh edge status partition'
-                    call exit_function
-                end if
-
-                ! if elem partition is intact, then partition accord. to the most damaged edge
-                
-                ! find the most damaged edge
-                jbe1=ifedg(1)
-                do i=2,4
-                    if(edgstat(ifedg(i))>edgstat(jbe1)) then
-                        jbe1=ifedg(i)
-                    end if
-                end do   
-                nfailedge=2
-                ifedg=0
-                ifedg(1)=jbe1
-                ifedg(2)=jbe1+nedge/2
-                   
-              
-            else
-            
-                write(msg_file,*)'unsupported edge status partition in xcoh!'
-                write(msg_file,*) nfailedge, ifedg
-                call exit_function
-              
-            end if
-
-        end if
+        do i=1,size(ifedg)
+            if(ifedg(i)>0) nfailedge=nfailedge+1
+        end do
+    
         
-        
-!****** if elem is intact, after the above sorting/updating, nfailedge should be 0 or 2 only and they should be a pair of upper/lower edges
-!****** if elem is already partitioned, then nfailedge can be 2 or 4 only, and they should be two pairs of upper/lower edges
-        if(nfailedge==0 .and. elstat==intact) then
+        if(nfailedge==0) then
         ! remains intact, do nothing
             continue
-        else if(nfailedge==2 .and. (ifedg(2)-ifedg(1))==nedge/2) then 
-        ! could be 1st time wake elm, tip elm, ref elm and trans elm
-        ! update the edge status, crack tip coords and elstat accordingly
+        else if(nfailedge==1) then 
+        ! adj. ply elem is transition partition
         
             if(edgstat(ifedg(1))==egtrans) then
               ! edge marks the refinement end and the trans elem start 
@@ -530,156 +425,17 @@ module xcoh_element_module
                 elstat=eltrans
                 
             else
-              ! another edge must be partitioned to form a ref/tip/wake elem
-              ! find the other edge to be partitioned
-                
-                ! first, find the index of the lower broken edge
-                jbe1=ifedg(1)
-                
-                ! move the corresponding upper broken edge to ifedg(3), s.t. ifedg(2) is free to take the 2nd broken lower edge
-                ifedg(3)=ifedg(2)
-                
-                
-                ! find the first (or the second also can) fl. node on the bottom broken edge 
-                jnode=topo(3,jbe1)
-                
-                ! store x,y values of this node in xp1, yp1 (legacy format)
-                xp1=coord(jnode)%array(1)
-                yp1=coord(jnode)%array(2)
-
-                ! from theta (local fibre dir.), calculate another point on the crack line (could be any point along the line)
-                xp2=xp1+cos(theta/halfcirc*pi)
-                yp2=yp1+sin(theta/halfcirc*pi)
-                
-                ! next, find the other edge crossed by the crack line
-                do i=1,nedge/2
-                    if (i==jbe1) cycle ! the already broken edge, go to next edge
-                    
-                    ! extract end node 1 coords of edge i
-                    jnode=topo(1,i)  
-                    x1=coord(jnode)%array(1)
-                    y1=coord(jnode)%array(2)
-                    z1=coord(jnode)%array(3)
-                    
-                    ! extract end node 2 coords of edge i
-                    jnode=topo(2,i)
-                    x2=coord(jnode)%array(1)
-                    y2=coord(jnode)%array(2)
-                    z2=coord(jnode)%array(3)
-
-                    ! zero cross status and intersection coords for reuse
-                    iscross=0
-                    xct=zero
-                    yct=zero
-                    
-                    ! check intersection of the crack line and the edge
-                    call klinecross(x1,y1,x2,y2,xp1,yp1,xp2,yp2,iscross,xct,yct)
-                    if (iscross>0) then
-                        nfailedge=nfailedge+1
-                        ifedg(2)=i          ! index of the 2nd lower broken edge is i
-                        zct=half*(z1+z2)    ! z1 should be the same as z2
-                        coord(topo(3,i))%array=[xct,yct,zct]
-                        coord(topo(4,i))%array=[xct,yct,zct]
-                    end if
-                    if (nfailedge==3) exit ! found the edge, no need to proceed
-                end do
-                
-                ! badly shaped element may have large angles; e.g.: 3 or all edges almost parallel to crack, then numerical error may
-                ! prevent the algorithm from finding any broken edge or only one broken edge
-
-                if(nfailedge == 2) then
-                ! use trial lines: connecting the existing crack tip (xp1,yp1) to the midpoints of the other 3 edges
-                    ! crack line equation constants
-                    a2=sin(theta/halfcirc*pi)
-                    b2=-cos(theta/halfcirc*pi)
-                    ! find the midpoint which forms the most parrallel-to-crack line with (xp1,yp1)
-                    do i=1,nedge/2 
-                        if (i==jbe1) cycle
-                        ! tip coords of edge i
-                        x1=coord(topo(1,i))%array(1)
-                        y1=coord(topo(1,i))%array(2)
-                        z1=coord(topo(1,i))%array(3)
-                        x2=coord(topo(2,i))%array(1)
-                        y2=coord(topo(2,i))%array(2)
-                        z2=coord(topo(2,i))%array(3)
-                        ! mid point of edge i
-                        xmid=half*(x1+x2)
-                        ymid=half*(y1+y2)
-                        ! line equation constants of midpoint-(xp1,yp1)
-                        a1=ymid-yp1
-                        b1=xp1-xmid
-                        ! initialize detlc and intersection info
-                        if(i==1 .or. (jbe1==1 .and. i==2)) then
-                            detlc=a1*b2-a2*b1
-                            ifedg(2)=i   ! store failed edge indices
-                            xct=xmid
-                            yct=ymid
-                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
-                        end if
-                        ! find the most parallel trial line and update stored info
-                        if(abs(a1*b2-a2*b1)<abs(detlc)) then
-                            ifedg(2)=i   ! store failed edge indices
-                            xct=xmid
-                            yct=ymid
-                            zct=half*(z1+z2)     ! z1 should be == to z2 (shell bottom plane)
-                        end if
-                    end do
-                    coord(topo(3,ifedg(2)))%array=[xct,yct,zct]
-                    coord(topo(4,ifedg(2)))%array=[xct,yct,zct]
-                end if
-                
-
-                jbe2=ifedg(2)   ! store it in jbe2 (safer)
-
-                ! update edge status variables
-                if(edgstat(jbe1)==egref) then ! tip elem end, refinement elem. start (1st time)
-                    elstat=elref               
-                    ! change 2nd broken edge status to 1 (trans elem start)
-                    edgstat(jbe2)=egtrans
-             
-                else if(edgstat(jbe1)==egtip) then ! wake elem end, tip elem start (1st time)
-                    elstat=eltip
-                    ! change 2nd broken edge status to 2 (refinement start)
-                    edgstat(jbe2)=egref
-               
-                else if(edgstat(jbe1)>=cohcrack) then ! wake elem start (1st time)
-                    elstat=elwake !wake elem               
-                    ! change 2nd broken edge status to 3 (tip elem start)
-                    edgstat(jbe2)=egtip
-                    
-                else ! unknown edge status
-                    write(msg_file,*)'unknown edge status!'
-                    call exit_function
-                end if
-
-                !***** project var. values of the bottom broken edges to the top ones *****
-                
-                nfailedge=4            ! no. of broken edge is now 4
-                ifedg(4)=jbe2+nedge/2  ! index of the 4th broken edge is i
-                
-                ! store it in jbe4 (safer)
-                jbe4=ifedg(4)
-                
-                ! update the two fl. node coords on this edge
-                jnode=topo(1,jbe4); z1=coord(jnode)%array(3)
-                jnode=topo(2,jbe4); z2=coord(jnode)%array(3)
-                zct=half*(z1+z2) ! z1 should be the same as z2
-                
-                jnode=topo(3,jbe4)
-                coord(jnode)%array=[xct,yct,zct]
-                jnode=topo(4,jbe4)               
-                coord(jnode)%array=[xct,yct,zct]
-
-                ! update edge status var. value
-                edgstat(jbe4)=edgstat(jbe2)
+              ! ifailedge is not correct
+              write(msg_file,*)'wrong edge status for nfailedge=1 in xcohtop'
+              call exit_function
         
             endif
             
-        else if(nfailedge==4 .and. (ifedg(3)-ifedg(1))==nedge/2 .and. (ifedg(4)-ifedg(2))==nedge/2) then
-        ! could be cracked, wake, tip, refinement elem
+        else if(nfailedge==2) then
+        ! adj. ply elem could be cracked, wake, tip, refinement elem
         ! only update the elstat, not the edge status, nor the crack tip coords
         
-            !**** the partitioning of xcoh elem is entirely based on the bottom four edges ****         
+            !**** the partitioning of xcohtop elem is entirely based on the bottom four edges ****         
             
             jbe1=ifedg(1)
             jbe2=ifedg(2)
@@ -699,12 +455,12 @@ module xcoh_element_module
             ! cracked elem, cohesive/stress-free crack
                 elstat=elfailm
             else ! unknown combination
-                write(msg_file,*)'unknown combination of 2 edge status!'
+                write(msg_file,*)'unknown combination of 2 edge status in xcohtop!'
                 call exit_function
             end if
             
         else
-            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in xcoh edge stat partition!'
+            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in xcohtop edge stat partition!'
             call exit_function 
         end if     
 
@@ -717,27 +473,10 @@ module xcoh_element_module
 
         if(elstat>elem%curr_status) then
 
-            elem%curr_status=elstat 
-            elem%ifailedge=ifedg                      
+            elem%curr_status=elstat                    
 
             call update_subcnc(elem,edgstat,ifedg,nfailedge)
         
-
-            ! update glb edge array, only the broken edges' status variables
-            lib_edge(elem%edgecnc(ifedg(1:nfailedge)))=edgstat(ifedg(1:nfailedge))
-            
-            ! update glb node array, only the broken edges' fl. node coord
-            do i=1, nfailedge
-                j=ifedg(i)          ! local index of broken edge
-                
-                l=topo(3,j)         ! elem lcl index of broken edge fl. node 1
-                k=elem%nodecnc(l)   ! global index of broken edge fl. node 1
-                call update(lib_node(k),x=coord(l)%array)
-                
-                l=topo(4,j)         ! elem lcl index of broken edge fl. node 2
-                k=elem%nodecnc(l)   ! global index of broken edge fl. node 2
-                call update(lib_node(k),x=coord(l)%array)
-            end do
         end if
 
 
@@ -758,7 +497,7 @@ module xcoh_element_module
     subroutine update_subcnc(elem,edgstat,ifedg,nfailedge)
     
     ! passed-in variables
-    type(xcoh_element),    intent(inout)   :: elem
+    type(xcohtop_element),    intent(inout)   :: elem
     integer,                intent(in)      :: edgstat(:), ifedg(:), nfailedge
 
 
@@ -790,9 +529,15 @@ module xcoh_element_module
             continue
             
             
-        case (2) !- one edge cracked, trans partition
+        case (1) !- one edge cracked, trans partition
             ! find the index of the broken edge
             ibe=ifedg(1)
+
+            ! ibe1 must be between 1 to 4
+            if(ibe1<1 .or. ibe1>4) then
+                write(msg_file,*) 'something wrong in xcohtop update subcnc case nfailedge=1'
+                call exit_function
+            end if
 
             ! verify its status variable value
             if(edgstat(ibe)/=egtrans) then
@@ -874,22 +619,17 @@ module xcoh_element_module
          
 
  
-        case (4) !- two edges cracked
+        case (2) !- two edges cracked
          
-            ibe1=min(ifedg(1),ifedg(2),ifedg(3),ifedg(4))   ! local edge index of 1st broken edge
-            do i=1, 4
-                if(ifedg(i)<=nedge/2) ibe2=max(ibe2,ifedg(i))! local edge index of 2nd broken edge
-            end do  
+            ibe1=min(ifedg(1),ifedg(2))   ! local edge index of 1st broken edge
+            ibe2=max(ifedg(1),ifedg(2)) 
             
             
-
             ! ibe1 must be between 1 to 3, and ibe2 between 2 to 4, with ibe2 > ibe1
-            if(ibe1>=nedge/2 .or. ibe1==0 .or. ibe2<=1 .or. ibe2<=ibe1) then
-                write(msg_file,*) 'something wrong in xcoh update subcnc case nfailedge=4'
+            if(ibe1<1 .or. ibe1>3 .or. ibe2<2 .or. ibe2>4 .or. ibe2<=ibe1) then
+                write(msg_file,*) 'something wrong in xcohtop update subcnc case nfailedge=2'
                 call exit_function
             end if
-
-            if(edgstat(ibe1)==cohcrack .or. edgstat(ibe2)==cohcrack) iscoh=.true.
 
             
             ! determine partition based on the indices of the two broken edges
@@ -908,7 +648,7 @@ module xcoh_element_module
                             nbulk=4
                             e1=4; e2=1; e3=2; e4=3
                         case default
-                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xcoh'
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xcohtop'
                             call exit_function
                     end select
                 case(2)
@@ -920,7 +660,7 @@ module xcoh_element_module
                             nbulk=2
                             e1=2; e2=3; e3=4; e4=1
                         case default
-                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xcoh'
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xcohtop'
                             call exit_function
                     end select
                 case(3)
@@ -928,11 +668,11 @@ module xcoh_element_module
                         nbulk=4
                         e1=3; e2=4; e3=1; e4=2
                     else
-                        write(msg_file,*)'wrong 2nd broken edge in update subcnc xcoh'
+                        write(msg_file,*)'wrong 2nd broken edge in update subcnc xcohtop'
                         call exit_function                    
                     end if    
                 case default
-                    write(msg_file,*)'wrong broken edge in update subcnc xcoh'
+                    write(msg_file,*)'wrong broken edge in update subcnc xcohtop'
                     call exit_function
             end select
             
@@ -940,11 +680,9 @@ module xcoh_element_module
             select case(nbulk)
                 case(2)
                 ! two brick bulk subdomains
-                    if(iscoh) then
-                        nsub=3  ! two brick and one coh2d
-                    else
-                        nsub=2  ! only two brick
-                    end if
+
+                    nsub=2  ! only two brick
+
                     if(allocated(elem%subelem)) deallocate(elem%subelem)
                     if(allocated(elem%subcnc)) deallocate(elem%subcnc)
                     if(allocated(subglbcnc)) deallocate(subglbcnc)
@@ -1004,38 +742,17 @@ module xcoh_element_module
                     &glbcnc=subglbcnc(1)%array)
                     call prepare(elem%subelem(2),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
                     &glbcnc=subglbcnc(2)%array)
+    
+                    
+                    !call prepare(elem%subelem(3),eltype='coh3d8',matkey=elem%cohmat,glbcnc=subglbcnc(3)%array)
                     
                     
-                    if(iscoh) then
-                    
-                    ! sub elm 3 connec
-                    elem%subcnc(3)%array(2)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(2)=jnode3
-                    elem%subcnc(3)%array(1)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(1)=jnode1
-                    
-                    elem%subcnc(3)%array(3)=elem%subcnc(3)%array(2)+nndfl/2
-                    elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nndfl/2
-                    
-                    elem%subcnc(3)%array(6)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(3)%array(6)=jnode3
-                    elem%subcnc(3)%array(5)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(5)=jnode1
-                    
-                    elem%subcnc(3)%array(7)=elem%subcnc(3)%array(6)+nndfl/2
-                    elem%subcnc(3)%array(8)=elem%subcnc(3)%array(5)+nndfl/2
-                    
-                    subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
-                    
-                    
-                    call prepare(elem%subelem(3),eltype='coh3d8',matkey=elem%cohmat,glbcnc=subglbcnc(3)%array)
-                    
-                    
-                    end if
                     
                 case(4)
                 ! four triangular bulk subdomains
-                    if(iscoh) then
-                        nsub=5
-                    else
-                        nsub=4
-                    end if
+
+                    nsub=4
+
                     if(allocated(elem%subelem)) deallocate(elem%subelem)
                     if(allocated(elem%subcnc)) deallocate(elem%subcnc)
                     if(allocated(subglbcnc)) deallocate(subglbcnc)
@@ -1048,12 +765,7 @@ module xcoh_element_module
                         elem%subcnc(j)%array=0
                         subglbcnc(j)%array=0
                     end do
-                    if(iscoh) then
-                        allocate(elem%subcnc(5)%array(8))
-                        allocate(subglbcnc(5)%array(8))
-                        elem%subcnc(5)%array=0
-                        subglbcnc(5)%array=0
-                    end if
+
                     
                     ! find the smaller glb fl. node on the broken edge
                     if(elem%nodecnc(topo(3,e1))<elem%nodecnc(topo(4,e1))) then
@@ -1123,29 +835,12 @@ module xcoh_element_module
                     call prepare(elem%subelem(4),eltype='wedge',matkey=elem%bulkmat,&
                     &plyangle=elem%plyangle,glbcnc=subglbcnc(4)%array)
                     
-                    if(iscoh) then
                     
-                    ! sub elm 5 connec
-                    elem%subcnc(5)%array(5)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(5)=jnode1
-                    elem%subcnc(5)%array(6)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(6)=jnode2
+                    !call prepare(elem%subelem(5),eltype='coh3d8', matkey=elem%cohmat, glbcnc=subglbcnc(5)%array)
                     
-                    elem%subcnc(5)%array(7)=elem%subcnc(5)%array(6)+nndfl/2
-                    elem%subcnc(5)%array(8)=elem%subcnc(5)%array(5)+nndfl/2
-                    
-                    elem%subcnc(5)%array(1)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(5)%array(1)=jnode1
-                    elem%subcnc(5)%array(2)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(5)%array(2)=jnode2   
-                    
-                    elem%subcnc(5)%array(3)=elem%subcnc(5)%array(2)+nndfl/2
-                    elem%subcnc(5)%array(4)=elem%subcnc(5)%array(1)+nndfl/2
-                    
-                    subglbcnc(5)%array(:)=elem%nodecnc(elem%subcnc(5)%array(:))
-                    
-                    call prepare(elem%subelem(5),eltype='coh3d8', matkey=elem%cohmat, glbcnc=subglbcnc(5)%array)
-                    
-                    end if
                     
                 case default
-                    write(msg_file,*)'wrong nbulk in update subcnc xcoh'
+                    write(msg_file,*)'wrong nbulk in update subcnc xcohtop'
                     call exit_function
             end select
 
@@ -1159,7 +854,7 @@ module xcoh_element_module
 
            
         case default
-           write(msg_file,*) 'WARNING: xcoh update subcnc case selection default!'
+           write(msg_file,*) 'WARNING: xcohtop update subcnc case selection default!'
            
         end select
         
@@ -1182,4 +877,4 @@ module xcoh_element_module
   
   
   
-end module xcoh_element_module
+end module xcohtop_element_module
