@@ -1,4 +1,4 @@
-module xcohtop_element_module
+module xsubcoh_element_module
     use parameter_module
     use glb_clock_module
     use toolkit_module                  ! global tools for element integration
@@ -22,7 +22,7 @@ module xcohtop_element_module
     integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
     
 
-    type, public :: xcohtop_element             ! breakable brick
+    type, public :: xsubcoh_element             ! breakable brick
         private
         
         integer :: curr_status=0        ! 0 means intact
@@ -41,32 +41,36 @@ module xcohtop_element_module
         
         type(sdv_array), allocatable :: sdv(:)
         
-    end type xcohtop_element
+    end type xsubcoh_element
   
     interface empty
-        module procedure empty_xcohtop_element
+        module procedure empty_xsubcoh_element
     end interface
   
     interface prepare
-        module procedure prepare_xcohtop_element
+        module procedure prepare_xsubcoh_element
+    end interface
+    
+    interface update
+        module procedure update_xsubcoh_element
     end interface
     
     !~interface precrack
-    !~    module procedure precrack_xcohtop_element
+    !~    module procedure precrack_xsubcoh_element
     !~end interface
     
     interface integrate
-        module procedure integrate_xcohtop_element
+        module procedure integrate_xsubcoh_element
     end interface
     
     interface extract
-        module procedure extract_xcohtop_element
+        module procedure extract_xsubcoh_element
     end interface
 
 
 
 
-    public :: empty,prepare,integrate,extract
+    public :: empty,prepare,update,integrate,extract
 
 
 
@@ -76,9 +80,9 @@ module xcohtop_element_module
 
 
     ! empty a breakable quadrilateral
-    subroutine empty_xcohtop_element(elem)
+    subroutine empty_xsubcoh_element(elem)
   
-        type(xcohtop_element),intent(out) :: elem
+        type(xsubcoh_element),intent(out) :: elem
         
         elem%curr_status=0
         elem%key=0 
@@ -96,7 +100,7 @@ module xcohtop_element_module
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
         if(allocated(elem%sdv)) deallocate(elem%sdv)
 
-    end subroutine empty_xcohtop_element
+    end subroutine empty_xsubcoh_element
   
   
   
@@ -104,9 +108,9 @@ module xcohtop_element_module
   
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xcohtop_element(elem,key,matkey,nodecnc,edgecnc)
+    subroutine prepare_xsubcoh_element(elem,key,matkey,nodecnc,edgecnc)
     
-        type(xcohtop_element),    intent(inout)   :: elem
+        type(xsubcoh_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: matkey
         integer,                intent(in)      :: nodecnc(nnode)
@@ -117,28 +121,28 @@ module xcohtop_element_module
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
     
-    end subroutine prepare_xcohtop_element
+    end subroutine prepare_xsubcoh_element
  
 
 
 
     ! this subroutine is used to update the ifailedge array of the element
-    subroutine update_xcohtop_element(elem,ifailedge)
+    subroutine update_xsubcoh_element(elem,ifailedge)
     
-        type(xcohtop_element),    intent(inout)   :: elem
+        type(xsubcoh_element),    intent(inout)   :: elem
         integer,                  intent(in)      :: ifailedge(nedge)
 
         elem%ifailedge=ifailedge
     
-    end subroutine update_xcohtop_element
+    end subroutine update_xsubcoh_element
 
 
    
     
-    subroutine extract_xcohtop_element(elem,curr_status,key,matkey,nodecnc,edgecnc, &
+    subroutine extract_xsubcoh_element(elem,curr_status,key,matkey,nodecnc,edgecnc, &
     & ifailedge,newpartition,nstep,ninc,subelem,subcnc,sdv)
     
-        type(xcohtop_element),                      intent(in)  :: elem
+        type(xsubcoh_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: matkey
@@ -197,16 +201,16 @@ module xcohtop_element_module
             end if
         end if
     
-    end subroutine extract_xcohtop_element
+    end subroutine extract_xsubcoh_element
 
 
 
 
 
 
-    subroutine integrate_xcohtop_element(elem, K_matrix, F_vector)
+    subroutine integrate_xsubcoh_element(elem, K_matrix, F_vector)
     
-        type(xcohtop_element),intent(inout)       :: elem 
+        type(xsubcoh_element),intent(inout)       :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
     
     
@@ -315,7 +319,7 @@ module xcohtop_element_module
         if(allocated(dofcnc)) deallocate(dofcnc)
     
  
-    end subroutine integrate_xcohtop_element
+    end subroutine integrate_xsubcoh_element
     
     
     
@@ -327,7 +331,7 @@ module xcohtop_element_module
 
     
     ! passed-in variables
-    type(xcohtop_element), intent(inout) :: elem
+    type(xsubcoh_element), intent(inout) :: elem
 
 
     ! extracted variables, from glb libraries
@@ -426,7 +430,7 @@ module xcohtop_element_module
                 
             else
               ! ifailedge is not correct
-              write(msg_file,*)'wrong edge status for nfailedge=1 in xcohtop'
+              write(msg_file,*)'wrong edge status for nfailedge=1 in xsubcoh'
               call exit_function
         
             endif
@@ -435,7 +439,7 @@ module xcohtop_element_module
         ! adj. ply elem could be cracked, wake, tip, refinement elem
         ! only update the elstat, not the edge status, nor the crack tip coords
         
-            !**** the partitioning of xcohtop elem is entirely based on the bottom four edges ****         
+            !**** the partitioning of xsubcoh elem is entirely based on the bottom four edges ****         
             
             jbe1=ifedg(1)
             jbe2=ifedg(2)
@@ -455,12 +459,12 @@ module xcohtop_element_module
             ! cracked elem, cohesive/stress-free crack
                 elstat=elfailm
             else ! unknown combination
-                write(msg_file,*)'unknown combination of 2 edge status in xcohtop!'
+                write(msg_file,*)'unknown combination of 2 edge status in xsubcoh!'
                 call exit_function
             end if
             
         else
-            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in xcohtop edge stat partition!'
+            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in xsubcoh edge stat partition!'
             call exit_function 
         end if     
 
@@ -497,7 +501,7 @@ module xcohtop_element_module
     subroutine update_subcnc(elem,edgstat,ifedg,nfailedge)
     
     ! passed-in variables
-    type(xcohtop_element),    intent(inout)   :: elem
+    type(xsubcoh_element),    intent(inout)   :: elem
     integer,                intent(in)      :: edgstat(:), ifedg(:), nfailedge
 
 
@@ -511,6 +515,10 @@ module xcohtop_element_module
     integer :: jnode, jnode1, jnode2, jnode3, jnode4    ! node index variables
     logical :: iscoh
 
+    real(dp), allocatable   :: x1(:), x2(:), xc(:)  ! coords of broken edge end nodes (x1 and x2) and crack tip (xc)
+    real(dp)                :: tratio               ! |xc-x1|/|x2-x1|
+    type(xnode),allocatable :: mnode(:)     ! material nodes of cohesive elem
+    real(dp)                :: Tmatrix(3,4) ! interpolation matrix btw bottom 4 num nodes and 3 mat nodes
 
 
 !       initialize local variables
@@ -521,6 +529,8 @@ module xcohtop_element_module
         nsub=0; nbulk=0
         jnode=0; jnode1=0; jnode2=0; jnode3=0; jnode4=0
         iscoh=.false.
+        
+        Tmatrix=zero
         
 
 
@@ -535,7 +545,7 @@ module xcohtop_element_module
 
             ! ibe1 must be between 1 to 4
             if(ibe1<1 .or. ibe1>4) then
-                write(msg_file,*) 'something wrong in xcohtop update subcnc case nfailedge=1'
+                write(msg_file,*) 'something wrong in xsubcoh update subcnc case nfailedge=1'
                 call exit_function
             end if
 
@@ -545,20 +555,26 @@ module xcohtop_element_module
                 call exit_function
             end if
             
-            ! allocate sub element arrays; in this case, 3 wedge elements
+            ! allocate sub element arrays; in this case, 3 coh3d6 sub3d elements
             nsub=3
             if(allocated(elem%subelem)) deallocate(elem%subelem)
             if(allocated(elem%subcnc)) deallocate(elem%subcnc)
             if(allocated(subglbcnc)) deallocate(subglbcnc)
             allocate(elem%subelem(nsub))
             allocate(elem%subcnc(nsub))
-            allocate(subglbcnc(nsub))
+            allocate(subglbcnc(nsub)) 
+            ! these coh3d6 elems have 7 num nodes and 6 mat nodes
             do j=1, nsub
-                allocate(elem%subcnc(j)%array(6))
-                allocate(subglbcnc(j)%array(6))
+                allocate(elem%subcnc(j)%array(7))
+                allocate(subglbcnc(j)%array(7))
                 elem%subcnc(j)%array=0
-                subglbcnc(j)%array=0
-            end do             
+                subglbcnc(j)%array=0    
+            end do 
+            
+            ! allocate 6 material nodes for sub elems
+            if(allocated(mnode)) deallocate(mnode)
+            allocate(mnode(6))
+            
             
             ! find the neighbouring edges of this broken edge, in counter-clockwise direction
             select case(ibe)
@@ -582,40 +598,111 @@ module xcohtop_element_module
                 jnode=topo(4,ibe)
             end if
             
-            ! sub elm 1 connec
-            elem%subcnc(1)%array(1)=topo(1,e1)
-            elem%subcnc(1)%array(2)=topo(2,e1)
-            elem%subcnc(1)%array(3)=jnode
+            ! find the relative position of crack tip on this edge
+            call extract(lib_node(elem%nodecnc(topo(1,ibe))),x=x1)
+            call extract(lib_node(elem%nodecnc(topo(2,ibe))),x=x2)
+            call extract(lib_node(elem%nodecnc(jnode)),x=xc)
+            tratio=distance(x1,xc)/distance(x1,x2)
             
-            elem%subcnc(1)%array(4:5)=elem%subcnc(1)%array(1:2)+nndrl/2 ! upper surf nodes
-            elem%subcnc(1)%array(6)=elem%subcnc(1)%array(3)+nndfl/2
+            
+            
+            !*** sub elm 1 connec; 7 numerical nodes, 6 material nodes     
+            
+            elem%subcnc(1)%array(1)=topo(1,e1)-nndrl/2
+            elem%subcnc(1)%array(2)=topo(2,e1)-nndrl/2
+            elem%subcnc(1)%array(3)=topo(1,e3)-nndrl/2
+            elem%subcnc(1)%array(4)=topo(2,e3)-nndrl/2
+            !elem%subcnc(1)%array(3)=topo(1,ibe)-nndrl/2 
+            elem%subcnc(1)%array(5)=topo(1,e1)
+            elem%subcnc(1)%array(6)=topo(2,e1)
+            elem%subcnc(1)%array(7)=jnode
             
             subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
             
-            ! sub elm 2 connec
-            elem%subcnc(2)%array(1)=topo(1,e2)
-            elem%subcnc(2)%array(2)=topo(2,e2)
-            elem%subcnc(2)%array(3)=jnode 
-
-            elem%subcnc(2)%array(4:5)=elem%subcnc(2)%array(1:2)+nndrl/2 ! upper surf nodes
-            elem%subcnc(2)%array(6)=elem%subcnc(2)%array(3)+nndfl/2 
+            ! update the mnode array
+            ! first two mat nodes of bottom surf are the same as num nodes
+            mnode(1)=lib_node(subglbcnc(1)%array(1))
+            mnode(2)=lib_node(subglbcnc(1)%array(2))
+            mnode(3)=tratio*lib_node(subglbcnc(1)%array(4))+(one-tratio)*lib_node(subglbcnc(1)%array(1))
+            mnode(4)=lib_node(subglbcnc(1)%array(5))
+            mnode(5)=lib_node(subglbcnc(1)%array(6))
+            mnode(6)=lib_node(subglbcnc(1)%array(7))
+            
+            Tmatrix=zero
+            Tmatrix(1,1)=one
+            Tmatrix(2,2)=one  
+            Tmatrix(3,1)=one-tratio
+            Tmatrix(3,4)=tratio
+            
+            call prepare(elem%subelem(1),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(1)%array &
+            & ,Tmatrix=Tmatrix,mnode=mnode)
+            
+            
+            
+            
+            !*** sub elm 2 connec; 7 numerical nodes; 6 material nodes
+            
+            elem%subcnc(2)%array(1)=topo(1,e2)-nndrl/2
+            elem%subcnc(2)%array(2)=topo(2,e2)-nndrl/2
+            elem%subcnc(2)%array(3)=topo(1,ibe)-nndrl/2
+            elem%subcnc(2)%array(4)=topo(2,ibe)-nndrl/2
+            elem%subcnc(2)%array(5)=topo(1,e2)
+            elem%subcnc(2)%array(6)=topo(2,e2)
+            elem%subcnc(2)%array(7)=jnode
 
             subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
             
-            ! sub elm 3 connec
-            elem%subcnc(3)%array(1)=topo(1,e3)
-            elem%subcnc(3)%array(2)=topo(2,e3)
-            elem%subcnc(3)%array(3)=jnode  
+            ! update the mnode array
+            ! first two mat nodes of bottom surf are the same as num nodes
+            mnode(1)=lib_node(subglbcnc(2)%array(1))
+            mnode(2)=lib_node(subglbcnc(2)%array(2))
+            mnode(3)=tratio*lib_node(subglbcnc(2)%array(3))+(one-tratio)*lib_node(subglbcnc(2)%array(4))
+            mnode(4)=lib_node(subglbcnc(2)%array(5))
+            mnode(5)=lib_node(subglbcnc(2)%array(6))
+            mnode(6)=lib_node(subglbcnc(2)%array(7))
             
-            elem%subcnc(3)%array(4:5)=elem%subcnc(3)%array(1:2)+nndrl/2 ! upper surf nodes
-            elem%subcnc(3)%array(6)=elem%subcnc(3)%array(3)+nndfl/2
-
+            Tmatrix=zero
+            Tmatrix(1,1)=one
+            Tmatrix(2,2)=one  ! first two mat nodes of bottom surf are the same as num nodes
+            Tmatrix(3,3)=tratio
+            Tmatrix(3,4)=one-tratio
+            
+            call prepare(elem%subelem(2),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(2)%array &
+            & ,Tmatrix=Tmatrix,mnode=mnode)
+            
+            
+            
+            
+            !*** sub elm 3 connec; 7 numerical nodes, 6 material nodes
+            
+            elem%subcnc(3)%array(1)=topo(1,e3)-nndrl/2
+            elem%subcnc(3)%array(2)=topo(2,e3)-nndrl/2
+            elem%subcnc(3)%array(3)=topo(1,e1)-nndrl/2
+            elem%subcnc(3)%array(4)=topo(2,e1)-nndrl/2
+            !elem%subcnc(3)%array(3)=topo(2,ibe)-nndrl/2  
+            elem%subcnc(3)%array(5)=topo(1,e3)
+            elem%subcnc(3)%array(6)=topo(2,e3)
+            elem%subcnc(3)%array(7)=jnode  
+            
             subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
-
-            ! create sub elements
-            call prepare(elem%subelem(1),eltype='wedge', matkey=elem%bulkmat, plyangle=elem%plyangle, glbcnc=subglbcnc(1)%array)
-            call prepare(elem%subelem(2),eltype='wedge', matkey=elem%bulkmat, plyangle=elem%plyangle, glbcnc=subglbcnc(2)%array)
-            call prepare(elem%subelem(3),eltype='wedge', matkey=elem%bulkmat, plyangle=elem%plyangle, glbcnc=subglbcnc(3)%array)
+            
+            ! update the mnode array
+            ! first two mat nodes of bottom surf are the same as num nodes
+            mnode(1)=lib_node(subglbcnc(3)%array(1))
+            mnode(2)=lib_node(subglbcnc(3)%array(2))
+            mnode(3)=tratio*lib_node(subglbcnc(3)%array(2))+(one-tratio)*lib_node(subglbcnc(3)%array(3))
+            mnode(4)=lib_node(subglbcnc(3)%array(5))
+            mnode(5)=lib_node(subglbcnc(3)%array(6))
+            mnode(6)=lib_node(subglbcnc(3)%array(7))
+            
+            Tmatrix=zero
+            Tmatrix(1,1)=one
+            Tmatrix(2,2)=one  ! first two mat nodes of bottom surf are the same as num nodes
+            Tmatrix(3,2)=tratio
+            Tmatrix(3,3)=one-tratio
+            
+            call prepare(elem%subelem(3),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(3)%array &
+            & ,Tmatrix=Tmatrix,mnode=mnode)
          
 
  
@@ -627,7 +714,7 @@ module xcohtop_element_module
             
             ! ibe1 must be between 1 to 3, and ibe2 between 2 to 4, with ibe2 > ibe1
             if(ibe1<1 .or. ibe1>3 .or. ibe2<2 .or. ibe2>4 .or. ibe2<=ibe1) then
-                write(msg_file,*) 'something wrong in xcohtop update subcnc case nfailedge=2'
+                write(msg_file,*) 'something wrong in xsubcoh update subcnc case nfailedge=2'
                 call exit_function
             end if
 
@@ -648,7 +735,7 @@ module xcohtop_element_module
                             nbulk=4
                             e1=4; e2=1; e3=2; e4=3
                         case default
-                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xcohtop'
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xsubcoh'
                             call exit_function
                     end select
                 case(2)
@@ -660,7 +747,7 @@ module xcohtop_element_module
                             nbulk=2
                             e1=2; e2=3; e3=4; e4=1
                         case default
-                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xcohtop'
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xsubcoh'
                             call exit_function
                     end select
                 case(3)
@@ -668,11 +755,11 @@ module xcohtop_element_module
                         nbulk=4
                         e1=3; e2=4; e3=1; e4=2
                     else
-                        write(msg_file,*)'wrong 2nd broken edge in update subcnc xcohtop'
+                        write(msg_file,*)'wrong 2nd broken edge in update subcnc xsubcoh'
                         call exit_function                    
                     end if    
                 case default
-                    write(msg_file,*)'wrong broken edge in update subcnc xcohtop'
+                    write(msg_file,*)'wrong broken edge in update subcnc xsubcoh'
                     call exit_function
             end select
             
@@ -703,12 +790,25 @@ module xcohtop_element_module
                         jnode1=topo(4,e1)
                     end if
                     
+                    ! find the relative position of crack tip on this edge
+                    call extract(lib_node(elem%nodecnc(topo(1,e1))),x=x1)
+                    call extract(lib_node(elem%nodecnc(topo(2,e1))),x=x2)
+                    call extract(lib_node(elem%nodecnc(jnode1)),x=xc)
+                    tratio1=distance(x1,xc)/distance(x1,x2)
+                    
                     ! find the smaller glb fl. node on the broken edge
                     if(elem%nodecnc(topo(3,e3))<elem%nodecnc(topo(4,e3))) then
                         jnode3=topo(3,e3)
                     else
                         jnode3=topo(4,e3)
                     end if
+                    
+                    ! find the relative position of crack tip on this edge
+                    call extract(lib_node(elem%nodecnc(topo(1,e3))),x=x1)
+                    call extract(lib_node(elem%nodecnc(topo(2,e3))),x=x2)
+                    call extract(lib_node(elem%nodecnc(jnode3)),x=xc)
+                    tratio2=distance(x1,xc)/distance(x1,x2)
+                    
                     
                     ! sub elm 1 connec
                     elem%subcnc(1)%array(1)=topo(1,e1)
@@ -840,7 +940,7 @@ module xcohtop_element_module
                     
                     
                 case default
-                    write(msg_file,*)'wrong nbulk in update subcnc xcohtop'
+                    write(msg_file,*)'wrong nbulk in update subcnc xsubcoh'
                     call exit_function
             end select
 
@@ -854,7 +954,7 @@ module xcohtop_element_module
 
            
         case default
-           write(msg_file,*) 'WARNING: xcohtop update subcnc case selection default!'
+           write(msg_file,*) 'WARNING: xsubcoh update subcnc case selection default!'
            
         end select
         
@@ -877,4 +977,4 @@ module xcohtop_element_module
   
   
   
-end module xcohtop_element_module
+end module xsubcoh_element_module
