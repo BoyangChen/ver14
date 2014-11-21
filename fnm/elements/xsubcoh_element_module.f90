@@ -512,13 +512,12 @@ module xsubcoh_element_module
     integer :: ibe, ibe1, ibe2                          ! indices of broken edges
     integer :: e1,e2,e3,e4                              ! edge indices, used for partitioning element
     integer :: nsub, nbulk                              ! no. of sub elements, and no. of bulk partitions
-    integer :: jnode, jnode1, jnode2, jnode3, jnode4    ! node index variables
-    logical :: iscoh
+    integer :: jnode, jnode1, jnode2                    ! node index variables
 
-    real(dp), allocatable   :: x1(:), x2(:), xc(:)  ! coords of broken edge end nodes (x1 and x2) and crack tip (xc)
-    real(dp)                :: tratio               ! |xc-x1|/|x2-x1|
-    type(xnode),allocatable :: mnode(:)     ! material nodes of cohesive elem
-    real(dp)                :: Tmatrix(3,4) ! interpolation matrix btw bottom 4 num nodes and 3 mat nodes
+    real(dp), allocatable   :: x1(:), x2(:), xc(:)      ! coords of broken edge end nodes (x1 and x2) and crack tip (xc)
+    real(dp)                :: tratio, tratio1, tratio2 ! tratio=|xc-x1|/|x2-x1|
+    type(xnode),allocatable :: mnode(:)                 ! material nodes of cohesive elem
+    real(dp), allocatable   :: Tmatrix(:,:)             ! interpolation matrix btw bottom num nodes and mat nodes
 
 
 !       initialize local variables
@@ -527,12 +526,10 @@ module xsubcoh_element_module
         e1=0; e2=0; e3=0; e4=0
         ibe=0; ibe1=0; ibe2=0
         nsub=0; nbulk=0
-        jnode=0; jnode1=0; jnode2=0; jnode3=0; jnode4=0
-        iscoh=.false.
+        jnode=0; jnode1=0; jnode2=0
+        tratio=zero; tratio1=zero; tratio2=zero
         
-        Tmatrix=zero
         
-
 
 10      select case (nfailedge)
         case (0) !- no cracked edge, do nothing
@@ -575,6 +572,9 @@ module xsubcoh_element_module
             if(allocated(mnode)) deallocate(mnode)
             allocate(mnode(6))
             
+            ! allocate Tmatrix for bottom surface (3 mat nodes interpolated by 4 num nodes)
+            if(allocated(Tmatrix)) deallocate(Tmatrix)
+            allocate(Tmatrix(3,4))
             
             ! find the neighbouring edges of this broken edge, in counter-clockwise direction
             select case(ibe)
@@ -612,7 +612,6 @@ module xsubcoh_element_module
             elem%subcnc(1)%array(2)=topo(2,e1)-nndrl/2
             elem%subcnc(1)%array(3)=topo(1,e3)-nndrl/2
             elem%subcnc(1)%array(4)=topo(2,e3)-nndrl/2
-            !elem%subcnc(1)%array(3)=topo(1,ibe)-nndrl/2 
             elem%subcnc(1)%array(5)=topo(1,e1)
             elem%subcnc(1)%array(6)=topo(2,e1)
             elem%subcnc(1)%array(7)=jnode
@@ -678,8 +677,7 @@ module xsubcoh_element_module
             elem%subcnc(3)%array(1)=topo(1,e3)-nndrl/2
             elem%subcnc(3)%array(2)=topo(2,e3)-nndrl/2
             elem%subcnc(3)%array(3)=topo(1,e1)-nndrl/2
-            elem%subcnc(3)%array(4)=topo(2,e1)-nndrl/2
-            !elem%subcnc(3)%array(3)=topo(2,ibe)-nndrl/2  
+            elem%subcnc(3)%array(4)=topo(2,e1)-nndrl/2 
             elem%subcnc(3)%array(5)=topo(1,e3)
             elem%subcnc(3)%array(6)=topo(2,e3)
             elem%subcnc(3)%array(7)=jnode  
@@ -766,9 +764,9 @@ module xsubcoh_element_module
             
             select case(nbulk)
                 case(2)
-                ! two brick bulk subdomains
+                ! two quad subdomains
 
-                    nsub=2  ! only two brick
+                    nsub=2  ! only two coh3d8 sub3d elems
 
                     if(allocated(elem%subelem)) deallocate(elem%subelem)
                     if(allocated(elem%subcnc)) deallocate(elem%subcnc)
@@ -776,6 +774,8 @@ module xsubcoh_element_module
                     allocate(elem%subelem(nsub))
                     allocate(elem%subcnc(nsub))
                     allocate(subglbcnc(nsub))
+                    
+                    ! allocate 8 numerical nodes for sub elems
                     do j=1, nsub
                         allocate(elem%subcnc(j)%array(8))
                         allocate(subglbcnc(j)%array(8))
@@ -783,7 +783,15 @@ module xsubcoh_element_module
                         subglbcnc(j)%array=0
                     end do
                     
-                    ! find the smaller glb fl. node on the broken edge
+                    ! allocate 8 material nodes for sub elems
+                    if(allocated(mnode)) deallocate(mnode)
+                    allocate(mnode(8))
+                    
+                    ! allocate Tmatrix for bottom surface (4 mat nodes interpolated by 4 num nodes)
+                    if(allocated(Tmatrix)) deallocate(Tmatrix)
+                    allocate(Tmatrix(4,4))
+                    
+                    ! find the smaller glb fl. node on the 1st broken edge
                     if(elem%nodecnc(topo(3,e1))<elem%nodecnc(topo(4,e1))) then
                         jnode1=topo(3,e1)
                     else
@@ -796,60 +804,97 @@ module xsubcoh_element_module
                     call extract(lib_node(elem%nodecnc(jnode1)),x=xc)
                     tratio1=distance(x1,xc)/distance(x1,x2)
                     
-                    ! find the smaller glb fl. node on the broken edge
+                    ! find the smaller glb fl. node on the 2nd broken edge
                     if(elem%nodecnc(topo(3,e3))<elem%nodecnc(topo(4,e3))) then
-                        jnode3=topo(3,e3)
+                        jnode2=topo(3,e3)
                     else
-                        jnode3=topo(4,e3)
+                        jnode2=topo(4,e3)
                     end if
                     
                     ! find the relative position of crack tip on this edge
                     call extract(lib_node(elem%nodecnc(topo(1,e3))),x=x1)
                     call extract(lib_node(elem%nodecnc(topo(2,e3))),x=x2)
-                    call extract(lib_node(elem%nodecnc(jnode3)),x=xc)
+                    call extract(lib_node(elem%nodecnc(jnode2)),x=xc)
                     tratio2=distance(x1,xc)/distance(x1,x2)
                     
                     
-                    ! sub elm 1 connec
-                    elem%subcnc(1)%array(1)=topo(1,e1)
-                    elem%subcnc(1)%array(2)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(1)%array(2)=jnode1
-                    elem%subcnc(1)%array(3)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(1)%array(3)=jnode3
-                    elem%subcnc(1)%array(4)=topo(2,e3)
-                    
-                    elem%subcnc(1)%array(5)=elem%subcnc(1)%array(1)+nndrl/2
-                    elem%subcnc(1)%array(6)=elem%subcnc(1)%array(2)+nndfl/2
-                    elem%subcnc(1)%array(7)=elem%subcnc(1)%array(3)+nndfl/2
-                    elem%subcnc(1)%array(8)=elem%subcnc(1)%array(4)+nndrl/2
+                    !*** sub elm 1 connec
+                    elem%subcnc(1)%array(1)=topo(1,e1)-nndrl/2
+                    elem%subcnc(1)%array(2)=topo(2,e1)-nndrl/2
+                    elem%subcnc(1)%array(3)=topo(1,e3)-nndrl/2
+                    elem%subcnc(1)%array(4)=topo(2,e3)-nndrl/2
+                    elem%subcnc(1)%array(5)=topo(1,e1)
+                    elem%subcnc(1)%array(6)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(1)%array(6)=jnode1
+                    elem%subcnc(1)%array(7)=topo(4,e3); if(edgstat(e3)<cohcrack) elem%subcnc(1)%array(7)=jnode2
+                    elem%subcnc(1)%array(8)=topo(2,e3)
                     
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     
-                    ! sub elm 2 connec
-                    elem%subcnc(2)%array(1)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(2)%array(1)=jnode1
-                    elem%subcnc(2)%array(2)=topo(2,e1)
-                    elem%subcnc(2)%array(3)=topo(1,e3)
-                    elem%subcnc(2)%array(4)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(2)%array(4)=jnode3
+                    ! update the mnode array
+                    mnode(1)=lib_node(subglbcnc(1)%array(1))
+                    mnode(2)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
+                    mnode(3)=tratio2*lib_node(subglbcnc(1)%array(3))+(one-tratio2)*lib_node(subglbcnc(1)%array(4))
+                    mnode(4)=lib_node(subglbcnc(1)%array(4))
+                    mnode(5)=lib_node(subglbcnc(1)%array(5))
+                    mnode(6)=lib_node(subglbcnc(1)%array(6))
+                    mnode(7)=lib_node(subglbcnc(1)%array(7))
+                    mnode(8)=lib_node(subglbcnc(1)%array(8))
                     
-                    elem%subcnc(2)%array(5)=elem%subcnc(2)%array(1)+nndfl/2
-                    elem%subcnc(2)%array(6)=elem%subcnc(2)%array(2)+nndrl/2
-                    elem%subcnc(2)%array(7)=elem%subcnc(2)%array(3)+nndrl/2
-                    elem%subcnc(2)%array(8)=elem%subcnc(2)%array(4)+nndfl/2
+                    Tmatrix=zero
+                    Tmatrix(1,1)=one
+                    Tmatrix(2,1)=tratio1
+                    Tmatrix(2,2)=one-tratio1
+                    Tmatrix(3,3)=tratio2
+                    Tmatrix(3,4)=one-tratio2
+                    Tmatrix(4,4)=one
+                    
+                    call prepare(elem%subelem(1),eltype='coh3d8',matkey=elem%matkey,glbcnc=subglbcnc(1)%array &
+                    & ,Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    
+                    
+                    
+                    
+                    !*** sub elm 2 connec
+                    elem%subcnc(2)%array(1)=topo(1,e1)-nndrl/2
+                    elem%subcnc(2)%array(2)=topo(2,e1)-nndrl/2
+                    elem%subcnc(2)%array(3)=topo(1,e3)-nndrl/2
+                    elem%subcnc(2)%array(4)=topo(2,e3)-nndrl/2
+                    elem%subcnc(2)%array(5)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(2)%array(5)=jnode1
+                    elem%subcnc(2)%array(6)=topo(2,e1)
+                    elem%subcnc(2)%array(7)=topo(1,e3)
+                    elem%subcnc(2)%array(8)=topo(3,e3); if(edgstat(e3)<cohcrack) elem%subcnc(2)%array(8)=jnode2
 
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
-                    ! create sub bulk elements
+                    ! update the mnode array
+                    mnode(1)=tratio1*lib_node(subglbcnc(2)%array(1))+(one-tratio1)*lib_node(subglbcnc(2)%array(2))
+                    mnode(2)=lib_node(subglbcnc(2)%array(2))
+                    mnode(3)=lib_node(subglbcnc(2)%array(3))
+                    mnode(4)=tratio2*lib_node(subglbcnc(2)%array(3))+(one-tratio2)*lib_node(subglbcnc(2)%array(4))
+                    mnode(5)=lib_node(subglbcnc(2)%array(5))
+                    mnode(6)=lib_node(subglbcnc(2)%array(6))
+                    mnode(7)=lib_node(subglbcnc(2)%array(7))
+                    mnode(8)=lib_node(subglbcnc(2)%array(8))
                     
-                    call prepare(elem%subelem(1),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
-                    &glbcnc=subglbcnc(1)%array)
-                    call prepare(elem%subelem(2),eltype='brick',matkey=elem%bulkmat,plyangle=elem%plyangle,&
-                    &glbcnc=subglbcnc(2)%array)
+                    Tmatrix=zero
+                    Tmatrix(1,1)=tratio1
+                    Tmatrix(1,2)=one-tratio1
+                    Tmatrix(2,2)=one
+                    Tmatrix(3,3)=one
+                    Tmatrix(4,3)=tratio2
+                    Tmatrix(4,4)=one-tratio2
+                    
+                    call prepare(elem%subelem(2),eltype='coh3d8',matkey=elem%matkey,glbcnc=subglbcnc(2)%array &
+                    & ,Tmatrix=Tmatrix,mnode=mnode)
+                    
     
                     
-                    !call prepare(elem%subelem(3),eltype='coh3d8',matkey=elem%cohmat,glbcnc=subglbcnc(3)%array)
                     
                     
                     
                 case(4)
-                ! four triangular bulk subdomains
+                ! four triangular subdomains
 
                     nsub=4
 
@@ -859,84 +904,164 @@ module xsubcoh_element_module
                     allocate(elem%subelem(nsub))
                     allocate(elem%subcnc(nsub))
                     allocate(subglbcnc(nsub))
-                    do j=1, 4   ! bulk elem cnc
-                        allocate(elem%subcnc(j)%array(6))
-                        allocate(subglbcnc(j)%array(6))
+                    do j=1, nsub   ! coh3d6 elem cnc
+                        allocate(elem%subcnc(j)%array(7))
+                        allocate(subglbcnc(j)%array(7))
                         elem%subcnc(j)%array=0
                         subglbcnc(j)%array=0
                     end do
 
+                    ! allocate 6 material nodes for sub elems
+                    if(allocated(mnode)) deallocate(mnode)
+                    allocate(mnode(6))
                     
-                    ! find the smaller glb fl. node on the broken edge
+                    ! allocate Tmatrix for bottom surface (3 mat nodes interpolated by 4 num nodes)
+                    if(allocated(Tmatrix)) deallocate(Tmatrix)
+                    allocate(Tmatrix(3,4))
+
+                    
+                    ! find the smaller glb fl. node on the 1st broken edge
                     if(elem%nodecnc(topo(3,e1))<elem%nodecnc(topo(4,e1))) then
                         jnode1=topo(3,e1)
                     else
                         jnode1=topo(4,e1)
                     end if
                     
-                    ! find the smaller glb fl. node on the broken edge
+                    ! find the relative position of crack tip on this edge
+                    call extract(lib_node(elem%nodecnc(topo(1,e1))),x=x1)
+                    call extract(lib_node(elem%nodecnc(topo(2,e1))),x=x2)
+                    call extract(lib_node(elem%nodecnc(jnode1)),x=xc)
+                    tratio1=distance(x1,xc)/distance(x1,x2)
+                    
+                    ! find the smaller glb fl. node on the 2nd broken edge
                     if(elem%nodecnc(topo(3,e2))<elem%nodecnc(topo(4,e2))) then
                         jnode2=topo(3,e2)
                     else
                         jnode2=topo(4,e2)
                     end if
                     
-                    ! sub elm 1 connec
-                    elem%subcnc(1)%array(1)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(1)%array(1)=jnode1
-                    elem%subcnc(1)%array(2)=topo(1,e2)
-                    elem%subcnc(1)%array(3)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(1)%array(3)=jnode2
-
-                    elem%subcnc(1)%array(4)=elem%subcnc(1)%array(1)+nndfl/2 ! upper surf nodes
-                    elem%subcnc(1)%array(5)=elem%subcnc(1)%array(2)+nndrl/2
-                    elem%subcnc(1)%array(6)=elem%subcnc(1)%array(3)+nndfl/2
+                    ! find the relative position of crack tip on this edge
+                    call extract(lib_node(elem%nodecnc(topo(1,e2))),x=x1)
+                    call extract(lib_node(elem%nodecnc(topo(2,e2))),x=x2)
+                    call extract(lib_node(elem%nodecnc(jnode2)),x=xc)
+                    tratio2=distance(x1,xc)/distance(x1,x2)
+                    
+                    
+                    
+                    !*** sub elm 1 connec
+                    elem%subcnc(1)%array(1)=topo(1,e1)-nndrl/2 ! upper surf nodes
+                    elem%subcnc(1)%array(2)=topo(2,e1)-nndrl/2
+                    elem%subcnc(1)%array(3)=topo(1,e3)-nndrl/2
+                    elem%subcnc(1)%array(4)=topo(2,e3)-nndrl/2
+                    elem%subcnc(1)%array(5)=topo(4,e1); if(edgstat(e1)<cohcrack) elem%subcnc(1)%array(5)=jnode1
+                    elem%subcnc(1)%array(6)=topo(1,e2)
+                    elem%subcnc(1)%array(7)=topo(3,e2); if(edgstat(e2)<cohcrack) elem%subcnc(1)%array(7)=jnode2
                     
                     subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
                     
-                    ! sub elm 2 connec
-                    elem%subcnc(2)%array(1)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(2)%array(1)=jnode2
-                    elem%subcnc(2)%array(2)=topo(1,e3)
-                    elem%subcnc(2)%array(3)=topo(2,e3)
+                    mnode(1)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
+                    mnode(2)=lib_node(subglbcnc(1)%array(2))
+                    mnode(3)=tratio2*lib_node(subglbcnc(1)%array(2))+(one-tratio2)*lib_node(subglbcnc(1)%array(3))
+                    mnode(4)=lib_node(subglbcnc(1)%array(5))
+                    mnode(5)=lib_node(subglbcnc(1)%array(6))
+                    mnode(6)=lib_node(subglbcnc(1)%array(7))
                     
-                    elem%subcnc(2)%array(4)=elem%subcnc(2)%array(1)+nndfl/2 ! upper surf nodes
-                    elem%subcnc(2)%array(5)=elem%subcnc(2)%array(2)+nndrl/2
-                    elem%subcnc(2)%array(6)=elem%subcnc(2)%array(3)+nndrl/2
+                    Tmatrix=zero
+                    Tmatrix(1,1)=tratio1
+                    Tmatrix(1,2)=one-tratio1
+                    Tmatrix(2,2)=one
+                    Tmatrix(3,2)=tratio2
+                    Tmatrix(3,3)=one-tratio2
+                    
+                    call prepare(elem%subelem(1),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(1)%array &
+                    & ,Tmatrix=Tmatrix,mnode=mnode)
+ 
+                    
+                    !*** sub elm 2 connec
+                    elem%subcnc(2)%array(1)=topo(1,e2)-nndrl/2 ! upper surf nodes
+                    elem%subcnc(2)%array(2)=topo(2,e2)-nndrl/2
+                    elem%subcnc(2)%array(3)=topo(1,e4)-nndrl/2
+                    elem%subcnc(2)%array(4)=topo(2,e4)-nndrl/2
+                    elem%subcnc(2)%array(5)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(2)%array(5)=jnode2
+                    elem%subcnc(2)%array(6)=topo(1,e3)
+                    elem%subcnc(2)%array(7)=topo(2,e3) 
                     
                     subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
                     
-                    ! sub elm 3 connec
-                    elem%subcnc(3)%array(1)=topo(1,e4)
-                    elem%subcnc(3)%array(2)=topo(2,e4)
-                    elem%subcnc(3)%array(3)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(3)=jnode1
+                    mnode(1)=tratio2*lib_node(subglbcnc(2)%array(1))+(one-tratio2)*lib_node(subglbcnc(2)%array(2))
+                    mnode(2)=lib_node(subglbcnc(2)%array(2))
+                    mnode(3)=lib_node(subglbcnc(2)%array(3))
+                    mnode(4)=lib_node(subglbcnc(2)%array(5))
+                    mnode(5)=lib_node(subglbcnc(2)%array(6))
+                    mnode(6)=lib_node(subglbcnc(2)%array(7))
                     
-                    elem%subcnc(3)%array(4)=elem%subcnc(3)%array(1)+nndrl/2 ! upper surf nodes
-                    elem%subcnc(3)%array(5)=elem%subcnc(3)%array(2)+nndrl/2
-                    elem%subcnc(3)%array(6)=elem%subcnc(3)%array(3)+nndfl/2
+                    Tmatrix=zero
+                    Tmatrix(1,1)=tratio2
+                    Tmatrix(1,2)=one-tratio2
+                    Tmatrix(2,2)=one
+                    Tmatrix(3,3)=one
+                    
+                    call prepare(elem%subelem(2),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(2)%array &
+                    & ,Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    
+                    !*** sub elm 3 connec
+                    elem%subcnc(3)%array(1)=topo(1,e4)-nndrl/2 ! upper surf nodes
+                    elem%subcnc(3)%array(2)=topo(2,e4)-nndrl/2
+                    elem%subcnc(3)%array(3)=topo(1,e2)-nndrl/2
+                    elem%subcnc(3)%array(4)=topo(2,e2)-nndrl/2
+                    elem%subcnc(3)%array(5)=topo(1,e4)
+                    elem%subcnc(3)%array(6)=topo(2,e4)
+                    elem%subcnc(3)%array(7)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(3)%array(7)=jnode1
                     
                     subglbcnc(3)%array(:)=elem%nodecnc(elem%subcnc(3)%array(:))
                     
-                    ! sub elm 4 connec
-                    elem%subcnc(4)%array(1)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(4)%array(1)=jnode1
-                    elem%subcnc(4)%array(2)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(4)%array(2)=jnode2
-                    elem%subcnc(4)%array(3)=topo(2,e3)
-
-                    elem%subcnc(4)%array(4)=elem%subcnc(4)%array(1)+nndfl/2 ! upper surf nodes
-                    elem%subcnc(4)%array(5)=elem%subcnc(4)%array(2)+nndfl/2
-                    elem%subcnc(4)%array(6)=elem%subcnc(4)%array(3)+nndrl/2
+                    mnode(1)=lib_node(subglbcnc(3)%array(1))
+                    mnode(2)=lib_node(subglbcnc(3)%array(2))
+                    mnode(3)=tratio1*lib_node(subglbcnc(3)%array(2))+(one-tratio1)*lib_node(subglbcnc(3)%array(3))
+                    mnode(4)=lib_node(subglbcnc(3)%array(5))
+                    mnode(5)=lib_node(subglbcnc(3)%array(6))
+                    mnode(6)=lib_node(subglbcnc(3)%array(7))
+                    
+                    Tmatrix=zero
+                    Tmatrix(1,1)=one
+                    Tmatrix(2,2)=one
+                    Tmatrix(3,2)=tratio1
+                    Tmatrix(3,3)=one-tratio1
+                    
+                    call prepare(elem%subelem(3),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(3)%array &
+                    & ,Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    
+                    !*** sub elm 4 connec
+                    elem%subcnc(4)%array(1)=topo(1,e1)-nndrl/2 ! upper surf nodes
+                    elem%subcnc(4)%array(2)=topo(2,e1)-nndrl/2
+                    elem%subcnc(4)%array(3)=topo(1,e3)-nndrl/2
+                    elem%subcnc(4)%array(4)=topo(2,e3)-nndrl/2
+                    elem%subcnc(4)%array(5)=topo(3,e1); if(edgstat(e1)<cohcrack) elem%subcnc(4)%array(5)=jnode1
+                    elem%subcnc(4)%array(6)=topo(4,e2); if(edgstat(e2)<cohcrack) elem%subcnc(4)%array(6)=jnode2
+                    elem%subcnc(4)%array(7)=topo(2,e3)             
                     
                     subglbcnc(4)%array(:)=elem%nodecnc(elem%subcnc(4)%array(:))
                     
-                    ! create sub bulk elements
-                    call prepare(elem%subelem(1),eltype='wedge',matkey=elem%bulkmat,&
-                    &plyangle=elem%plyangle,glbcnc=subglbcnc(1)%array)
-                    call prepare(elem%subelem(2),eltype='wedge',matkey=elem%bulkmat,&
-                    &plyangle=elem%plyangle,glbcnc=subglbcnc(2)%array)
-                    call prepare(elem%subelem(3),eltype='wedge',matkey=elem%bulkmat,&
-                    &plyangle=elem%plyangle,glbcnc=subglbcnc(3)%array)
-                    call prepare(elem%subelem(4),eltype='wedge',matkey=elem%bulkmat,&
-                    &plyangle=elem%plyangle,glbcnc=subglbcnc(4)%array)
+                    mnode(1)=tratio1*lib_node(subglbcnc(4)%array(1))+(one-tratio1)*lib_node(subglbcnc(4)%array(2))
+                    mnode(2)=tratio2*lib_node(subglbcnc(4)%array(2))+(one-tratio2)*lib_node(subglbcnc(4)%array(3))
+                    mnode(3)=lib_node(subglbcnc(4)%array(4))
+                    mnode(4)=lib_node(subglbcnc(4)%array(5))
+                    mnode(5)=lib_node(subglbcnc(4)%array(6))
+                    mnode(6)=lib_node(subglbcnc(4)%array(7))
+                    
+                    Tmatrix=zero
+                    Tmatrix(1,1)=tratio1
+                    Tmatrix(1,2)=one-tratio1
+                    Tmatrix(2,2)=tratio2
+                    Tmatrix(2,3)=one-tratio2
+                    Tmatrix(3,4)=one
+                    
+                    call prepare(elem%subelem(4),eltype='coh3d6',matkey=elem%matkey,glbcnc=subglbcnc(4)%array &
+                    & ,Tmatrix=Tmatrix,mnode=mnode)
                     
                     
-                    !call prepare(elem%subelem(5),eltype='coh3d8', matkey=elem%cohmat, glbcnc=subglbcnc(5)%array)
                     
                     
                 case default
@@ -962,6 +1087,8 @@ module xsubcoh_element_module
         ! deallocate local array
         
         if(allocated(subglbcnc)) deallocate(subglbcnc)
+        if(allocated(mnode)) deallocate(mnode)
+        if(allocated(Tmatrix)) deallocate(Tmatrix)
 
 
     end subroutine update_subcnc
