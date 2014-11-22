@@ -298,6 +298,10 @@
             integer :: i,j,l, elstat
             logical :: nofail, gauss
             
+            ! temp K and F arrays for coh sub elem integration; Tmatrix relating mat
+            ! nodes' dof array and num nodes dof array
+            real(dp), allocatable :: Kmatrix2(:,:), Fvector2(:), Tmatrixfull(:,:)
+            
             i=0; j=0; l=0; elstat=0
             nofail=.false. ; gauss=.false.
             
@@ -349,7 +353,36 @@
                     end if
                     
                     if(allocated(elem%Tmatrix)) then
-                        call integrate(elem%coh3d6(1),Kmatrix,Fvector,nofail,gauss,elem%mnode)
+                    
+                        call integrate(elem%coh3d6(1),Kmatrix2,Fvector2,nofail,gauss,elem%mnode)
+                        
+                        if(allocated(Tmatrixfull)) deallocate(Tmatrixfull)
+                        allocate(Tmatrixfull(6*ndim,7*ndim))  ! 6 mat nodal dofs and 7 num nodal dofs
+                        Tmatrixfull=zero
+                        ! Tmatrix corresponding to bottom nodes (3 mat nodes and 4 num nodes)
+                        do i=1, 3    
+                            do j=1, 4
+                                do l=1, ndim
+                                    Tmatrixfull((i-1)*ndim+l,(j-1)*ndim+l)=elem%Tmatrix(i,j)
+                                end do
+                            end do   
+                        end do
+                        ! Tmatrix corresponding to top 3 nodes
+                        do i=4, 6    
+                            do l=1, ndim
+                                Tmatrixfull((i-1)*ndim+l,i*ndim+l)=one
+                            end do  
+                        end do
+                        
+                        if(allocated(Kmatrix)) deallocate(Kmatrix)
+                        allocate(Kmatrix(7*ndim,7*ndim)); Kmatrix=zero
+                        
+                        if(allocated(Fvector)) deallocate(Fvector)
+                        allocate(Fvector(7*ndim)); Fvector=zero
+                        
+                        Kmatrix=matmul(matmul(transpose(Tmatrixfull),Kmatrix2),Tmatrixfull)
+                        Fvector=matmul(transpose(Tmatrixfull),Fvector2)
+                        
                     else
                         call integrate(elem%coh3d6(1),Kmatrix,Fvector,nofail,gauss)
                     end if
@@ -376,7 +409,36 @@
                     end if
                     
                     if(allocated(elem%Tmatrix)) then
-                        call integrate(elem%coh3d8(1),Kmatrix,Fvector,nofail,gauss,elem%mnode)
+                    
+                        call integrate(elem%coh3d8(1),Kmatrix2,Fvector2,nofail,gauss,elem%mnode)
+                        
+                        if(allocated(Tmatrixfull)) deallocate(Tmatrixfull)
+                        allocate(Tmatrixfull(8*ndim,8*ndim))  ! 8 mat nodal dofs and 8 num nodal dofs
+                        Tmatrixfull=zero
+                        ! Tmatrix corresponding to bottom nodes (4 mat nodes and 4 num nodes)
+                        do i=1, 4
+                            do j=1, 4
+                                do l=1, ndim
+                                    Tmatrixfull((i-1)*ndim+l,(j-1)*ndim+l)=elem%Tmatrix(i,j)
+                                end do
+                            end do   
+                        end do
+                        ! Tmatrix corresponding to top 4 nodes
+                        do i=5, 8    
+                            do l=1, ndim
+                                Tmatrixfull((i-1)*ndim+l,(i-1)*ndim+l)=one
+                            end do  
+                        end do
+                        
+                        if(allocated(Kmatrix)) deallocate(Kmatrix)
+                        allocate(Kmatrix(8*ndim,8*ndim)); Kmatrix=zero
+                        
+                        if(allocated(Fvector)) deallocate(Fvector)
+                        allocate(Fvector(8*ndim)); Fvector=zero
+                        
+                        Kmatrix=matmul(matmul(transpose(Tmatrixfull),Kmatrix2),Tmatrixfull)
+                        Fvector=matmul(transpose(Tmatrixfull),Fvector2)
+                        
                     else
                         call integrate(elem%coh3d8(1),Kmatrix,Fvector,nofail,gauss)
                     end if

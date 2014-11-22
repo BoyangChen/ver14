@@ -16,7 +16,7 @@ module xsubcoh_element_module
     integer,parameter :: topo(4,nedge)=reshape([5,6,9,10,6,7,11,12,7,8,13,14,8,5,15,16],[4,nedge])
                                               
     ! element status variable values
-    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfailm=5, elfailf=6
+    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfail=5
     
     ! edge status variable values
     integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
@@ -223,8 +223,6 @@ module xsubcoh_element_module
         
         character(len=eltypelength) ::  subeltype
         
-        logical :: nofailure
-        
         ! - glb clock step and increment no. extracted from glb clock module
         integer :: curr_step, curr_inc
         logical :: last_converged               ! true if last iteration has converged: a new increment/step has started
@@ -237,7 +235,6 @@ module xsubcoh_element_module
         ! initialize local variables
         i=0; j=0; l=0
         elstat=0; subelstat=0; subeltype=''
-        nofailure=.false.
         curr_step=0; curr_inc=0
         last_converged=.false.
 
@@ -250,7 +247,6 @@ module xsubcoh_element_module
             last_converged=.true.
             elem%nstep = curr_step
             elem%ninc = curr_inc
-            elem%newpartition=.false.   ! last partition has converged; newpartition is false
         end if
 
         
@@ -259,28 +255,31 @@ module xsubcoh_element_module
         !---------------------------------------------------------------------!
         !       update elem partition using edge status variable
         !---------------------------------------------------------------------!
-     
-        ! if elem is not yet failed, check elem edge status variables and update elem status and sub elem cnc
 
-        ! store current status value
-        elstat=elem%curr_status  
-        call edge_status_partition(elem) 
-
-        ! if elem is still intact after checking edge status (no broken edges), assign 1 coh3d8 subelem if not yet done
-        if(.not.allocated(elem%subelem)) then 
-            allocate(elem%subelem(1))
-            allocate(elem%subcnc(1))
-            allocate(elem%subcnc(1)%array(nndrl))   ! coh3d8 elem
-            allocate(subglbcnc(1))
-            allocate(subglbcnc(1)%array(nndrl))
-            ! sub elm 1 connec
-            elem%subcnc(1)%array=[(i, i=1,nndrl)]
-            subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
-            ! create sub elements
-            call prepare(elem%subelem(1),eltype='coh3d8', matkey=elem%matkey, &
-            & glbcnc=subglbcnc(1)%array)
+        ! extract current status value
+        elstat=elem%curr_status     
+        
+        ! if elem is intact, assign 1 coh3d8 subelem if not yet done
+        if(elstat==intact) then
+            if(.not.allocated(elem%subelem)) then 
+                allocate(elem%subelem(1))
+                allocate(elem%subcnc(1))
+                allocate(elem%subcnc(1)%array(nndrl))   ! coh3d8 elem
+                allocate(subglbcnc(1))
+                allocate(subglbcnc(1)%array(nndrl))
+                ! sub elm 1 connec
+                elem%subcnc(1)%array=[(i, i=1,nndrl)]
+                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+                ! create sub elements
+                call prepare(elem%subelem(1),eltype='coh3d8', matkey=elem%matkey, &
+                & glbcnc=subglbcnc(1)%array)
+            end if
         end if
-            
+        
+        ! if elem has not reached failed partition (2 broken edges), then check for edge status and repartition if necessary
+        if(elstat<elfail) then 
+            call edge_status_partition(elem)          
+        end if
 
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays
@@ -291,9 +290,8 @@ module xsubcoh_element_module
         K_matrix=zero; F_vector=zero  
      
         ! integrate sub elements and assemble into global matrix
-        ! if elem partition just changed in this iteration, no failure modelling at this iteration
         do i=1, size(elem%subelem)
-            call integrate(elem%subelem(i),Ki,Fi,nofailure)
+            call integrate(elem%subelem(i),Ki,Fi)
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
             do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
@@ -394,6 +392,9 @@ module xsubcoh_element_module
 !-----------------------------------------------------------------------!
         ! extract elem status variable
         elstat=elem%curr_status
+        
+        ! no need to update if elem is already in failed partition (2 broken/coh broken edges)
+        if(elstat==elfail) return
 
         ! extract edge status variables from glb edge library
         edgstat(:)=lib_edge(elem%edgecnc(:))
@@ -419,7 +420,11 @@ module xsubcoh_element_module
         
         if(nfailedge==0) then
         ! remains intact, do nothing
-            continue
+            if(elstat/=intact) then
+                write(msg_file,*)'inconsistency btw elstat and nfailedge in xsubcoh elem!'
+                call exit_function
+            end if
+            
         else if(nfailedge==1) then 
         ! adj. ply elem is transition partition
         
@@ -457,7 +462,7 @@ module xsubcoh_element_module
                 elstat=elwake
             else if(edgstat(jbe1)>=cohcrack .and. edgstat(jbe2)>=cohcrack) then
             ! cracked elem, cohesive/stress-free crack
-                elstat=elfailm
+                elstat=elfail
             else ! unknown combination
                 write(msg_file,*)'unknown combination of 2 edge status in xsubcoh!'
                 call exit_function
