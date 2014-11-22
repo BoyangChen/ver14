@@ -28,8 +28,20 @@
         module procedure extract_xnode
       end interface
       
+      interface operator(+)
+        module procedure plus_xnode
+      end interface
+      
+      interface operator(-)
+        module procedure minus_xnode
+      end interface
+      
+      interface operator(*)
+        module procedure ratio_xnode
+      end interface
+      
 
-      public :: empty,update,extract
+      public :: empty,update,extract,operator(+),operator(-),operator(*)
 
 
 
@@ -56,10 +68,146 @@
         if(allocated(this_xnode%ddof)) deallocate(this_xnode%ddof)
 
       end subroutine empty_xnode
+
+
+ 
       
+      function plus_xnode(xnode1,xnode2) result(xnode3)
       
-      
+      	type(xnode),intent(in) :: xnode1,xnode2
+        type(xnode)            :: xnode3
+      	
+        !xnode3%key=xnode1%key+xnode2%key
+        
+        if(allocated(xnode1%x) .and. allocated(xnode2%x)) then
+            if(size(xnode1%x)==size(xnode2%x)) then
+                allocate(xnode3%x(size(xnode1%x)))
+                xnode3%x=xnode1%x+xnode2%x
+            else
+                write(msg_file,*)'nodes x dimension not consistent in plus_xnode'
+                call exit_function
+            end if
+        else
+            write(msg_file,*)'one node x not allocated in plus_xnode'
+            call exit_function
+        end if
+ 
+ 
+        if(allocated(xnode1%u) .and. allocated(xnode2%u)) then
+            if(size(xnode1%u)==size(xnode2%u)) then
+                allocate(xnode3%u(size(xnode1%u)))
+                xnode3%u=xnode1%u+xnode2%u
+            else
+                write(msg_file,*)'nodes u dimension not consistent in plus_xnode'
+                call exit_function
+            end if
+        else
+            write(msg_file,*)'one node u not allocated in plus_xnode'
+            call exit_function
+        end if
+        
+  
+        !~if(allocated(xnode%du)) 
+        !~if(allocated(xnode%v)) 
+        !~if(allocated(xnode%a)) 
+        !~if(allocated(xnode%dof)) 
+        !~if(allocated(xnode%ddof)) 
+        
+        
+      end subroutine plus_xnode
     
+
+
+
+
+      
+      function minus_xnode(xnode1,xnode2) result(xnode3)
+      
+      	type(xnode),intent(in) :: xnode1,xnode2
+        type(xnode)            :: xnode3
+      	
+        !xnode3%key=xnode1%key+xnode2%key
+        
+        if(allocated(xnode1%x) .and. allocated(xnode2%x)) then
+            if(size(xnode1%x)==size(xnode2%x)) then
+                allocate(xnode3%x(size(xnode1%x)))
+                xnode3%x=xnode1%x-xnode2%x
+            else
+                write(msg_file,*)'nodes x dimension not consistent in minus_xnode'
+                call exit_function
+            end if
+        else
+            write(msg_file,*)'one node x not allocated in minus_xnode'
+            call exit_function
+        end if
+ 
+ 
+        if(allocated(xnode1%u) .and. allocated(xnode2%u)) then
+            if(size(xnode1%u)==size(xnode2%u)) then
+                allocate(xnode3%u(size(xnode1%u)))
+                xnode3%u=xnode1%u-xnode2%u
+            else
+                write(msg_file,*)'nodes u dimension not consistent in minus_xnode'
+                call exit_function
+            end if
+        else
+            write(msg_file,*)'one node u not allocated in minus_xnode'
+            call exit_function
+        end if
+        
+  
+        !~if(allocated(xnode%du)) 
+        !~if(allocated(xnode%v)) 
+        !~if(allocated(xnode%a)) 
+        !~if(allocated(xnode%dof)) 
+        !~if(allocated(xnode%ddof)) 
+        
+        
+      end subroutine minus_xnode
+    
+
+
+
+
+
+      
+      function ratio_xnode(r,xnode1) result(xnode3)
+      
+      	type(xnode),intent(in) :: xnode1
+        real(dp),   intent(in) :: r
+        type(xnode)            :: xnode3
+      	
+        !xnode3%key=xnode1%key+xnode2%key
+        
+        if(allocated(xnode1%x)) then
+            allocate(xnode3%x(size(xnode1%x)))
+            xnode3%x=r*xnode1%x
+        else
+            write(msg_file,*)'node x not allocated in ratio_xnode'
+            call exit_function
+        end if
+ 
+ 
+        if(allocated(xnode1%u)) then
+            allocate(xnode3%u(size(xnode1%u)))
+            xnode3%u=r*xnode1%u
+        else
+            write(msg_file,*)'one node u not allocated in ratio_xnode'
+            call exit_function
+        end if
+        
+  
+        !~if(allocated(xnode%du)) 
+        !~if(allocated(xnode%v)) 
+        !~if(allocated(xnode%a)) 
+        !~if(allocated(xnode%dof)) 
+        !~if(allocated(xnode%ddof)) 
+        
+        
+      end subroutine ratio_xnode
+    
+
+
 
 
 

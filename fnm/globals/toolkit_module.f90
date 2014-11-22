@@ -380,7 +380,24 @@
     
     
     
-    
+!********************************************************************************************
+!               function to compute the distance between two vectors
+!********************************************************************************************
+    function distance(a, b)
+      real(dp), intent(in)  :: a(:), b(:)
+      real(dp)              :: distance
+
+      if(size(a)/=size(b)) then
+        write(msg_file,*) 'two vector sizes must be the same in distance function!'
+        call exit_function
+      end if
+      
+      distance=sqrt(dot_product(a-b,a-b))
+      
+    end function distance
+!********************************************************************************************
+!********************************************************************************************    
+   
 
 
 
