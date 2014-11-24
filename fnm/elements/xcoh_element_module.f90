@@ -265,70 +265,65 @@ module xcoh_element_module
             
             ! check if elem has started to fail; if so, no more edge status partitioning later
             call extract(elem%mainelem(1),curr_status=mainelstat)
-            if(mainelstat>intact) then 
+            
+            if(mainelstat>intact) then
+            ! if elem has reached failure onset, then update curr status; no edge status partition
                 elstat=elfail1
                 elem%curr_status=elstat
+                ! reaching here, elem curr status is elfail1
+            else
+            ! if elem has not reached failure initiation, then
+            ! check edge status, and partition into 2 subxcoh elems if any edge status is not intact
+                if(maxval(elem%ifailedge)>0) then
+                    elstat=elfail2
+                    elem%curr_status=elstat
+                    
+                    ! deallocate original elem
+                    deallocate(elem%mainelem)
+                    deallocate(elem%maincnc)
+                    
+                    ! allocate two subxcoh elems
+                    allocate(elem%subelem(2))
+                    allocate(elem%subcnc(2))
+                    allocate(subglbcnc(2))
+                    allocate(subedgecnc(2))
+                    do i=1, 2
+                        allocate(elem%subcnc(i)%array(16))
+                        allocate(subglbcnc(i)%array(16))
+                        allocate(subedgecnc(i)%array(4))
+                        elem%subcnc(i)%array=0
+                        subglbcnc(i)%array=0
+                        subedgecnc(i)%array=0
+                    end do
+                    
+                    ! local connec of two subxcoh elems
+                    elem%subcnc(1)%array=[1,2,3,4,5,6,7,8,17,18,19,20,21,22,23,24]
+                    elem%subcnc(2)%array=[6,5,8,7,2,1,4,3,10,9,16,15,14,13,12,11]
+                    
+                    ! glb connec of two subxcoh elems
+                    subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+                    subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
+                    
+                    ! glb edge cnc of two subxcoh elems
+                    subedgecnc(1)%array=elem%edgecnc([5,6,7,8])
+                    subedgecnc(2)%array=elem%edgecnc([1,4,3,2])
+                    
+                    ! prepare two subxcoh elems
+                    call prepare(elem%subelem(1),key=0,matkey=elem%matkey,&
+                    & nodecnc=subglbcnc(1)%array,edgecnc=subedgecnc(1)%array)
+                    call prepare(elem%subelem(2),key=0,matkey=elem%matkey,&
+                    & nodecnc=subglbcnc(2)%array,edgecnc=subedgecnc(2)%array)
+                    
+                end if
+                ! reaching here, elem curr status is either intact or elfail2
             end if  
          
         end if
-        ! reaching here, elem curr status is either intact or elfail1
-
-
-        ! if elem has not reached failure initiation
-        ! then check for edge status and repartition if necessary
-        if(elstat<elfail1) then     
+        ! reaching here, elem curr status is either intact, elfail1 or efail2       
             
-            ! if one or more edges have broken, partition into 2 subxcoh elems
-            if(maxval(elem%ifailedge)>0) then
-                elstat=elfail2
-                elem%curr_status=elstat
-                
-                ! deallocate original elem
-                deallocate(elem%mainelem)
-                deallocate(elem%maincnc)
-                
-                ! allocate two subxcoh elems
-                allocate(elem%subelem(2))
-                allocate(elem%subcnc(2))
-                allocate(subglbcnc(2))
-                allocate(subedgecnc(2))
-                do i=1, 2
-                    allocate(elem%subcnc(i)%array(16))
-                    allocate(subglbcnc(i)%array(16))
-                    allocate(subedgecnc(i)%array(4))
-                    elem%subcnc(i)%array=0
-                    subglbcnc(i)%array=0
-                    subedgecnc(i)%array=0
-                end do
-                
-                ! local connec of two subxcoh elems
-                elem%subcnc(1)%array=[1,2,3,4,5,6,7,8,17,18,19,20,21,22,23,24]
-                elem%subcnc(2)%array=[6,5,8,7,2,1,4,3,10,9,16,15,14,13,12,11]
-                
-                ! glb connec of two subxcoh elems
-                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
-                subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
-                
-                ! glb edge cnc of two subxcoh elems
-                subedgecnc(1)%array=elem%edgecnc([5,6,7,8])
-                subedgecnc(2)%array=elem%edgecnc([1,4,3,2])
-                
-                ! prepare two subxcoh elems
-                call prepare(elem%subelem(1),key=0,matkey=elem%matkey,&
-                & nodecnc=subglbcnc(1)%array,edgecnc=subedgecnc(1)%array)
-                call prepare(elem%subelem(2),key=0,matkey=elem%matkey,&
-                & nodecnc=subglbcnc(2)%array,edgecnc=subedgecnc(2)%array)
-                
-            end if
-            ! reaching here, elem curr status is either intact or elfail2
-        end if
-            
-
-        ! if elem has reached failure initiation, go straight to integration
-        if(elstat==elfail1) continue
 
         ! if elem has already been partitioned into 2 subxcoh elems,
-        ! update their ifailedge arrays
+        ! update their ifailedge arrays and elem curr status
         if(elstat==elfail2) then 
         
             call extract(elem%subelem(1),curr_status=subelstat1)
@@ -378,10 +373,6 @@ module xcoh_element_module
             if(subelstat2<elfail1) call update(elem%subelem(2),ifailedge=ifailedge2)   
         end if
 
-
-
-        ! if both subxcoh elems have reached steady-state partitions, go straight to integration
-        if(elstat==elfail3) continue
 
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays

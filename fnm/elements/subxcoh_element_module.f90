@@ -281,26 +281,24 @@ module subxcoh_element_module
             
             ! check if elem has started to fail; if so, no more edge status partitioning later
             call extract(elem%subelem(1),curr_status=subelstat)
+            
             if(subelstat>intact) then 
+            ! if elem reached failure initiation, no edge status partition
                 elstat=elfail1
                 elem%curr_status=elstat
+                ! reaching here, elem curr status is elfail1
+            else
+            ! if elem has not reached failure initiation, 
+            ! then check for edge status and repartition if necessary
+                call edge_status_partition(elem)
+                ! reaching here, elem curr status is either intact (no partition) or elfail2 (partitioned)
             end if  
          
         end if
-        ! reaching here, elem curr status is either intact or elfail1
+        
+        ! reaching here, elem curr status is either intact, elfail1 or elfail2
+        ! in all cases, go to integration
 
-
-        ! if elem has not reached fail_1 partition (failure initiation), 
-        ! then check for edge status and repartition if necessary
-        if(elstat<elfail1) then 
-            call edge_status_partition(elem)
-            ! reaching here, elem curr status is either intact or elfail2
-        end if
-
-
-        ! if elem is either damaged (elfail1) or partitioned (elfail2), 
-        ! go straight to sub elem integrations
-        if(elstat>=elfail1) continue
 
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays
@@ -504,6 +502,7 @@ module subxcoh_element_module
         !if(elstat>elem%curr_status) then
         if (elstat==elfail2) then
         ! only update elem curr status and partitions into sub elems when it reaches elfail2 partition
+        ! otherwise, elem curr status remains intact
 
             elem%curr_status=elstat                    
             
