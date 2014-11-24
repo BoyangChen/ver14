@@ -1,4 +1,4 @@
-module xsubcoh_element_module
+module subxcoh_element_module
     use parameter_module
     use glb_clock_module
     use toolkit_module                  ! global tools for element integration
@@ -16,13 +16,14 @@ module xsubcoh_element_module
     integer,parameter :: topo(4,nedge)=reshape([5,6,9,10,6,7,11,12,7,8,13,14,8,5,15,16],[4,nedge])
                                               
     ! element status variable values
-    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfail=5
+    ! in order: transition, refinement, tip, wake, delam-before-edge-break, 2-broken-edges-before-delam
+    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfail1=5, elfail2=6
     
     ! edge status variable values
     integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
     
 
-    type, public :: xsubcoh_element             ! breakable brick
+    type, public :: subxcoh_element             ! breakable brick
         private
         
         integer :: curr_status=0        ! 0 means intact
@@ -41,30 +42,30 @@ module xsubcoh_element_module
         
         type(sdv_array), allocatable :: sdv(:)
         
-    end type xsubcoh_element
+    end type subxcoh_element
   
     interface empty
-        module procedure empty_xsubcoh_element
+        module procedure empty_subxcoh_element
     end interface
   
     interface prepare
-        module procedure prepare_xsubcoh_element
+        module procedure prepare_subxcoh_element
     end interface
     
     interface update
-        module procedure update_xsubcoh_element
+        module procedure update_subxcoh_element
     end interface
     
     !~interface precrack
-    !~    module procedure precrack_xsubcoh_element
+    !~    module procedure precrack_subxcoh_element
     !~end interface
     
     interface integrate
-        module procedure integrate_xsubcoh_element
+        module procedure integrate_subxcoh_element
     end interface
     
     interface extract
-        module procedure extract_xsubcoh_element
+        module procedure extract_subxcoh_element
     end interface
 
 
@@ -80,9 +81,9 @@ module xsubcoh_element_module
 
 
     ! empty a breakable quadrilateral
-    subroutine empty_xsubcoh_element(elem)
+    subroutine empty_subxcoh_element(elem)
   
-        type(xsubcoh_element),intent(out) :: elem
+        type(subxcoh_element),intent(out) :: elem
         
         elem%curr_status=0
         elem%key=0 
@@ -100,7 +101,7 @@ module xsubcoh_element_module
         if(allocated(elem%subcnc))  deallocate(elem%subcnc)
         if(allocated(elem%sdv)) deallocate(elem%sdv)
 
-    end subroutine empty_xsubcoh_element
+    end subroutine empty_subxcoh_element
   
   
   
@@ -108,9 +109,9 @@ module xsubcoh_element_module
   
     ! this subroutine is used to prepare the connectivity and material lib index of the element
     ! it is used in the initialize_lib_elem procedure in the lib_elem module
-    subroutine prepare_xsubcoh_element(elem,key,matkey,nodecnc,edgecnc)
+    subroutine prepare_subxcoh_element(elem,key,matkey,nodecnc,edgecnc)
     
-        type(xsubcoh_element),    intent(inout)   :: elem
+        type(subxcoh_element),    intent(inout)   :: elem
         integer,                intent(in)      :: key
         integer,                intent(in)      :: matkey
         integer,                intent(in)      :: nodecnc(nnode)
@@ -121,28 +122,28 @@ module xsubcoh_element_module
         elem%nodecnc=nodecnc
         elem%edgecnc=edgecnc
     
-    end subroutine prepare_xsubcoh_element
+    end subroutine prepare_subxcoh_element
  
 
 
 
     ! this subroutine is used to update the ifailedge array of the element
-    subroutine update_xsubcoh_element(elem,ifailedge)
+    subroutine update_subxcoh_element(elem,ifailedge)
     
-        type(xsubcoh_element),    intent(inout)   :: elem
+        type(subxcoh_element),    intent(inout)   :: elem
         integer,                  intent(in)      :: ifailedge(nedge)
 
         elem%ifailedge=ifailedge
     
-    end subroutine update_xsubcoh_element
+    end subroutine update_subxcoh_element
 
 
    
     
-    subroutine extract_xsubcoh_element(elem,curr_status,key,matkey,nodecnc,edgecnc, &
+    subroutine extract_subxcoh_element(elem,curr_status,key,matkey,nodecnc,edgecnc, &
     & ifailedge,newpartition,nstep,ninc,subelem,subcnc,sdv)
     
-        type(xsubcoh_element),                      intent(in)  :: elem
+        type(subxcoh_element),                      intent(in)  :: elem
         integer,                        optional, intent(out) :: curr_status
         integer,                        optional, intent(out) :: key
         integer,                        optional, intent(out) :: matkey
@@ -201,16 +202,16 @@ module xsubcoh_element_module
             end if
         end if
     
-    end subroutine extract_xsubcoh_element
+    end subroutine extract_subxcoh_element
 
 
 
 
 
 
-    subroutine integrate_xsubcoh_element(elem, K_matrix, F_vector)
+    subroutine integrate_subxcoh_element(elem, K_matrix, F_vector)
     
-        type(xsubcoh_element),intent(inout)       :: elem 
+        type(subxcoh_element),intent(inout)       :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
     
     
@@ -281,18 +282,25 @@ module xsubcoh_element_module
             ! check if elem has started to fail; if so, no more edge status partitioning later
             call extract(elem%subelem(1),curr_status=subelstat)
             if(subelstat>intact) then 
-                elstat=elfail
+                elstat=elfail1
                 elem%curr_status=elstat
             end if  
          
         end if
+        ! reaching here, elem curr status is either intact or elfail1
 
 
-        ! if elem has not reached failed partition (2 broken edges or failure initiation), 
+        ! if elem has not reached fail_1 partition (failure initiation), 
         ! then check for edge status and repartition if necessary
-        if(elstat<elfail) then 
-            call edge_status_partition(elem)          
+        if(elstat<elfail1) then 
+            call edge_status_partition(elem)
+            ! reaching here, elem curr status is either intact or elfail2
         end if
+
+
+        ! if elem is either damaged (elfail1) or partitioned (elfail2), 
+        ! go straight to sub elem integrations
+        if(elstat>=elfail1) continue
 
         !---------------------------------------------------------------------!
         !       integrate and assemble sub element system arrays
@@ -330,7 +338,7 @@ module xsubcoh_element_module
         if(allocated(dofcnc)) deallocate(dofcnc)
     
  
-    end subroutine integrate_xsubcoh_element
+    end subroutine integrate_subxcoh_element
     
     
     
@@ -342,7 +350,7 @@ module xsubcoh_element_module
 
     
     ! passed-in variables
-    type(xsubcoh_element), intent(inout) :: elem
+    type(subxcoh_element), intent(inout) :: elem
 
 
     ! extracted variables, from glb libraries
@@ -407,7 +415,7 @@ module xsubcoh_element_module
         elstat=elem%curr_status
         
         ! no need to update if elem is already in failed partition (2 broken/coh broken edges)
-        if(elstat==elfail) return
+        if(elstat==elfail2) return
 
         ! extract edge status variables from glb edge library
         edgstat(:)=lib_edge(elem%edgecnc(:))
@@ -434,7 +442,7 @@ module xsubcoh_element_module
         if(nfailedge==0) then
         ! remains intact, do nothing
             if(elstat/=intact) then
-                write(msg_file,*)'inconsistency btw elstat and nfailedge in xsubcoh elem!'
+                write(msg_file,*)'inconsistency btw elstat and nfailedge in subxcoh elem!'
                 call exit_function
             end if
             
@@ -448,7 +456,7 @@ module xsubcoh_element_module
                 
             else
               ! ifailedge is not correct
-              write(msg_file,*)'wrong edge status for nfailedge=1 in xsubcoh'
+              write(msg_file,*)'wrong edge status for nfailedge=1 in subxcoh'
               call exit_function
         
             endif
@@ -457,7 +465,7 @@ module xsubcoh_element_module
         ! adj. ply elem could be cracked, wake, tip, refinement elem
         ! only update the elstat, not the edge status, nor the crack tip coords
         
-            !**** the partitioning of xsubcoh elem is entirely based on the bottom four edges ****         
+            !**** the partitioning of subxcoh elem is entirely based on the bottom four edges ****         
             
             jbe1=ifedg(1)
             jbe2=ifedg(2)
@@ -475,14 +483,14 @@ module xsubcoh_element_module
                 elstat=elwake
             else if(edgstat(jbe1)>=cohcrack .and. edgstat(jbe2)>=cohcrack) then
             ! cracked elem, cohesive/stress-free crack
-                elstat=elfail
+                elstat=elfail2
             else ! unknown combination
-                write(msg_file,*)'unknown combination of 2 edge status in xsubcoh!'
+                write(msg_file,*)'unknown combination of 2 edge status in subxcoh!'
                 call exit_function
             end if
             
         else
-            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in xsubcoh edge stat partition!'
+            write(msg_file,*)'unsupported nfailedge value for edge and el stat update in subxcoh edge stat partition!'
             call exit_function 
         end if     
 
@@ -493,12 +501,13 @@ module xsubcoh_element_module
             
 !       update element curr_status and sub-element cnc matrices
 
-        if(elstat>elem%curr_status) then
+        !if(elstat>elem%curr_status) then
+        if (elstat==elfail2) then
+        ! only update elem curr status and partitions into sub elems when it reaches elfail2 partition
 
             elem%curr_status=elstat                    
-
-            ! only partitions into sub elems when it reaches elfail partition
-            if (elstat==elfail) call update_subcnc(elem,edgstat,ifedg,nfailedge)
+            
+            call update_subcnc(elem,edgstat,ifedg,nfailedge)
         
         end if
 
@@ -520,7 +529,7 @@ module xsubcoh_element_module
     subroutine update_subcnc(elem,edgstat,ifedg,nfailedge)
     
     ! passed-in variables
-    type(xsubcoh_element),    intent(inout)   :: elem
+    type(subxcoh_element),    intent(inout)   :: elem
     integer,                intent(in)      :: edgstat(:), ifedg(:), nfailedge
 
 
@@ -561,7 +570,7 @@ module xsubcoh_element_module
 
             ! ibe1 must be between 1 to 4
             if(ibe1<1 .or. ibe1>4) then
-                write(msg_file,*) 'something wrong in xsubcoh update subcnc case nfailedge=1'
+                write(msg_file,*) 'something wrong in subxcoh update subcnc case nfailedge=1'
                 call exit_function
             end if
 
@@ -731,7 +740,7 @@ module xsubcoh_element_module
             
             ! ibe1 must be between 1 to 3, and ibe2 between 2 to 4, with ibe2 > ibe1
             if(ibe1<1 .or. ibe1>3 .or. ibe2<2 .or. ibe2>4 .or. ibe2<=ibe1) then
-                write(msg_file,*) 'something wrong in xsubcoh update subcnc case nfailedge=2'
+                write(msg_file,*) 'something wrong in subxcoh update subcnc case nfailedge=2'
                 call exit_function
             end if
 
@@ -752,7 +761,7 @@ module xsubcoh_element_module
                             nbulk=4
                             e1=4; e2=1; e3=2; e4=3
                         case default
-                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xsubcoh'
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc subxcoh'
                             call exit_function
                     end select
                 case(2)
@@ -764,7 +773,7 @@ module xsubcoh_element_module
                             nbulk=2
                             e1=2; e2=3; e3=4; e4=1
                         case default
-                            write(msg_file,*)'wrong 2nd broken edge in update subcnc xsubcoh'
+                            write(msg_file,*)'wrong 2nd broken edge in update subcnc subxcoh'
                             call exit_function
                     end select
                 case(3)
@@ -772,11 +781,11 @@ module xsubcoh_element_module
                         nbulk=4
                         e1=3; e2=4; e3=1; e4=2
                     else
-                        write(msg_file,*)'wrong 2nd broken edge in update subcnc xsubcoh'
+                        write(msg_file,*)'wrong 2nd broken edge in update subcnc subxcoh'
                         call exit_function                    
                     end if    
                 case default
-                    write(msg_file,*)'wrong broken edge in update subcnc xsubcoh'
+                    write(msg_file,*)'wrong broken edge in update subcnc subxcoh'
                     call exit_function
             end select
             
@@ -1084,7 +1093,7 @@ module xsubcoh_element_module
                     
                     
                 case default
-                    write(msg_file,*)'wrong nbulk in update subcnc xsubcoh'
+                    write(msg_file,*)'wrong nbulk in update subcnc subxcoh'
                     call exit_function
             end select
 
@@ -1098,7 +1107,7 @@ module xsubcoh_element_module
 
            
         case default
-           write(msg_file,*) 'WARNING: xsubcoh update subcnc case selection default!'
+           write(msg_file,*) 'WARNING: subxcoh update subcnc case selection default!'
            
         end select
         
@@ -1123,4 +1132,4 @@ module xsubcoh_element_module
   
   
   
-end module xsubcoh_element_module
+end module subxcoh_element_module
