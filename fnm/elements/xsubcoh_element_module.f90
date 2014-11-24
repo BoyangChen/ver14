@@ -223,6 +223,7 @@ module xsubcoh_element_module
         
         character(len=eltypelength) ::  subeltype
         
+        
         ! - glb clock step and increment no. extracted from glb clock module
         integer :: curr_step, curr_inc
         logical :: last_converged               ! true if last iteration has converged: a new increment/step has started
@@ -259,8 +260,10 @@ module xsubcoh_element_module
         ! extract current status value
         elstat=elem%curr_status     
         
-        ! if elem is intact, assign 1 coh3d8 subelem if not yet done
+        ! if elem is intact
         if(elstat==intact) then
+        
+            ! assign 1 coh3d8 subelem if not yet done
             if(.not.allocated(elem%subelem)) then 
                 allocate(elem%subelem(1))
                 allocate(elem%subcnc(1))
@@ -274,9 +277,19 @@ module xsubcoh_element_module
                 call prepare(elem%subelem(1),eltype='coh3d8', matkey=elem%matkey, &
                 & glbcnc=subglbcnc(1)%array)
             end if
+            
+            ! check if elem has started to fail; if so, no more edge status partitioning later
+            call extract(elem%subelem(1),curr_status=subelstat)
+            if(subelstat>intact) then 
+                elstat=elfail
+                elem%curr_status=elstat
+            end if  
+         
         end if
-        
-        ! if elem has not reached failed partition (2 broken edges), then check for edge status and repartition if necessary
+
+
+        ! if elem has not reached failed partition (2 broken edges or failure initiation), 
+        ! then check for edge status and repartition if necessary
         if(elstat<elfail) then 
             call edge_status_partition(elem)          
         end if
@@ -484,7 +497,8 @@ module xsubcoh_element_module
 
             elem%curr_status=elstat                    
 
-            call update_subcnc(elem,edgstat,ifedg,nfailedge)
+            ! only partitions into sub elems when it reaches elfail partition
+            if (elstat==elfail) call update_subcnc(elem,edgstat,ifedg,nfailedge)
         
         end if
 
