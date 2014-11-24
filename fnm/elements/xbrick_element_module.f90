@@ -16,11 +16,6 @@ module xbrick_element_module
     integer,parameter :: topo(4,nedge)=reshape([1,2,9,10,2,3,11,12,3,4,13,14,4,1,15,16, &
                                               & 5,6,17,18,6,7,19,20,7,8,21,22,8,5,23,24],[4,nedge])
                                               
-    ! element status variable values
-    integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfailm=5, elfailf=6
-    
-    ! edge status variable values
-    integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
     
 
     type, public :: xbrick_element             ! breakable brick
