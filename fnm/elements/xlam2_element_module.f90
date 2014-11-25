@@ -330,9 +330,13 @@ module xlam_element_module
                 elem%interfnodecnc(i)%array(ncorner/2+1 : ncorner)=&
                 & [( j, j=i*nndplyblk+1 , i*nndplyblk+ncorner/2 )]    
                 
-                ! 1st half of flo nodes
+                ! 1st half of interface flo nodes come from bottm plyblk elem top surface (nodes 17-24)
+                elem%interfnodecnc(i)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)=&
+                & [( j, j=(i-1)*nndplyblk+ncorner+(nndinterf-ncorner)/2+1 , (i-1)*nndplyblk+nndinterf)]
                 
-                ! 2nd half of flo nodes
+                ! 2nd half of interface flo nodes come from top plyblk elem bottom surface (nodes 9-16)
+                elem%interfnodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)=&
+                & [( j, j=i*nndplyblk+ncorner+1 , i*nndplyblk+ncorner+(nndinterf-ncorner)/2 )]    
                        
             end do
             
