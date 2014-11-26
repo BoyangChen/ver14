@@ -41,6 +41,10 @@
             module procedure prepare_sub3d_element
         end interface
         
+        interface update
+            module procedure update_sub3d_element
+        end interface
+        
         interface integrate
             module procedure integrate_sub3d_element
         end interface
@@ -52,7 +56,7 @@
     
 
 
-        public :: empty,prepare,integrate,extract
+        public :: empty,prepare,update,integrate,extract
         
         
         
@@ -183,7 +187,23 @@
         
         
         
+        subroutine update_sub3d_element(elem,mnode)
         
+        	type(sub3d_element), intent(inout) :: elem
+        	type(xnode), intent(in)	:: mnode(:)
+        	
+        	if(allocated(elem%mnode)) then
+        		if(size(elem%mnode)==size(mnode)) then
+        			elem%mnode=mnode
+        		else
+        			write(msg_file,*)'mis-match in sub3d mnode array size! No mnode update done'
+        		end if
+        	else
+        	 	allocate(elem%mnode(size(mnode)))
+        	 	elem%mnode=mnode
+        	end if
+        
+        end subroutine update_sub3d_element
         
         
         

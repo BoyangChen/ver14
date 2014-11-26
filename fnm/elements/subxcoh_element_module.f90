@@ -211,10 +211,10 @@ module subxcoh_element_module
     
         ! local variables
         type(int_alloc_array), allocatable  :: subglbcnc(:)     ! glb cnc of sub element, used when elem is intact
-        real(kind=dp),allocatable           :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
+        
         
         integer :: i,j,l, elstat, subelstat
-        integer, allocatable :: dofcnc(:)
+        
         
         character(len=eltypelength) ::  subeltype
         
@@ -277,32 +277,64 @@ module subxcoh_element_module
             call extract(elem%subelem(1),curr_status=subelstat)
             
             if(subelstat>intact) then 
-            ! if elem reached failure initiation, no edge status partition
+            ! if elem reached failure initiation; for now, no edge status partition
+            ! ideally, should check for edge status partition, then transfer intg point sdv arrays
                 elstat=elfail1
                 elem%curr_status=elstat
                 ! reaching here, elem curr status is elfail1
             else
             ! if elem has not reached failure initiation, 
-            ! then check for edge status and repartition if necessary
+            ! then check for edge status and repartition into sub elems if necessary
                 call edge_status_partition(elem)
                 ! reaching here, elem curr status is either intact (no partition) or elfail2 (partitioned)
-            end if  
-         
+            end if
+            
+            call integrate_assemble(elem,K_matrix,F_vector) 
+            
+    	else if(elstat==elfail1) then
+    	! elem already delaminated; at the moment, go straight to integrate and assemble
+    	! ideally, should do edge status partition, then transfer intg point sdv arrays
+    		call integrate_assemble(elem,K_matrix,F_vector) 
+    	
+    	else if(elstat==elfail2) then
+    	! elem already edge partitioned; need to update mnodes, then integrate and assemble
+    	
+    		! update mnodes
+    		call update_mnode(elem)
+    		! integrate and assemble
+    		call integrate_assemble(elem,K_matrix,F_vector) 
+    	
+    	else
+         	write(msg_file,*)'unsupported elstat value in subxcoh elem module'
+			call exit_function
         end if
         
-        ! reaching here, elem curr status is either intact, elfail1 or elfail2
-        ! in all cases, go to integration
-
-
+            
+        
         !---------------------------------------------------------------------!
-        !       integrate and assemble sub element system arrays
-        !---------------------------------------------------------------------!        
+        !               deallocate local arrays 
+        !---------------------------------------------------------------------!
+        
+        if(allocated(subglbcnc)) deallocate(subglbcnc)
+        
+    
+ 
+    end subroutine integrate_subxcoh_element
+    
+    
 
-		! make sure only the intended elstat values are present here
-		if(.not.(elstat==intact .or. elstat==elfail1 .or. elstat==elfail2)) then
-			write(msg_file,*)'unsupported elstat value in subxcoh elem module'
-			call exit_function
-		end if
+
+
+	subroutine integrate_assemble(elem,K_matrix,F_vector)
+	!---------------------------------------------------------------------!
+    !       integrate and assemble sub element system arrays
+    !---------------------------------------------------------------------!     
+    	! - passed in variables   
+    	type(subxcoh_element), intent(inout)	:: elem
+    	real(kind=dp), 	intent(inout)			:: K_matrix(:,:), F_vector(:)
+    	! - local variables
+    	real(kind=dp),	allocatable           	:: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
+    	integer, 		allocatable 			:: dofcnc(:)
         
         ! empty K and F for reuse
         K_matrix=zero; F_vector=zero  
@@ -323,22 +355,14 @@ module subxcoh_element_module
             deallocate(Fi)
             deallocate(dofcnc)
         end do
-
-            
         
-        !---------------------------------------------------------------------!
-        !               deallocate local arrays 
-        !---------------------------------------------------------------------!
         if(allocated(Ki)) deallocate(Ki)
         if(allocated(Fi)) deallocate(Fi)
-        if(allocated(subglbcnc)) deallocate(subglbcnc)
         if(allocated(dofcnc)) deallocate(dofcnc)
-    
- 
-    end subroutine integrate_subxcoh_element
-    
-    
-    
+        
+    end subroutine integrate_assemble
+
+
     
     
     
@@ -1115,6 +1139,9 @@ module subxcoh_element_module
         if(allocated(subglbcnc)) deallocate(subglbcnc)
         if(allocated(mnode)) deallocate(mnode)
         if(allocated(Tmatrix)) deallocate(Tmatrix)
+        if(allocated(x1)) deallocate(x1)
+        if(allocated(x2)) deallocate(x2)
+        if(allocated(xc)) deallocate(xc)
 
 
     end subroutine update_subcnc
@@ -1123,9 +1150,186 @@ module subxcoh_element_module
   
   
   
+    subroutine update_mnode(elem)
+    
+    	! passed-in variables
+    	type(subxcoh_element),    intent(inout)   :: elem
+    	
+    	! local variables
+    	type(int_alloc_array), allocatable :: subglbcnc(:)  ! glb cnc of sub elements
+    	integer :: i, j, l                                  ! counters
+    	integer :: nsub                             		! no. of sub elements
+
+
+    	real(dp)                :: tratio1, tratio2 		! tratio=|xc-x1|/|x2-x1|
+    	type(xnode),allocatable :: mnode(:)                 ! material nodes of cohesive elem
+    	real(dp), allocatable   :: Tmatrix(:,:)             ! interpolation matrix btw bottom num nodes and mat nodes
+
+!       initialize local variables
+
+        i=0; j=0; l=0
+        nsub=0
+        tratio1=zero; tratio2=zero
+    
+    	if(.not.allocated(elem%subelem)) then
+    		write(msg_file,*)'sub elems not allocated in subxcoh update mnode!'
+    		call exit_function
+    	end if
+    	
+    	nsub=size(elem%subelem)
+    	
+    	select case(nsub)
+                case(2)
+                ! two coh3d8 sub elems
+
+                    allocate(subglbcnc(nsub))
+                    
+                    ! allocate 8 numerical nodes for sub elems
+                    do j=1, nsub
+                        allocate(subglbcnc(j)%array(8))
+                        subglbcnc(j)%array=0
+                        subglbcnc(j)%array(:)=elem%nodecnc(elem%subcnc(j)%array(:))
+                    end do
+                    
+                    !*** sub elem 1 mnode update
+                    
+					call extract(elem%subelem(1),Tmatrix=Tmatrix,mnode=mnode)                                       
+                    
+                    ! extract ratio values from Tmatrix
+                    tratio1=Tmatrix(2,1)
+                    tratio2=Tmatrix(3,3)
+                    
+                    ! update the mnode array
+                    mnode(1)=lib_node(subglbcnc(1)%array(1))
+                    mnode(2)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
+                    mnode(3)=tratio2*lib_node(subglbcnc(1)%array(3))+(one-tratio2)*lib_node(subglbcnc(1)%array(4))
+                    mnode(4)=lib_node(subglbcnc(1)%array(4))
+                    mnode(5)=lib_node(subglbcnc(1)%array(5))
+                    mnode(6)=lib_node(subglbcnc(1)%array(6))
+                    mnode(7)=lib_node(subglbcnc(1)%array(7))
+                    mnode(8)=lib_node(subglbcnc(1)%array(8))                  
+                    
+                    call update(elem%subelem(1),mnode=mnode)
+                                     
+                    
+                    !*** sub elm 2 mnode update
+                    
+                    call extract(elem%subelem(2),Tmatrix=Tmatrix,mnode=mnode) 
+                    
+                    tratio1=Tmatrix(1,1)
+                    tratio2=Tmatrix(4,3)
+                    
+                    ! update the mnode array
+                    mnode(1)=tratio1*lib_node(subglbcnc(2)%array(1))+(one-tratio1)*lib_node(subglbcnc(2)%array(2))
+                    mnode(2)=lib_node(subglbcnc(2)%array(2))
+                    mnode(3)=lib_node(subglbcnc(2)%array(3))
+                    mnode(4)=tratio2*lib_node(subglbcnc(2)%array(3))+(one-tratio2)*lib_node(subglbcnc(2)%array(4))
+                    mnode(5)=lib_node(subglbcnc(2)%array(5))
+                    mnode(6)=lib_node(subglbcnc(2)%array(6))
+                    mnode(7)=lib_node(subglbcnc(2)%array(7))
+                    mnode(8)=lib_node(subglbcnc(2)%array(8))
+                    
+                    call update(elem%subelem(2),mnode=mnode)                
+                    
+                    
+                    
+                case(4)
+                ! four coh3d6 sub elems
+
+
+                    if(allocated(subglbcnc)) deallocate(subglbcnc)
+                    allocate(subglbcnc(nsub))
+                    do j=1, nsub   ! coh3d6 elem cnc
+                        allocate(subglbcnc(j)%array(7))
+                        subglbcnc(j)%array=0
+                        subglbcnc(j)%array(:)=elem%nodecnc(elem%subcnc(j)%array(:))
+                    end do
+
+                                
+                    
+                    !*** sub elm 1 connec
+                    
+                    call extract(elem%subelem(1),Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    tratio1=Tmatrix(1,1)
+                    tratio2=Tmatrix(3,2)
+                    
+                    mnode(1)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
+                    mnode(2)=lib_node(subglbcnc(1)%array(2))
+                    mnode(3)=tratio2*lib_node(subglbcnc(1)%array(2))+(one-tratio2)*lib_node(subglbcnc(1)%array(3))
+                    mnode(4)=lib_node(subglbcnc(1)%array(5))
+                    mnode(5)=lib_node(subglbcnc(1)%array(6))
+                    mnode(6)=lib_node(subglbcnc(1)%array(7))
+                    
+                    call update(elem%subelem(1),mnode=mnode)
+                    
+ 
+                    
+                    !*** sub elm 2 connec
+                    
+                    call extract(elem%subelem(2),Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    tratio2=Tmatrix(1,1)
+                    
+                    mnode(1)=tratio2*lib_node(subglbcnc(2)%array(1))+(one-tratio2)*lib_node(subglbcnc(2)%array(2))
+                    mnode(2)=lib_node(subglbcnc(2)%array(2))
+                    mnode(3)=lib_node(subglbcnc(2)%array(3))
+                    mnode(4)=lib_node(subglbcnc(2)%array(5))
+                    mnode(5)=lib_node(subglbcnc(2)%array(6))
+                    mnode(6)=lib_node(subglbcnc(2)%array(7))        
+                    
+                    call update(elem%subelem(2),mnode=mnode)
+
+                    
+                    
+                    
+                    !*** sub elm 3 connec
+                    
+                    call extract(elem%subelem(3),Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    tratio1=Tmatrix(3,2)
+                    
+                    mnode(1)=lib_node(subglbcnc(3)%array(1))
+                    mnode(2)=lib_node(subglbcnc(3)%array(2))
+                    mnode(3)=tratio1*lib_node(subglbcnc(3)%array(2))+(one-tratio1)*lib_node(subglbcnc(3)%array(3))
+                    mnode(4)=lib_node(subglbcnc(3)%array(5))
+                    mnode(5)=lib_node(subglbcnc(3)%array(6))
+                    mnode(6)=lib_node(subglbcnc(3)%array(7))
+      
+                    call update(elem%subelem(3),mnode=mnode)
+                    
+                    
+                    
+                    !*** sub elm 4 connec
+                    
+                    call extract(elem%subelem(4),Tmatrix=Tmatrix,mnode=mnode)
+                    
+                    tratio1=Tmatrix(1,1)
+                    tratio2=Tmatrix(2,2)
+                    
+                    mnode(1)=tratio1*lib_node(subglbcnc(4)%array(1))+(one-tratio1)*lib_node(subglbcnc(4)%array(2))
+                    mnode(2)=tratio2*lib_node(subglbcnc(4)%array(2))+(one-tratio2)*lib_node(subglbcnc(4)%array(3))
+                    mnode(3)=lib_node(subglbcnc(4)%array(4))
+                    mnode(4)=lib_node(subglbcnc(4)%array(5))
+                    mnode(5)=lib_node(subglbcnc(4)%array(6))
+                    mnode(6)=lib_node(subglbcnc(4)%array(7))          
+                    
+                    call update(elem%subelem(4),mnode=mnode)                   
+                    
+                    
+                case default
+                    write(msg_file,*)'wrong nbulk in update subcnc subxcoh'
+                    call exit_function
+        end select
+            
+        ! deallocate local array
+        
+        if(allocated(subglbcnc)) deallocate(subglbcnc)
+        if(allocated(mnode)) deallocate(mnode)
+        if(allocated(Tmatrix)) deallocate(Tmatrix)
   
   
-  
+  	end subroutine update_mnode
   
   
   
