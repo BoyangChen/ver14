@@ -66,7 +66,7 @@ module xcoh_element_module
 
 
 
-    public :: empty,prepare,integrate,extract
+    public :: empty,prepare,update,integrate,extract
 
 
 
@@ -261,6 +261,7 @@ module xcoh_element_module
             ! check if elem has started to fail; if so, no more edge status partitioning later
             call extract(elem%mainelem(1),curr_status=mainelstat)
             
+            
             if(mainelstat>intact) then
             ! if elem has reached failure onset, then update curr status; no edge status partition
                 elstat=elfail1
@@ -325,47 +326,48 @@ module xcoh_element_module
             call extract(elem%subelem(2),curr_status=subelstat2)
             
             ! if both subxcoh elems have reached final partition state, 
-            ! then no update is needed; break out of the control statement
+            ! then no update is needed;
             if(subelstat1>=elfail1 .and. subelstat2>=elfail1) then
                 elstat=elfail3
                 elem%curr_status=elstat
-                exit
-            end if
+            else
         
-            ! update ifailedge arrays of two subxcoh elems
-            allocate(ifailedge1(4)); ifailedge1=0
-            allocate(ifailedge2(4)); ifailedge2=0
-            
-            nfe1=0
-            nfe2=0
-            do i=1, nedge
-                select case (elem%ifailedge(i))
-                    case(1) ! edge 1 here is edge 1 of subxcoh2
-                        nfe2=nfe2+1
-                        ifailedge2(nfe2)=1
-                    case(2) ! edge 2 here is edge 4 of subxcoh2
-                        nfe2=nfe2+1
-                        ifailedge2(nfe2)=4
-                    case(3) ! edge 3 here is edge 3 of subxcoh2
-                        nfe2=nfe2+1
-                        ifailedge2(nfe2)=3
-                    case(4) ! edge 4 here is edge 2 of subxcoh2
-                        nfe2=nfe2+1
-                        ifailedge2(nfe2)=2
-                    case(5:8) ! top 4 edges are the 4 edges of subxcoh1
-                        nfe1=nfe1+1
-                        ifailedge1(nfe1)=elem%ifailedge(i)-4
-                    case(0)
-                    ! do nothing
-                        continue
-                    case default
-                        write(msg_file,*)'sth wrong in xcoh integration subxcoh ifailedge update!'
-                        call exit_function            
-                end select   
-            end do
-            
-            if(subelstat1<elfail1) call update(elem%subelem(1),ifailedge=ifailedge1)
-            if(subelstat2<elfail1) call update(elem%subelem(2),ifailedge=ifailedge2)   
+                ! update ifailedge arrays of two subxcoh elems
+                allocate(ifailedge1(4)); ifailedge1=0
+                allocate(ifailedge2(4)); ifailedge2=0
+                
+                nfe1=0
+                nfe2=0
+                do i=1, nedge
+                    select case (elem%ifailedge(i))
+                        case(1) ! edge 1 here is edge 1 of subxcoh2
+                            nfe2=nfe2+1
+                            ifailedge2(nfe2)=1
+                        case(2) ! edge 2 here is edge 4 of subxcoh2
+                            nfe2=nfe2+1
+                            ifailedge2(nfe2)=4
+                        case(3) ! edge 3 here is edge 3 of subxcoh2
+                            nfe2=nfe2+1
+                            ifailedge2(nfe2)=3
+                        case(4) ! edge 4 here is edge 2 of subxcoh2
+                            nfe2=nfe2+1
+                            ifailedge2(nfe2)=2
+                        case(5:8) ! top 4 edges are the 4 edges of subxcoh1
+                            nfe1=nfe1+1
+                            ifailedge1(nfe1)=elem%ifailedge(i)-4
+                        case(0)
+                        ! do nothing
+                            continue
+                        case default
+                            write(msg_file,*)'sth wrong in xcoh integration subxcoh ifailedge update!'
+                            call exit_function            
+                    end select   
+                end do
+                
+                if(subelstat1<elfail1) call update(elem%subelem(1),ifailedge=ifailedge1)
+                if(subelstat2<elfail1) call update(elem%subelem(2),ifailedge=ifailedge2)  
+
+            end if
         end if
 
 
@@ -414,7 +416,7 @@ module xcoh_element_module
                         dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
                     end do
                 end do
-                call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
+                call assembleKF(K_matrix,F_vector,half*Ki,half*Fi,dofcnc)
                 deallocate(Ki)
                 deallocate(Fi)
                 deallocate(dofcnc)

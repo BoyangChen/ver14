@@ -18,6 +18,8 @@
         integer :: matkey=0                         ! material index in the global material arrays
         type(integration_point) :: ig_point(nig)    ! x, xi, weight, stress, strain, sdv; initialize in prepare procedure
         
+        integer :: nstep=0, ninc=0      ! to store curr step and increment no.
+        
         ! below are optional terms 
         
         type(sdv_array), allocatable :: sdv(:)
@@ -67,6 +69,9 @@
         elem%key=0
         elem%connec=0
         elem%matkey=0
+        
+        elem%nstep=0
+        elem%ninc=0
 
         do i=1,nig
             call empty(elem%ig_point(i))
@@ -105,7 +110,7 @@
     
     
     
-    subroutine extract_coh3d8_element(elem,curr_status,key,connec,matkey,ig_point,sdv)
+    subroutine extract_coh3d8_element(elem,curr_status,key,connec,matkey,ig_point,sdv,nstep,ninc)
     
         type(coh3d8_element), intent(in) :: elem
         
@@ -113,6 +118,7 @@
         integer,                 allocatable, optional, intent(out) :: connec(:)
         type(integration_point), allocatable, optional, intent(out) :: ig_point(:)
         type(sdv_array),         allocatable, optional, intent(out) :: sdv(:)
+        integer,                        optional, intent(out) :: nstep, ninc
         
         if(present(curr_status)) curr_status=elem%curr_status
         
@@ -136,6 +142,10 @@
                 sdv=elem%sdv
             end if
         end if
+        
+        if(present(nstep)) nstep=elem%nstep
+        
+        if(present(ninc)) ninc=elem%ninc
          
     end subroutine extract_coh3d8_element
 
@@ -274,7 +284,12 @@
         ! - extract curr step and inc values from glb clock module
         call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
         
-        
+        ! - check if last iteration has converged, and update the current step & increment no.
+        if(elem%nstep.ne.curr_step .or. elem%ninc.ne.curr_inc) then
+            last_converged=.true.
+            elem%nstep = curr_step
+            elem%ninc = curr_inc
+        end if
         
         
         
@@ -312,24 +327,6 @@
         call extract(mat,matname,mattype,typekey) 
         
         
-        ! - extract isdv values from element and assign to nstep and ninc
-        if(.not.allocated(elem%sdv)) then   ! 1st iteration
-            allocate(elem%sdv(1))
-            allocate(elem%sdv(1)%i(2))      ! allocate integer sdv array
-            elem%sdv(1)%i(1) = curr_step    ! store current step & increment in the integer sdv array
-            elem%sdv(1)%i(2) = curr_inc
-        end if
-        nstep        = elem%sdv(1)%i(1)     ! extract the step & increment no. of the last iteration
-        ninc         = elem%sdv(1)%i(2)
-        
-        
-        ! check if last iteration has converged, and if so, update logical var. 
-        ! and store new step & iteration values
-        if(nstep.ne.curr_step .or. ninc.ne.curr_inc) then
-            last_converged=.true.
-            elem%sdv(1)%i(1) = curr_step    ! update the current step & increment no.
-            elem%sdv(1)%i(2) = curr_inc
-        end if
         
         
         

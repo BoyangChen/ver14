@@ -114,7 +114,7 @@
         !~if(allocated(xnode%ddof)) 
         
         
-      end subroutine plus_xnode
+      end function plus_xnode
     
 
 
@@ -163,7 +163,7 @@
         !~if(allocated(xnode%ddof)) 
         
         
-      end subroutine minus_xnode
+      end function minus_xnode
     
 
 
@@ -204,7 +204,7 @@
         !~if(allocated(xnode%ddof)) 
         
         
-      end subroutine ratio_xnode
+      end function ratio_xnode
     
 
 

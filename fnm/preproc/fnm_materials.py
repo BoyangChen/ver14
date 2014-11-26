@@ -83,9 +83,9 @@ laminate_Delamination=interface(   interface_modulus(\
                                         Dll=1000000.
                                      ),
                     interface_strength(\
-                                        tau_nc=30., 
-                                        tau_tc=45., 
-                                        tau_lc=45.
+                                        tau_nc=60., 
+                                        tau_tc=90., 
+                                        tau_lc=90.
                                       ),
                     interface_toughness(\
                                         Gnc=0.293, 

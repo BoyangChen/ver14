@@ -451,6 +451,10 @@
                     write(msg_file,*)'unsupported elem type in sub3d element module!'
                     call exit_function
             end select
+            
+            if(allocated(Kmatrix2)) deallocate(Kmatrix2)
+            if(allocated(Fvector2)) deallocate(Fvector2)
+            if(allocated(Tmatrixfull)) deallocate(Tmatrixfull)
         
         end subroutine integrate_sub3d_element
         

@@ -63,7 +63,10 @@
         type(coh3d8_element),allocatable :: subcoh3d8(:)
         type(sub3d_element),allocatable :: sub3d(:)
         type(xbrick_element),allocatable :: subplyblk(:)
-        type(coh3d8_element),allocatable :: subinterf(:)
+        !type(coh3d8_element),allocatable :: subinterf(:)
+        type(xcoh_element),allocatable :: subinterf(:)
+        type(coh3d8_element),allocatable :: mainelem(:)
+        type(subxcoh_element),allocatable :: subelem(:)
         
         ! integration points
         type(integration_point), allocatable :: igpnt(:) ! intg point array
@@ -75,6 +78,7 @@
         ! damage/failure variables
         real(kind=dp)               :: fvar    ! temporary failure variable for scalar outpt
         type(sdv_array),allocatable :: fsdv(:)  ! failure variables extracted from ig point sdv array
+        integer                     :: ifvar,ifvar1,ifvar2
         
         ! counters
         integer                     :: i, j, l, m, n, nxl
@@ -99,7 +103,7 @@
         nsize=0; elnode=0
         x3d=zero; disp3d=zero
         sigtsr=zero; epstsr=zero
-        fvar=zero
+        fvar=zero; ifvar=0; ifvar1=0; ifvar2=0
         i=0; j=0; l=0; m=0; n=0; nxl=0
         
         ! obtain nnode value from glb libraries
@@ -275,10 +279,10 @@
                     ninterf=size(subinterf)                
                     if(ninterf > 0) then
                         do i=1,ninterf
-                            call extract(subinterf(i),connec=connec)
+                            call extract(subinterf(i),nodecnc=connec)
                             connec=connec-1
-                            write(outunit,fmatcnc,advance="no") size(connec)
-                            do j=1,size(connec)
+                            write(outunit,fmatcnc,advance="no") 8   ! only write real nodes
+                            do j=1,8
                                 write(outunit,fmatcnc,advance="no") connec(j)
                             end do
                             write(outunit,'(a)')''
@@ -791,18 +795,50 @@
                     ninterf=size(subinterf)                
                     if(ninterf > 0) then
                         do i=1,ninterf
-                            call extract(subinterf(i),ig_point=igpnt)
-                            fvar=zero
-                            do j=1,size(igpnt)
-                                call extract(igpnt(j),sdv=fsdv)
-                                if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                if(allocated(fsdv)) deallocate(fsdv)
-                            end do 
-                            ! average failure status in the element
-                            fvar=fvar/size(igpnt)
-                            write(outunit,*) fvar
                             
-                            deallocate(igpnt)
+                            fvar=zero
+                            ifvar=0
+                            
+                            call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
+                            
+                            if(allocated(mainelem)) then
+                            ! a coh3d8 elem
+                                call extract(mainelem(1),ig_point=igpnt)
+                                
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                    if(allocated(fsdv)) deallocate(fsdv)
+                                end do 
+                                ! average failure status in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                                deallocate(igpnt)
+                            else 
+                            ! 
+                                if(.not.allocated(subelem)) then
+                                    write(msg_file,*)'subelem not allocated for output!'
+                                    call exit_function
+                                end if
+                                
+                                call extract(subelem(1),curr_status=ifvar1)
+                                call extract(subelem(2),curr_status=ifvar2)
+                                
+                                ifvar=max(ifvar1,ifvar2)
+                                
+                                write(outunit,*) ifvar
+                            
+                            end if
+                            
+                            !~!~call extract(subinterf(i),sdv=fsdv)
+                            !~!~if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                            !~!~if(allocated(fsdv)) deallocate(fsdv)
+                            
+                            !~call extract(subinterf(i),curr_status=ifvar)
+                            !~
+                            !~write(outunit,*) ifvar
+                            
                         end do
                     end if 
 
@@ -932,18 +968,43 @@
                     ninterf=size(subinterf)                
                     if(ninterf > 0) then
                         do i=1,ninterf
-                            call extract(subinterf(i),ig_point=igpnt)
-                            fvar=zero
-                            do j=1,size(igpnt)
-                                call extract(igpnt(j),sdv=fsdv)
-                                if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                if(allocated(fsdv)) deallocate(fsdv)
-                            end do 
-                            ! average damage variable in the element
-                            fvar=fvar/size(igpnt)
-                            write(outunit,*) fvar
                             
-                            deallocate(igpnt)
+                            fvar=zero
+                            ifvar=0
+                            
+                            call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
+                            
+                            if(allocated(mainelem)) then
+                            ! a coh3d8 elem
+                                call extract(mainelem(1),ig_point=igpnt)
+                                
+                                do j=1,size(igpnt)
+                                    call extract(igpnt(j),sdv=fsdv)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                    if(allocated(fsdv)) deallocate(fsdv)
+                                end do 
+                                ! average failure status in the element
+                                fvar=fvar/size(igpnt)
+                                write(outunit,*) fvar
+                                
+                                deallocate(igpnt)
+                            else 
+                            ! 
+                                if(.not.allocated(subelem)) then
+                                    write(msg_file,*)'subelem not allocated for output!'
+                                    call exit_function
+                                end if
+                                
+                                call extract(subelem(1),curr_status=ifvar1)
+                                call extract(subelem(2),curr_status=ifvar2)
+                                
+                                ifvar=max(ifvar1,ifvar2)
+                                
+                                write(outunit,*) ifvar
+                            
+                            end if
+                            
+                            
                         end do
                     end if 
 
@@ -958,9 +1019,6 @@
         
 
 
-
-
-
         
 
 
@@ -971,7 +1029,11 @@
         if(allocated(subbrick)) deallocate(subbrick)
         if(allocated(subcoh3d6)) deallocate(subcoh3d6)
         if(allocated(subcoh3d8)) deallocate(subcoh3d8)
-        if(allocated(sub3d)) deallocate(sub3d)        
+        if(allocated(sub3d)) deallocate(sub3d)
+        if(allocated(subplyblk)) deallocate(subplyblk)
+        if(allocated(subinterf)) deallocate(subinterf)
+        if(allocated(mainelem)) deallocate(mainelem)
+        if(allocated(subelem)) deallocate(subelem)
         if(allocated(igpnt)) deallocate(igpnt)
         if(allocated(sig)) deallocate(sig)
         if(allocated(eps)) deallocate(eps)   

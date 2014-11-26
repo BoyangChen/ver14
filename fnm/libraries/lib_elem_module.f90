@@ -6,8 +6,10 @@
     include "elements/coh3d6_element_module.f90"                          
     include "elements/coh3d8_element_module.f90"                          
     include "elements/sub3d_element_module.f90"                           
-    include "elements/xbrick_element_module.f90"    
-    include "elements/xlam_element_module.f90"
+    include "elements/xbrick_element_module.f90"   
+    include "elements/subxcoh_element_module.f90"
+    include "elements/xcoh_element_module.f90"
+    include "elements/xlam2_element_module.f90"
     include "elements/element_module.f90"                                 
                                                                           
                                                                           
@@ -18,7 +20,9 @@
     use coh3d6_element_module                                             
     use coh3d8_element_module                                             
     use sub3d_element_module                                              
-    use xbrick_element_module  
+    use xbrick_element_module
+    use subxcoh_element_module
+    use xcoh_element_module
     use xlam_element_module
     use element_module                                                    
                                                                           

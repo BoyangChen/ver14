@@ -359,10 +359,10 @@ module xlam_element_module
                 & elem%plyblknodecnc(i+1)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)
                 
                 ! interface bottom edges are from bottom plyblk elem top edges 
-                elem%interfedgecnc(i)%array(1 : nedginterf/2)=elem%plyblkedge(i)%array(nedginterf/2+1 : nedginterf)
+                elem%interfedgecnc(i)%array(1 : nedginterf/2)=elem%plyblkedgecnc(i)%array(nedginterf/2+1 : nedginterf)
                 
                 ! interface top edges are from top plyblk elem bottom edges
-                elem%interfedgecnc(i)%array(nedginterf/2+1 : nedginterf)=elem%plyblkedge(i+1)%array(1 : nedginterf/2)
+                elem%interfedgecnc(i)%array(nedginterf/2+1 : nedginterf)=elem%plyblkedgecnc(i+1)%array(1 : nedginterf/2)
                 
                        
             end do
@@ -526,7 +526,7 @@ module xlam_element_module
             do j=1, nndinterf ! no. of nodes in sub elem i
                 do l=1, ndim
                     ! dof indices of the jth node of sub elem i 
-                    dofcnc((j-1)*ndim+l)=(elem%interfcnc(i)%array(j)-1)*ndim+l
+                    dofcnc((j-1)*ndim+l)=(elem%interfnodecnc(i)%array(j)-1)*ndim+l
                 end do
             end do
             call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
