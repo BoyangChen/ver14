@@ -490,6 +490,24 @@
             igstat=0
             if(allocated(ig_sdv(2)%i)) igstat=ig_sdv(2)%i(1)
             elem%curr_status=max(elem%curr_status,igstat)
+            
+            !~! update elem sdv arrays
+            !~if(.not.allocated(elem%sdv)) then
+            !~    allocate(elem%sdv(1))
+            !~    elem%sdv(1)=ig_sdv(2)
+            !~else
+            !~    if(ig_sdv(2)%i(1) > elem%sdv(1)%i(1))
+            !~    ! if fstat value is higher, update elem sdv to this ig point sdv values
+            !~        elem%sdv(1)=ig_sdv(2)
+            !~    else if(ig_sdv(2)%i(1)==elem%sdv(1)%i(1) .and. ig_sdv(2)%r(1) > elem%sdv(1)%r(1))
+            !~    ! if fstat value is the same but dm value is higher, also update to this ig point sdv
+            !~        elem%sdv(1)=ig_sdv(2)
+            !~    else
+            !~    ! no update
+            !~        continue
+            !~    end if
+            !~end if
+            
 
             
             deallocate(ig_sdv)

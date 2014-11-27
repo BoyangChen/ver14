@@ -44,19 +44,23 @@
 ** Name: Disp-BC-1 Type: Displacement/Rotation
 *Boundary
 BOTTOM, 2, 2
+BOTTOM, 1, 1
+BOTTOM, 3, 3
+TOP, 1, 1
+TOP, 3, 3
 ** Name: Disp-BC-2 Type: Displacement/Rotation
-*Boundary
-LEFT, 1, 1
+**Boundary
+**LEFT, 1, 1
 ** Name: Disp-BC-3 Type: Displacement/Rotation
-*Boundary
-BACK, 3, 3
+**Boundary
+**BACK, 3, 3
 ** ----------------------------------------------------------------
 ** 
 ** STEP: tension
 ** 
-*Step, name=tension
+*Step, name=tension, inc=1000
 *Static
-0.0002, 0.02, 1e-07, 0.0002
+0.0002, 0.06, 1e-07, 0.0002
 ** 
 ** BOUNDARY CONDITIONS
 ** 

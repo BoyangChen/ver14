@@ -794,11 +794,11 @@
                 if(allocated(subinterf)) then
                     ninterf=size(subinterf)                
                     if(ninterf > 0) then
+                        ! loop over all xcoh elems
                         do i=1,ninterf
                             
-                            fvar=zero
                             ifvar=0
-                            
+                            ! extract main elem (coh3d8) or sub elem (subxcoh) from this xcoh
                             call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
                             
                             if(allocated(mainelem)) then
@@ -807,37 +807,34 @@
                                 
                                 do j=1,size(igpnt)
                                     call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
+                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) ifvar=ifvar+fsdv(2)%i(1)
                                     if(allocated(fsdv)) deallocate(fsdv)
                                 end do 
                                 ! average failure status in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
+                                ifvar=int(ifvar/size(igpnt))
+                                write(outunit,*) ifvar
                                 
                                 deallocate(igpnt)
                             else 
-                            ! 
+                            ! two subxcoh elems
                                 if(.not.allocated(subelem)) then
                                     write(msg_file,*)'subelem not allocated for output!'
                                     call exit_function
                                 end if
                                 
-                                call extract(subelem(1),curr_status=ifvar1)
-                                call extract(subelem(2),curr_status=ifvar2)
-                                
-                                ifvar=max(ifvar1,ifvar2)
+                                ! extract sdv of the 2 subxcoh elems, and update to ifvar
+                                do j=1, 2
+                                    call extract(subelem(j),sdv=fsdv)
+                                    if(allocated(fsdv)) then 
+                                        if(allocated(fsdv(1)%i)) ifvar=max(ifvar,fsdv(1)%i(1))
+                                        deallocate(fsdv)
+                                    end if
+                                end do
                                 
                                 write(outunit,*) ifvar
                             
                             end if
                             
-                            !~!~call extract(subinterf(i),sdv=fsdv)
-                            !~!~if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                            !~!~if(allocated(fsdv)) deallocate(fsdv)
-                            
-                            !~call extract(subinterf(i),curr_status=ifvar)
-                            !~
-                            !~write(outunit,*) ifvar
                             
                         end do
                     end if 
@@ -970,7 +967,6 @@
                         do i=1,ninterf
                             
                             fvar=zero
-                            ifvar=0
                             
                             call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
                             
@@ -995,12 +991,16 @@
                                     call exit_function
                                 end if
                                 
-                                call extract(subelem(1),curr_status=ifvar1)
-                                call extract(subelem(2),curr_status=ifvar2)
+                                ! extract sdv of the 2 subxcoh elems, and update to ifvar
+                                do j=1, 2
+                                    call extract(subelem(j),sdv=fsdv)
+                                    if(allocated(fsdv)) then 
+                                        if(allocated(fsdv(1)%r)) fvar=max(fvar,fsdv(1)%r(1))
+                                        deallocate(fsdv)
+                                    end if
+                                end do
                                 
-                                ifvar=max(ifvar1,ifvar2)
-                                
-                                write(outunit,*) ifvar
+                                write(outunit,*) fvar
                             
                             end if
                             

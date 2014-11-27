@@ -5,7 +5,10 @@ module subxcoh_element_module
     use lib_edge_module                 ! global edge library
     use lib_node_module                 ! global node library
     use lib_mat_module                  ! global material library
+    use coh3d6_element_module
+    use coh3d8_element_module
     use sub3d_element_module
+    use integration_point_module
   
   
     implicit none
@@ -212,23 +215,35 @@ module subxcoh_element_module
         ! local variables
         type(int_alloc_array), allocatable  :: subglbcnc(:)     ! glb cnc of sub element, used when elem is intact
         
-        
         integer :: i,j,l, elstat, subelstat
         
-        
         character(len=eltypelength) ::  subeltype
-        
-        
+           
         ! - glb clock step and increment no. extracted from glb clock module
         integer :: curr_step, curr_inc
         logical :: last_converged               ! true if last iteration has converged: a new increment/step has started
-    
+  
+        ! real and integer failure variables
+        real(dp) :: rfvar
+        integer :: ifvar
+        
+        ! coh elem arrays
+        type(coh3d6_element),allocatable :: subcoh3d6(:)
+        type(coh3d8_element),allocatable :: subcoh3d8(:)
+        
+        ! intg point arrays
+        type(integration_point), allocatable :: igpnt(:) ! intg point array
+        
+        ! failure variables extracted from ig point sdv array
+        type(sdv_array),allocatable :: fsdv(:) 
+  
     
         ! initialize K & F
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
         K_matrix=zero; F_vector=zero
         
         ! initialize local variables
+        rfvar=zero; ifvar=0
         i=0; j=0; l=0
         elstat=0; subelstat=0; subeltype=''
         curr_step=0; curr_inc=0
@@ -309,6 +324,66 @@ module subxcoh_element_module
 			call exit_function
         end if
         
+        
+        ! update subxcoh elem sdv for output
+        if(.not.allocated(elem%sdv)) then
+            allocate(elem%sdv(1))
+            allocate(elem%sdv(1)%i(1))  ! fstat
+            allocate(elem%sdv(1)%r(1))  ! dm
+            elem%sdv(1)%i(1)=0
+            elem%sdv(1)%r(1)=0
+        end if
+                    
+        ! loop over all sub elems of xbrick and write each sub elem's failure status individually
+        do i=1,size(elem%subelem)           
+        
+            ifvar=0
+            rfvar=zero
+            
+            ! extract this subelem type
+            call extract(elem%subelem(i),eltype=subeltype)
+            
+            ! extract this subelem intg points based on subelem type
+            select case(subeltype)                       
+                case('coh3d6')
+                    call extract(elem%subelem(i),coh3d6=subcoh3d6)
+                    call extract(subcoh3d6(1),ig_point=igpnt)                        
+                case('coh3d8')
+                    call extract(elem%subelem(i),coh3d8=subcoh3d8)
+                    call extract(subcoh3d8(1),ig_point=igpnt)                       
+                case default
+                    write(msg_file,*)'subelem type not supported in subxcoh elem!'
+                    call exit_function
+            end select  
+            
+            ! sum up useful sdv values of all intg points into ifvar and rfvar
+            do j=1,size(igpnt)
+                call extract(igpnt(j),sdv=fsdv)
+                if(allocated(fsdv)) then
+                    ! update sdv values
+                    if(allocated(fsdv(2)%i)) ifvar=ifvar+fsdv(2)%i(1)
+                    if(allocated(fsdv(2)%r)) rfvar=rfvar+fsdv(2)%r(1)
+                
+                    deallocate(fsdv)
+                end if
+            end do 
+            ! average fvar values in this sub element
+            ifvar=int(ifvar/size(igpnt))
+            rfvar=rfvar/size(igpnt)
+            
+            ! update this fvar to subxcoh sdv
+            elem%sdv(1)%i(1)=max(elem%sdv(1)%i(1),ifvar)
+            elem%sdv(1)%r(1)=max(elem%sdv(1)%r(1),rfvar)
+            
+            ! deallocate arrays for re-use
+            if(allocated(igpnt))     deallocate(igpnt)
+            if(allocated(fsdv))      deallocate(fsdv)
+            if(allocated(subcoh3d6)) deallocate(subcoh3d6)
+            if(allocated(subcoh3d8)) deallocate(subcoh3d8)
+
+        end do
+        
+        
             
         
         !---------------------------------------------------------------------!
@@ -316,7 +391,10 @@ module subxcoh_element_module
         !---------------------------------------------------------------------!
         
         if(allocated(subglbcnc)) deallocate(subglbcnc)
-        
+        if(allocated(igpnt))     deallocate(igpnt)
+        if(allocated(fsdv))      deallocate(fsdv)
+        if(allocated(subcoh3d6)) deallocate(subcoh3d6)
+        if(allocated(subcoh3d8)) deallocate(subcoh3d8)
     
  
     end subroutine integrate_subxcoh_element
@@ -335,6 +413,9 @@ module subxcoh_element_module
     	! - local variables
     	real(kind=dp),	allocatable           	:: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
     	integer, 		allocatable 			:: dofcnc(:)
+        integer :: i,j,l
+        
+        i=0;j=0;l=0
         
         ! empty K and F for reuse
         K_matrix=zero; F_vector=zero  
