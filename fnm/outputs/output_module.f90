@@ -706,81 +706,12 @@
                     do m=1,nplyblk
                         call extract(subplyblk(m),subelem=sub3d)
                         nsub3d=size(sub3d)
-                        
-                        if(nsub3d > 0) then                        
-                            ! loop over all sub elems of xbrick and write each sub elem's failure status individually
-                            do i=1,nsub3d
-                                call extract(sub3d(i),eltype=subtype)
-                                select case(subtype)
-                                    case('wedge')
-                                        call extract(sub3d(i),wedge=subwedge)
-                                        call extract(subwedge(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average failure status in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subwedge)
-                                        
-                                    case('brick')
-                                        call extract(sub3d(i),brick=subbrick)
-                                        call extract(subbrick(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average failure status in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subbrick)
-                                        
-                                    case('coh3d6')
-                                        call extract(sub3d(i),coh3d6=subcoh3d6)
-                                        call extract(subcoh3d6(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average failure status in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subcoh3d6)
-                                        
-                                    case('coh3d8')
-                                        call extract(sub3d(i),coh3d8=subcoh3d8)
-                                        call extract(subcoh3d8(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%i)) fvar=fvar+fsdv(2)%i(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average failure status in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subcoh3d8)
-                                        
-                                    case default
-                                        continue
-                                end select    
-                            end do
-                        end if
+                                               
+                        ! loop over all sub elems of xbrick and write each sub elem's failure status individually
+                        do i=1,nsub3d
+                            call extract(sub3d(i),curr_status=ifvar)
+                            write(outunit,*) ifvar  
+                        end do
                         
                         deallocate(sub3d)
                     end do  
@@ -792,52 +723,13 @@
                 ! write failure status of interface elems
                 
                 if(allocated(subinterf)) then
-                    ninterf=size(subinterf)                
-                    if(ninterf > 0) then
-                        ! loop over all xcoh elems
-                        do i=1,ninterf
-                            
-                            ifvar=0
-                            ! extract main elem (coh3d8) or sub elem (subxcoh) from this xcoh
-                            call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
-                            
-                            if(allocated(mainelem)) then
-                            ! a coh3d8 elem
-                                call extract(mainelem(1),ig_point=igpnt)
-                                
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%i)) ifvar=ifvar+fsdv(2)%i(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average failure status in the element
-                                ifvar=int(ifvar/size(igpnt))
-                                write(outunit,*) ifvar
-                                
-                                deallocate(igpnt)
-                            else 
-                            ! two subxcoh elems
-                                if(.not.allocated(subelem)) then
-                                    write(msg_file,*)'subelem not allocated for output!'
-                                    call exit_function
-                                end if
-                                
-                                ! extract sdv of the 2 subxcoh elems, and update to ifvar
-                                do j=1, 2
-                                    call extract(subelem(j),sdv=fsdv)
-                                    if(allocated(fsdv)) then 
-                                        if(allocated(fsdv(1)%i)) ifvar=max(ifvar,fsdv(1)%i(1))
-                                        deallocate(fsdv)
-                                    end if
-                                end do
-                                
-                                write(outunit,*) ifvar
-                            
-                            end if
-                            
-                            
-                        end do
-                    end if 
+                    ninterf=size(subinterf)    
+            
+                    ! loop over all xcoh elems
+                    do i=1,ninterf
+                        call extract(subinterf(i),curr_status=ifvar)
+                        write(outunit,*) ifvar 
+                    end do
 
                     deallocate(subinterf)
                 end if
@@ -874,83 +766,81 @@
                     do m=1,nplyblk
                         call extract(subplyblk(m),subelem=sub3d)
                         nsub3d=size(sub3d)
-                        
-                        if(nsub3d > 0) then                        
-                            ! loop over all sub elems of xbrick and write each sub elem's damage variable individually
-                        
-                            do i=1,nsub3d
-                                call extract(sub3d(i),eltype=subtype)
-                                select case(subtype)
-                                    case('wedge')
-                                        call extract(sub3d(i),wedge=subwedge)
-                                        call extract(subwedge(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average damage variable in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subwedge)
-                                        
-                                    case('brick')
-                                        call extract(sub3d(i),brick=subbrick)
-                                        call extract(subbrick(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average damage variable in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subbrick)
-                                        
-                                    case('coh3d6')
-                                        call extract(sub3d(i),coh3d6=subcoh3d6)
-                                        call extract(subcoh3d6(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average damage variablen in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subcoh3d6)
-                                        
-                                    case('coh3d8')
-                                        call extract(sub3d(i),coh3d8=subcoh3d8)
-                                        call extract(subcoh3d8(1),ig_point=igpnt)
-                                        fvar=zero
-                                        do j=1,size(igpnt)
-                                            call extract(igpnt(j),sdv=fsdv)
-                                            if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                            if(allocated(fsdv)) deallocate(fsdv)
-                                        end do 
-                                        ! average damage variable in the element
-                                        fvar=fvar/size(igpnt)
-                                        write(outunit,*) fvar
-                                        
-                                        deallocate(igpnt)
-                                        deallocate(subcoh3d8)
-                                        
-                                    case default
-                                        continue
-                                end select    
-                            end do
-         
-                        end if
+                                               
+                        ! loop over all sub elems of xbrick and write each sub elem's damage variable individually
+                    
+                        do i=1,nsub3d
+                            call extract(sub3d(i),eltype=subtype)
+                            select case(subtype)
+                                case('wedge')
+                                    call extract(sub3d(i),wedge=subwedge)
+                                    call extract(subwedge(1),ig_point=igpnt)
+                                    fvar=zero
+                                    do j=1,size(igpnt)
+                                        call extract(igpnt(j),sdv=fsdv)
+                                        if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                        if(allocated(fsdv)) deallocate(fsdv)
+                                    end do 
+                                    ! average damage variable in the element
+                                    fvar=fvar/size(igpnt)
+                                    write(outunit,*) fvar
+                                    
+                                    deallocate(igpnt)
+                                    deallocate(subwedge)
+                                    
+                                case('brick')
+                                    call extract(sub3d(i),brick=subbrick)
+                                    call extract(subbrick(1),ig_point=igpnt)
+                                    fvar=zero
+                                    do j=1,size(igpnt)
+                                        call extract(igpnt(j),sdv=fsdv)
+                                        if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                        if(allocated(fsdv)) deallocate(fsdv)
+                                    end do 
+                                    ! average damage variable in the element
+                                    fvar=fvar/size(igpnt)
+                                    write(outunit,*) fvar
+                                    
+                                    deallocate(igpnt)
+                                    deallocate(subbrick)
+                                    
+                                case('coh3d6')
+                                    call extract(sub3d(i),coh3d6=subcoh3d6)
+                                    call extract(subcoh3d6(1),ig_point=igpnt)
+                                    fvar=zero
+                                    do j=1,size(igpnt)
+                                        call extract(igpnt(j),sdv=fsdv)
+                                        if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                        if(allocated(fsdv)) deallocate(fsdv)
+                                    end do 
+                                    ! average damage variablen in the element
+                                    fvar=fvar/size(igpnt)
+                                    write(outunit,*) fvar
+                                    
+                                    deallocate(igpnt)
+                                    deallocate(subcoh3d6)
+                                    
+                                case('coh3d8')
+                                    call extract(sub3d(i),coh3d8=subcoh3d8)
+                                    call extract(subcoh3d8(1),ig_point=igpnt)
+                                    fvar=zero
+                                    do j=1,size(igpnt)
+                                        call extract(igpnt(j),sdv=fsdv)
+                                        if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                        if(allocated(fsdv)) deallocate(fsdv)
+                                    end do 
+                                    ! average damage variable in the element
+                                    fvar=fvar/size(igpnt)
+                                    write(outunit,*) fvar
+                                    
+                                    deallocate(igpnt)
+                                    deallocate(subcoh3d8)
+                                    
+                                case default
+                                    continue
+                            end select    
+                        end do
+     
                         
                         deallocate(sub3d)
                     end do  
@@ -963,50 +853,49 @@
                 
                 if(allocated(subinterf)) then
                     ninterf=size(subinterf)                
-                    if(ninterf > 0) then
-                        do i=1,ninterf
+
+                    do i=1,ninterf
+                        
+                        fvar=zero
+                        
+                        call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
+                        
+                        if(allocated(mainelem)) then
+                        ! a coh3d8 elem
+                            call extract(mainelem(1),ig_point=igpnt)
                             
-                            fvar=zero
+                            do j=1,size(igpnt)
+                                call extract(igpnt(j),sdv=fsdv)
+                                if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
+                                if(allocated(fsdv)) deallocate(fsdv)
+                            end do 
+                            ! average failure status in the element
+                            fvar=fvar/size(igpnt)
+                            write(outunit,*) fvar
                             
-                            call extract(subinterf(i),mainelem=mainelem,subelem=subelem)
-                            
-                            if(allocated(mainelem)) then
-                            ! a coh3d8 elem
-                                call extract(mainelem(1),ig_point=igpnt)
-                                
-                                do j=1,size(igpnt)
-                                    call extract(igpnt(j),sdv=fsdv)
-                                    if(allocated(fsdv).and.allocated(fsdv(2)%r)) fvar=fvar+fsdv(2)%r(1)
-                                    if(allocated(fsdv)) deallocate(fsdv)
-                                end do 
-                                ! average failure status in the element
-                                fvar=fvar/size(igpnt)
-                                write(outunit,*) fvar
-                                
-                                deallocate(igpnt)
-                            else 
-                            ! 
-                                if(.not.allocated(subelem)) then
-                                    write(msg_file,*)'subelem not allocated for output!'
-                                    call exit_function
-                                end if
-                                
-                                ! extract sdv of the 2 subxcoh elems, and update to ifvar
-                                do j=1, 2
-                                    call extract(subelem(j),sdv=fsdv)
-                                    if(allocated(fsdv)) then 
-                                        if(allocated(fsdv(1)%r)) fvar=max(fvar,fsdv(1)%r(1))
-                                        deallocate(fsdv)
-                                    end if
-                                end do
-                                
-                                write(outunit,*) fvar
-                            
+                            deallocate(igpnt)
+                        else 
+                        ! 
+                            if(.not.allocated(subelem)) then
+                                write(msg_file,*)'subelem not allocated for output!'
+                                call exit_function
                             end if
                             
+                            ! extract sdv of the 2 subxcoh elems, and update to ifvar
+                            do j=1, 2
+                                call extract(subelem(j),sdv=fsdv)
+                                if(allocated(fsdv)) then 
+                                    if(allocated(fsdv(1)%r)) fvar=max(fvar,fsdv(1)%r(1))
+                                    deallocate(fsdv)
+                                end if
+                            end do
                             
-                        end do
-                    end if 
+                            write(outunit,*) fvar
+                        
+                        end if
+                        
+                        
+                    end do
 
                     deallocate(subinterf)
                 end if

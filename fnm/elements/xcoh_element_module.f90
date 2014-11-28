@@ -217,11 +217,10 @@ module xcoh_element_module
     
     
         ! local variables
-        type(int_alloc_array), allocatable  :: mainglbcnc(:),subglbcnc(:),subedgecnc(:)
-        real(kind=dp),allocatable           :: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
+        type(int_alloc_array), allocatable  :: mainglbcnc(:)
         
-        integer :: i,j,l, elstat, mainelstat, subelstat1, subelstat2, nfe1, nfe2
-        integer, allocatable :: dofcnc(:), ifailedge1(:), ifailedge2(:)
+        integer :: i,j,l, elstat, mainelstat
+
         
         
           
@@ -232,9 +231,21 @@ module xcoh_element_module
         
         ! initialize local variables
         i=0; j=0; l=0
-        elstat=0; mainelstat=0; subelstat1=0; subelstat2=0
+        elstat=0; mainelstat=0
 
-        
+        ! assign 1 coh3d8 elem as the main elem before failure, if not yet done
+        if(.not.allocated(elem%mainelem)) then 
+            allocate(elem%mainelem(1))
+            allocate(elem%maincnc(1))
+            allocate(elem%maincnc(1)%array(nndrl))   ! coh3d8 elem
+            allocate(mainglbcnc(1))
+            allocate(mainglbcnc(1)%array(nndrl))
+            ! main elm 1 connec
+            elem%maincnc(1)%array=[(i, i=1,nndrl)]
+            mainglbcnc(1)%array(:)=elem%nodecnc(elem%maincnc(1)%array(:))
+            ! create sub elements
+            call prepare(elem%mainelem(1),key=0,connec=mainglbcnc(1)%array,matkey=elem%matkey)   
+        end if   
         
 
         ! extract current status value
@@ -242,97 +253,151 @@ module xcoh_element_module
 
         ! if elem is intact
         if(elstat==intact) then
+            
+            ! check if elem has started to fail; if so, no more edge status partitioning later
+            call extract(elem%mainelem(1),curr_status=mainelstat)   
+            
+            if(mainelstat>intact) then
+            ! if elem has reached failure onset, then update curr status
+                elstat=elfail1
+                elem%curr_status=elstat
+            end if
+
+            call partition(elem)
+            call integrate_assemble(elem,K_matrix,F_vector)
+
+        else if(elstat==elfail1) then
+        ! if main elem coh3d8 has started to fail
+            call partition(elem)
+            call integrate_assemble(elem,K_matrix,F_vector)   
         
-            ! assign 1 coh3d8 elem as the main elem before failure, if not yet done
-            if(.not.allocated(elem%mainelem)) then 
-                allocate(elem%mainelem(1))
-                allocate(elem%maincnc(1))
-                allocate(elem%maincnc(1)%array(nndrl))   ! coh3d8 elem
-                allocate(mainglbcnc(1))
-                allocate(mainglbcnc(1)%array(nndrl))
-                ! main elm 1 connec
-                elem%maincnc(1)%array=[(i, i=1,nndrl)]
-                mainglbcnc(1)%array(:)=elem%nodecnc(elem%maincnc(1)%array(:))
-                ! create sub elements
-                call prepare(elem%mainelem(1),key=0,connec=mainglbcnc(1)%array,matkey=elem%matkey)
+        else if(elstat==elfail2) then
+        ! if elem has already been partitioned into 2 subxcoh elems,
+        ! update their ifailedge arrays and elem curr status 
+            
+            call update_edgestatus(elem)
+            call integrate_assemble(elem,K_matrix,F_vector) 
+        
+        else if(elstat==elfail3) then
+        
+            call integrate_assemble(elem,K_matrix,F_vector) 
+        
+        else
+			write(msg_file,*)'unsupported elstat value in xcoh elem module'
+			call exit_function
+        end if      
+            
+
+        !---------------------------------------------------------------------!
+        !               deallocate local arrays 
+        !---------------------------------------------------------------------!
+
+        if(allocated(mainglbcnc)) deallocate(mainglbcnc)
+    
+ 
+    end subroutine integrate_xcoh_element
+    
+     
+     
+    subroutine partition(elem)
+    ! check edge status, and partition into 2 subxcoh elems if any edge status is not intact
+        
+        type(xcoh_element), intent(inout) :: elem
+        
+        type(int_alloc_array), allocatable  :: subglbcnc(:),subedgecnc(:)
+        
+        integer :: i
+        
+        i=0
+        
+        
+        if(elem%curr_status==intact .or. elem%curr_status==elfail1) then
+        
+            if(maxval(elem%ifailedge)>0) then
+
+                elem%curr_status=elfail2
+                
+                ! deallocate original elem
+                deallocate(elem%mainelem)
+                deallocate(elem%maincnc)
+                
+                ! allocate two subxcoh elems
+                allocate(elem%subelem(2))
+                allocate(elem%subcnc(2))
+                allocate(subglbcnc(2))
+                allocate(subedgecnc(2))
+                
+                do i=1, 2
+                    allocate(elem%subcnc(i)%array(16))
+                    allocate(subglbcnc(i)%array(16))
+                    allocate(subedgecnc(i)%array(4))
+                    elem%subcnc(i)%array=0
+                    subglbcnc(i)%array=0
+                    subedgecnc(i)%array=0
+                end do
+                
+                ! local connec of two subxcoh elems
+                elem%subcnc(1)%array=[1,2,3,4,5,6,7,8,17,18,19,20,21,22,23,24]
+                elem%subcnc(2)%array=[6,5,8,7,2,1,4,3,10,9,16,15,14,13,12,11]
+                
+                ! glb connec of two subxcoh elems
+                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+                subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
+                
+                ! glb edge cnc of two subxcoh elems
+                subedgecnc(1)%array=elem%edgecnc([5,6,7,8])
+                subedgecnc(2)%array=elem%edgecnc([1,4,3,2])
+                
+                ! prepare two subxcoh elems
+                call prepare(elem%subelem(1),key=0,matkey=elem%matkey,&
+                & nodecnc=subglbcnc(1)%array,edgecnc=subedgecnc(1)%array)
+                call prepare(elem%subelem(2),key=0,matkey=elem%matkey,&
+                & nodecnc=subglbcnc(2)%array,edgecnc=subedgecnc(2)%array)
+                
+                ! update edge status array of two sub elems
+                call update_edgestatus(elem)
                 
             end if
             
-            ! check if elem has started to fail; if so, no more edge status partitioning later
-            call extract(elem%mainelem(1),curr_status=mainelstat)
-            
-            
-            if(mainelstat>intact) then
-            ! if elem has reached failure onset, then update curr status; no edge status partition
-                elstat=elfail1
-                elem%curr_status=elstat
-                ! reaching here, elem curr status is elfail1
-            else
-            ! if elem has not reached failure initiation, then
-            ! check edge status, and partition into 2 subxcoh elems if any edge status is not intact
-                if(maxval(elem%ifailedge)>0) then
-                    elstat=elfail2
-                    elem%curr_status=elstat
-                    
-                    ! deallocate original elem
-                    deallocate(elem%mainelem)
-                    deallocate(elem%maincnc)
-                    
-                    ! allocate two subxcoh elems
-                    allocate(elem%subelem(2))
-                    allocate(elem%subcnc(2))
-                    allocate(subglbcnc(2))
-                    allocate(subedgecnc(2))
-                    do i=1, 2
-                        allocate(elem%subcnc(i)%array(16))
-                        allocate(subglbcnc(i)%array(16))
-                        allocate(subedgecnc(i)%array(4))
-                        elem%subcnc(i)%array=0
-                        subglbcnc(i)%array=0
-                        subedgecnc(i)%array=0
-                    end do
-                    
-                    ! local connec of two subxcoh elems
-                    elem%subcnc(1)%array=[1,2,3,4,5,6,7,8,17,18,19,20,21,22,23,24]
-                    elem%subcnc(2)%array=[6,5,8,7,2,1,4,3,10,9,16,15,14,13,12,11]
-                    
-                    ! glb connec of two subxcoh elems
-                    subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
-                    subglbcnc(2)%array(:)=elem%nodecnc(elem%subcnc(2)%array(:))
-                    
-                    ! glb edge cnc of two subxcoh elems
-                    subedgecnc(1)%array=elem%edgecnc([5,6,7,8])
-                    subedgecnc(2)%array=elem%edgecnc([1,4,3,2])
-                    
-                    ! prepare two subxcoh elems
-                    call prepare(elem%subelem(1),key=0,matkey=elem%matkey,&
-                    & nodecnc=subglbcnc(1)%array,edgecnc=subedgecnc(1)%array)
-                    call prepare(elem%subelem(2),key=0,matkey=elem%matkey,&
-                    & nodecnc=subglbcnc(2)%array,edgecnc=subedgecnc(2)%array)
-                    
-                end if
-                ! reaching here, elem curr status is either intact or elfail2
-            end if  
-         
+        else
+            write(msg_file,*) 'unsupported elstat in xcoh partition!'
+            call exit_function
         end if
-        ! reaching here, elem curr status is either intact, elfail1 or efail2       
-            
-
-        ! if elem has already been partitioned into 2 subxcoh elems,
-        ! update their ifailedge arrays and elem curr status
-        if(elstat==elfail2) then 
         
+        if(allocated(subglbcnc)) deallocate(subglbcnc)
+        if(allocated(subedgecnc)) deallocate(subedgecnc)
+
+    end subroutine partition
+     
+  
+  
+    subroutine update_edgestatus(elem)
+    
+        type(xcoh_element), intent(inout) :: elem
+        
+        
+        integer :: subelstat1, subelstat2, nfe1, nfe2
+        integer, allocatable :: ifailedge1(:), ifailedge2(:)
+        integer :: i
+        
+        subelstat1=0; subelstat2=0; nfe1=0; nfe2=0
+        i=0
+        
+        
+        if(elem%curr_status==elfail2) then
+    
             call extract(elem%subelem(1),curr_status=subelstat1)
             call extract(elem%subelem(2),curr_status=subelstat2)
             
+            
+            if(subelstat1==elfail2 .and. subelstat2==elfail2) then
             ! if both subxcoh elems have reached final partition state, 
-            ! then no update is needed;
-            if(subelstat1>=elfail1 .and. subelstat2>=elfail1) then
-                elstat=elfail3
-                elem%curr_status=elstat
+            ! then update elstat to elfail3 and no ifailedge update is needed;
+                elem%curr_status=elfail3
+                
             else
-        
-                ! update ifailedge arrays of two subxcoh elems
+            ! update ifailedge arrays of two subxcoh elems
+                
                 allocate(ifailedge1(4)); ifailedge1=0
                 allocate(ifailedge2(4)); ifailedge2=0
                 
@@ -364,24 +429,36 @@ module xcoh_element_module
                     end select   
                 end do
                 
-                if(subelstat1<elfail1) call update(elem%subelem(1),ifailedge=ifailedge1)
-                if(subelstat2<elfail1) call update(elem%subelem(2),ifailedge=ifailedge2)  
+                if(subelstat1<elfail2) call update(elem%subelem(1),ifailedge=ifailedge1)
+                if(subelstat2<elfail2) call update(elem%subelem(2),ifailedge=ifailedge2)  
 
             end if
+    
+        else
+            write(msg_file,*)'unsupported elstat value in xcoh update edge status!'
+            call exit_function
         end if
-
-
-        !---------------------------------------------------------------------!
-        !       integrate and assemble sub element system arrays
-        !---------------------------------------------------------------------!        
-
-		! make sure only the intended elstat values are present here
-		if(.not.(elstat==intact .or. elstat==elfail1 .or. elstat==elfail2 &
-		& .or. elstat==elfail3)) then
-			write(msg_file,*)'unsupported elstat value in xcoh elem module'
-			call exit_function
-		end if
-
+        
+        if(allocated(ifailedge1)) deallocate(ifailedge1)
+        if(allocated(ifailedge2)) deallocate(ifailedge2)
+    
+    end subroutine update_edgestatus
+  
+  
+  
+    subroutine integrate_assemble(elem,K_matrix,F_vector) 
+    !---------------------------------------------------------------------!
+    !       integrate and assemble sub element system arrays
+    !---------------------------------------------------------------------!        
+    	! - passed in variables   
+    	type(xcoh_element), intent(inout)	:: elem
+    	real(kind=dp), 	intent(inout)			:: K_matrix(:,:), F_vector(:)
+    	! - local variables
+    	real(kind=dp),	allocatable           	:: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
+    	integer, 		allocatable 			:: dofcnc(:)
+        integer :: i,j,l
+        
+        i=0;j=0;l=0
         
         ! empty K and F for reuse
         K_matrix=zero; F_vector=zero  
@@ -416,6 +493,7 @@ module xcoh_element_module
                         dofcnc((j-1)*ndim+l)=(elem%subcnc(i)%array(j)-1)*ndim+l
                     end do
                 end do
+                ! each subxcoh elem contributes to half(in weight) of the system matrices
                 call assembleKF(K_matrix,F_vector,half*Ki,half*Fi,dofcnc)
                 deallocate(Ki)
                 deallocate(Fi)
@@ -426,23 +504,12 @@ module xcoh_element_module
             write(msg_file,*)'elem not allocated in xcoh element module!'
             call exit_function
         end if
-                
         
-        !---------------------------------------------------------------------!
-        !               deallocate local arrays 
-        !---------------------------------------------------------------------!
         if(allocated(Ki)) deallocate(Ki)
         if(allocated(Fi)) deallocate(Fi)
-        if(allocated(mainglbcnc)) deallocate(mainglbcnc)
-        if(allocated(subglbcnc)) deallocate(subglbcnc)
-        if(allocated(subedgecnc)) deallocate(subedgecnc)
         if(allocated(dofcnc)) deallocate(dofcnc)
-        if(allocated(ifailedge1)) deallocate(ifailedge1)
-        if(allocated(ifailedge2)) deallocate(ifailedge2)
-    
- 
-    end subroutine integrate_xcoh_element
-    
-     
+                
+    end subroutine integrate_assemble 
+  
   
 end module xcoh_element_module

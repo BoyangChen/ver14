@@ -53,9 +53,9 @@
       & Dtt=1000000.0_dp,& 
       & Dll=1000000.0_dp),& 
       & interface_strength(& 
-      & tau_nc=30.0_dp,& 
-      & tau_tc=45.0_dp,& 
-      & tau_lc=45.0_dp),& 
+      & tau_nc=60.0_dp,& 
+      & tau_tc=90.0_dp,& 
+      & tau_lc=90.0_dp),& 
       & interface_toughness(& 
       & Gnc=0.293_dp,& 
       & Gtc=0.631_dp,& 

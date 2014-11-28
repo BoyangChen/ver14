@@ -217,25 +217,12 @@ module subxcoh_element_module
         
         integer :: i,j,l, elstat, subelstat
         
-        character(len=eltypelength) ::  subeltype
+        
            
         ! - glb clock step and increment no. extracted from glb clock module
         integer :: curr_step, curr_inc
         logical :: last_converged               ! true if last iteration has converged: a new increment/step has started
   
-        ! real and integer failure variables
-        real(dp) :: rfvar
-        integer :: ifvar
-        
-        ! coh elem arrays
-        type(coh3d6_element),allocatable :: subcoh3d6(:)
-        type(coh3d8_element),allocatable :: subcoh3d8(:)
-        
-        ! intg point arrays
-        type(integration_point), allocatable :: igpnt(:) ! intg point array
-        
-        ! failure variables extracted from ig point sdv array
-        type(sdv_array),allocatable :: fsdv(:) 
   
     
         ! initialize K & F
@@ -243,12 +230,26 @@ module subxcoh_element_module
         K_matrix=zero; F_vector=zero
         
         ! initialize local variables
-        rfvar=zero; ifvar=0
         i=0; j=0; l=0
-        elstat=0; subelstat=0; subeltype=''
+        elstat=0; subelstat=0
         curr_step=0; curr_inc=0
         last_converged=.false.
 
+        ! assign 1 coh3d8 subelem if not yet done
+        if(.not.allocated(elem%subelem)) then 
+            allocate(elem%subelem(1))
+            allocate(elem%subcnc(1))
+            allocate(elem%subcnc(1)%array(nndrl))   ! coh3d8 elem
+            allocate(subglbcnc(1))
+            allocate(subglbcnc(1)%array(nndrl))
+            ! sub elm 1 connec
+            elem%subcnc(1)%array=[(i, i=1,nndrl)]
+            subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
+            ! create sub elements
+            call prepare(elem%subelem(1),eltype='coh3d8', matkey=elem%matkey, &
+            & glbcnc=subglbcnc(1)%array)
+        end if
+            
 
         ! - extract curr step and inc values from glb clock module
         call extract_glb_clock(kstep=curr_step,kinc=curr_inc)
@@ -259,7 +260,6 @@ module subxcoh_element_module
             elem%nstep = curr_step
             elem%ninc = curr_inc
         end if
-
         
         
 
@@ -273,42 +273,21 @@ module subxcoh_element_module
         ! if elem is intact
         if(elstat==intact) then
         
-            ! assign 1 coh3d8 subelem if not yet done
-            if(.not.allocated(elem%subelem)) then 
-                allocate(elem%subelem(1))
-                allocate(elem%subcnc(1))
-                allocate(elem%subcnc(1)%array(nndrl))   ! coh3d8 elem
-                allocate(subglbcnc(1))
-                allocate(subglbcnc(1)%array(nndrl))
-                ! sub elm 1 connec
-                elem%subcnc(1)%array=[(i, i=1,nndrl)]
-                subglbcnc(1)%array(:)=elem%nodecnc(elem%subcnc(1)%array(:))
-                ! create sub elements
-                call prepare(elem%subelem(1),eltype='coh3d8', matkey=elem%matkey, &
-                & glbcnc=subglbcnc(1)%array)
-            end if
-            
-            ! check if elem has started to fail; if so, no more edge status partitioning later
+            ! check if elem has started to fail
             call extract(elem%subelem(1),curr_status=subelstat)
             
             if(subelstat>intact) then 
-            ! if elem reached failure initiation; for now, no edge status partition
-            ! ideally, should check for edge status partition, then transfer intg point sdv arrays
+            ! if elem reached delamination onset
                 elstat=elfail1
                 elem%curr_status=elstat
-                ! reaching here, elem curr status is elfail1
-            else
-            ! if elem has not reached failure initiation, 
-            ! then check for edge status and repartition into sub elems if necessary
-                call edge_status_partition(elem)
-                ! reaching here, elem curr status is either intact (no partition) or elfail2 (partitioned)
             end if
             
+            call edge_status_partition(elem)
             call integrate_assemble(elem,K_matrix,F_vector) 
             
     	else if(elstat==elfail1) then
-    	! elem already delaminated; at the moment, go straight to integrate and assemble
-    	! ideally, should do edge status partition, then transfer intg point sdv arrays
+    	! elem already delaminated
+            call edge_status_partition(elem)
     		call integrate_assemble(elem,K_matrix,F_vector) 
     	
     	else if(elstat==elfail2) then
@@ -325,76 +304,18 @@ module subxcoh_element_module
         end if
         
         
-        ! update subxcoh elem sdv for output
-        if(.not.allocated(elem%sdv)) then
-            allocate(elem%sdv(1))
-            allocate(elem%sdv(1)%i(1))  ! fstat
-            allocate(elem%sdv(1)%r(1))  ! dm
-            elem%sdv(1)%i(1)=0
-            elem%sdv(1)%r(1)=0
-        end if
-                    
-        ! loop over all sub elems of xbrick and write each sub elem's failure status individually
-        do i=1,size(elem%subelem)           
-        
-            ifvar=0
-            rfvar=zero
-            
-            ! extract this subelem type
-            call extract(elem%subelem(i),eltype=subeltype)
-            
-            ! extract this subelem intg points based on subelem type
-            select case(subeltype)                       
-                case('coh3d6')
-                    call extract(elem%subelem(i),coh3d6=subcoh3d6)
-                    call extract(subcoh3d6(1),ig_point=igpnt)                        
-                case('coh3d8')
-                    call extract(elem%subelem(i),coh3d8=subcoh3d8)
-                    call extract(subcoh3d8(1),ig_point=igpnt)                       
-                case default
-                    write(msg_file,*)'subelem type not supported in subxcoh elem!'
-                    call exit_function
-            end select  
-            
-            ! sum up useful sdv values of all intg points into ifvar and rfvar
-            do j=1,size(igpnt)
-                call extract(igpnt(j),sdv=fsdv)
-                if(allocated(fsdv)) then
-                    ! update sdv values
-                    if(allocated(fsdv(2)%i)) ifvar=ifvar+fsdv(2)%i(1)
-                    if(allocated(fsdv(2)%r)) rfvar=rfvar+fsdv(2)%r(1)
-                
-                    deallocate(fsdv)
-                end if
-            end do 
-            ! average fvar values in this sub element
-            ifvar=int(ifvar/size(igpnt))
-            rfvar=rfvar/size(igpnt)
-            
-            ! update this fvar to subxcoh sdv
-            elem%sdv(1)%i(1)=max(elem%sdv(1)%i(1),ifvar)
-            elem%sdv(1)%r(1)=max(elem%sdv(1)%r(1),rfvar)
-            
-            ! deallocate arrays for re-use
-            if(allocated(igpnt))     deallocate(igpnt)
-            if(allocated(fsdv))      deallocate(fsdv)
-            if(allocated(subcoh3d6)) deallocate(subcoh3d6)
-            if(allocated(subcoh3d8)) deallocate(subcoh3d8)
 
-        end do
-        
-        
-            
+        !---------------------------------------------------------------------!
+        !               update elem sdv for output 
+        !---------------------------------------------------------------------!
+        call update_sdv(elem)
+  
         
         !---------------------------------------------------------------------!
         !               deallocate local arrays 
         !---------------------------------------------------------------------!
         
         if(allocated(subglbcnc)) deallocate(subglbcnc)
-        if(allocated(igpnt))     deallocate(igpnt)
-        if(allocated(fsdv))      deallocate(fsdv)
-        if(allocated(subcoh3d6)) deallocate(subcoh3d6)
-        if(allocated(subcoh3d8)) deallocate(subcoh3d8)
     
  
     end subroutine integrate_subxcoh_element
@@ -1422,6 +1343,106 @@ module subxcoh_element_module
   	end subroutine update_mnode
   
   
+  
+  
+  
+    subroutine update_sdv(elem)
+    
+    	! passed-in variables
+    	type(subxcoh_element),    intent(inout)   :: elem
+    	
+    	! local variables   
+        character(len=eltypelength) ::  subeltype
+    
+        ! real and integer failure variables
+        real(dp) :: rfvar
+        integer :: ifvar
+        
+        ! coh elem arrays
+        type(coh3d6_element),allocatable :: subcoh3d6(:)
+        type(coh3d8_element),allocatable :: subcoh3d8(:)
+        
+        ! intg point arrays
+        type(integration_point), allocatable :: igpnt(:) ! intg point array
+        
+        ! failure variables extracted from ig point sdv array
+        type(sdv_array),allocatable :: fsdv(:) 
+        
+        integer :: i,j,l
+        
+        
+        
+        ! initialize local variables
+        subeltype=''
+        rfvar=zero; ifvar=0
+        i=0; j=0; l=0
+        
+    
+        ! update subxcoh elem sdv for output
+        if(.not.allocated(elem%sdv)) then
+            allocate(elem%sdv(1))
+            allocate(elem%sdv(1)%i(1))  ! fstat
+            allocate(elem%sdv(1)%r(1))  ! dm
+            elem%sdv(1)%i(1)=0
+            elem%sdv(1)%r(1)=0
+        end if
+                    
+                    
+        do i=1,size(elem%subelem)           
+        
+            ifvar=0
+            rfvar=zero
+            
+            ! extract this subelem type
+            call extract(elem%subelem(i),eltype=subeltype)
+            
+            ! extract this subelem intg points based on subelem type
+            select case(subeltype)                       
+                case('coh3d6')
+                    call extract(elem%subelem(i),coh3d6=subcoh3d6)
+                    call extract(subcoh3d6(1),ig_point=igpnt)                        
+                case('coh3d8')
+                    call extract(elem%subelem(i),coh3d8=subcoh3d8)
+                    call extract(subcoh3d8(1),ig_point=igpnt)                       
+                case default
+                    write(msg_file,*)'subelem type not supported in subxcoh elem!'
+                    call exit_function
+            end select  
+            
+            ! sum up useful sdv values of all intg points into ifvar and rfvar
+            do j=1,size(igpnt)
+                call extract(igpnt(j),sdv=fsdv)
+                if(allocated(fsdv)) then
+                    ! update sdv values
+                    if(allocated(fsdv(2)%i)) ifvar=ifvar+fsdv(2)%i(1)
+                    if(allocated(fsdv(2)%r)) rfvar=rfvar+fsdv(2)%r(1)
+                
+                    deallocate(fsdv)
+                end if
+            end do 
+            ! average fvar values in this sub element
+            ifvar=int(ifvar/size(igpnt))
+            rfvar=rfvar/size(igpnt)
+            
+            ! update this fvar to subxcoh sdv
+            elem%sdv(1)%i(1)=max(elem%sdv(1)%i(1),ifvar)
+            elem%sdv(1)%r(1)=max(elem%sdv(1)%r(1),rfvar)
+            
+            ! deallocate arrays for re-use
+            if(allocated(igpnt))     deallocate(igpnt)
+            if(allocated(fsdv))      deallocate(fsdv)
+            if(allocated(subcoh3d6)) deallocate(subcoh3d6)
+            if(allocated(subcoh3d8)) deallocate(subcoh3d8)
+
+        end do
+        
+        
+        if(allocated(igpnt))     deallocate(igpnt)
+        if(allocated(fsdv))      deallocate(fsdv)
+        if(allocated(subcoh3d6)) deallocate(subcoh3d6)
+        if(allocated(subcoh3d8)) deallocate(subcoh3d8)
+    
+    end subroutine update_sdv
   
   
 end module subxcoh_element_module
