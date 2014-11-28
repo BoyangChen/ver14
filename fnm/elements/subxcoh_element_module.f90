@@ -511,12 +511,12 @@ module subxcoh_element_module
 
 !-----------------------------------------------------------------------!
 !               EXTRACTION INTERFACE
-!           extract variables from global libraries
+!           extract variables from elem components and global libraries
 !-----------------------------------------------------------------------!
         ! extract elem status variable
         elstat=elem%curr_status
         
-        ! no need to update if elem is already in failed partition (2 broken/coh broken edges)
+        ! no need to update partition if elem is already in failed partition (2 broken edges)
         if(elstat==elfail2) return
 
         ! extract edge status variables from glb edge library
@@ -527,29 +527,29 @@ module subxcoh_element_module
             call extract(lib_node(elem%nodecnc(i)),x=coord(i)%array)
         end do
 
-
-        ! extract elem failed edges' indices (this info is passed from adj. ply elem)
+        ! extract elem failed edges' indices 
+        ! this info is passed from adj. ply elem in the xcoh module
         ifedg=elem%ifailedge
 
 !-----------------------------------------------------------------------!
 !       procedure calculations (pure)
 !-----------------------------------------------------------------------!
     
-!       find and store the broken edges' variables
+!       find the no. of broken edges
         do i=1,size(ifedg)
             if(ifedg(i)>0) nfailedge=nfailedge+1
         end do
     
-        
+!       update elstat w.r.t no. of failed edges and edge status
         if(nfailedge==0) then
-        ! remains intact, do nothing
+        ! adj. ply elem remains intact, do nothing
             if(elstat/=intact) then
                 write(msg_file,*)'inconsistency btw elstat and nfailedge in subxcoh elem!'
                 call exit_function
             end if
             
         else if(nfailedge==1) then 
-        ! adj. ply elem is transition partition
+        ! adj. ply elem is in transition partition; edge status should be egtrans
         
             if(edgstat(ifedg(1))==egtrans) then
               ! edge marks the refinement end and the trans elem start 
@@ -557,7 +557,7 @@ module subxcoh_element_module
                 elstat=eltrans
                 
             else
-              ! ifailedge is not correct
+              ! ifailedge is not correct / edgstat not correct
               write(msg_file,*)'wrong edge status for nfailedge=1 in subxcoh'
               call exit_function
         
@@ -565,9 +565,7 @@ module subxcoh_element_module
             
         else if(nfailedge==2) then
         ! adj. ply elem could be cracked, wake, tip, refinement elem
-        ! only update the elstat, not the edge status, nor the crack tip coords
-        
-            !**** the partitioning of subxcoh elem is entirely based on the bottom four edges ****         
+        ! only update the elstat, not the edge status, nor the crack tip coords      
             
             jbe1=ifedg(1)
             jbe2=ifedg(2)
@@ -1256,151 +1254,162 @@ module subxcoh_element_module
     		write(msg_file,*)'sub elems not allocated in subxcoh update mnode!'
     		call exit_function
     	end if
-    	
-    	nsub=size(elem%subelem)
-    	
-    	select case(nsub)
-                case(2)
-                ! two coh3d8 sub elems
-
-                    allocate(subglbcnc(nsub))
-                    
-                    ! allocate 8 numerical nodes for sub elems
-                    do j=1, nsub
-                        allocate(subglbcnc(j)%array(8))
-                        subglbcnc(j)%array=0
-                        subglbcnc(j)%array(:)=elem%nodecnc(elem%subcnc(j)%array(:))
-                    end do
-                    
-                    !*** sub elem 1 mnode update
-                    
-					call extract(elem%subelem(1),Tmatrix=Tmatrix,mnode=mnode)                                       
-                    
-                    ! extract ratio values from Tmatrix
-                    tratio1=Tmatrix(2,1)
-                    tratio2=Tmatrix(3,3)
-                    
-                    ! update the mnode array
-                    mnode(1)=lib_node(subglbcnc(1)%array(1))
-                    mnode(2)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
-                    mnode(3)=tratio2*lib_node(subglbcnc(1)%array(3))+(one-tratio2)*lib_node(subglbcnc(1)%array(4))
-                    mnode(4)=lib_node(subglbcnc(1)%array(4))
-                    mnode(5)=lib_node(subglbcnc(1)%array(5))
-                    mnode(6)=lib_node(subglbcnc(1)%array(6))
-                    mnode(7)=lib_node(subglbcnc(1)%array(7))
-                    mnode(8)=lib_node(subglbcnc(1)%array(8))                  
-                    
-                    call update(elem%subelem(1),mnode=mnode)
-                                     
-                    
-                    !*** sub elm 2 mnode update
-                    
-                    call extract(elem%subelem(2),Tmatrix=Tmatrix,mnode=mnode) 
-                    
-                    tratio1=Tmatrix(1,1)
-                    tratio2=Tmatrix(4,3)
-                    
-                    ! update the mnode array
-                    mnode(1)=tratio1*lib_node(subglbcnc(2)%array(1))+(one-tratio1)*lib_node(subglbcnc(2)%array(2))
-                    mnode(2)=lib_node(subglbcnc(2)%array(2))
-                    mnode(3)=lib_node(subglbcnc(2)%array(3))
-                    mnode(4)=tratio2*lib_node(subglbcnc(2)%array(3))+(one-tratio2)*lib_node(subglbcnc(2)%array(4))
-                    mnode(5)=lib_node(subglbcnc(2)%array(5))
-                    mnode(6)=lib_node(subglbcnc(2)%array(6))
-                    mnode(7)=lib_node(subglbcnc(2)%array(7))
-                    mnode(8)=lib_node(subglbcnc(2)%array(8))
-                    
-                    call update(elem%subelem(2),mnode=mnode)                
-                    
-                    
-                    
-                case(4)
-                ! four coh3d6 sub elems
-
-
-                    if(allocated(subglbcnc)) deallocate(subglbcnc)
-                    allocate(subglbcnc(nsub))
-                    do j=1, nsub   ! coh3d6 elem cnc
-                        allocate(subglbcnc(j)%array(7))
-                        subglbcnc(j)%array=0
-                        subglbcnc(j)%array(:)=elem%nodecnc(elem%subcnc(j)%array(:))
-                    end do
-
-                                
-                    
-                    !*** sub elm 1 connec
-                    
-                    call extract(elem%subelem(1),Tmatrix=Tmatrix,mnode=mnode)
-                    
-                    tratio1=Tmatrix(1,1)
-                    tratio2=Tmatrix(3,2)
-                    
-                    mnode(1)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
-                    mnode(2)=lib_node(subglbcnc(1)%array(2))
-                    mnode(3)=tratio2*lib_node(subglbcnc(1)%array(2))+(one-tratio2)*lib_node(subglbcnc(1)%array(3))
-                    mnode(4)=lib_node(subglbcnc(1)%array(5))
-                    mnode(5)=lib_node(subglbcnc(1)%array(6))
-                    mnode(6)=lib_node(subglbcnc(1)%array(7))
-                    
-                    call update(elem%subelem(1),mnode=mnode)
-                    
  
-                    
-                    !*** sub elm 2 connec
-                    
-                    call extract(elem%subelem(2),Tmatrix=Tmatrix,mnode=mnode)
-                    
-                    tratio2=Tmatrix(1,1)
-                    
-                    mnode(1)=tratio2*lib_node(subglbcnc(2)%array(1))+(one-tratio2)*lib_node(subglbcnc(2)%array(2))
-                    mnode(2)=lib_node(subglbcnc(2)%array(2))
-                    mnode(3)=lib_node(subglbcnc(2)%array(3))
-                    mnode(4)=lib_node(subglbcnc(2)%array(5))
-                    mnode(5)=lib_node(subglbcnc(2)%array(6))
-                    mnode(6)=lib_node(subglbcnc(2)%array(7))        
-                    
-                    call update(elem%subelem(2),mnode=mnode)
+        ! currently only support elem partition elfail2
+        select case(elem%curr_status)
+        
+            case(elfail2)
+   	
+                nsub=size(elem%subelem)
+                
+                select case(nsub)
+                        case(2)
+                        ! two coh3d8 sub elems
 
-                    
-                    
-                    
-                    !*** sub elm 3 connec
-                    
-                    call extract(elem%subelem(3),Tmatrix=Tmatrix,mnode=mnode)
-                    
-                    tratio1=Tmatrix(3,2)
-                    
-                    mnode(1)=lib_node(subglbcnc(3)%array(1))
-                    mnode(2)=lib_node(subglbcnc(3)%array(2))
-                    mnode(3)=tratio1*lib_node(subglbcnc(3)%array(2))+(one-tratio1)*lib_node(subglbcnc(3)%array(3))
-                    mnode(4)=lib_node(subglbcnc(3)%array(5))
-                    mnode(5)=lib_node(subglbcnc(3)%array(6))
-                    mnode(6)=lib_node(subglbcnc(3)%array(7))
-      
-                    call update(elem%subelem(3),mnode=mnode)
-                    
-                    
-                    
-                    !*** sub elm 4 connec
-                    
-                    call extract(elem%subelem(4),Tmatrix=Tmatrix,mnode=mnode)
-                    
-                    tratio1=Tmatrix(1,1)
-                    tratio2=Tmatrix(2,2)
-                    
-                    mnode(1)=tratio1*lib_node(subglbcnc(4)%array(1))+(one-tratio1)*lib_node(subglbcnc(4)%array(2))
-                    mnode(2)=tratio2*lib_node(subglbcnc(4)%array(2))+(one-tratio2)*lib_node(subglbcnc(4)%array(3))
-                    mnode(3)=lib_node(subglbcnc(4)%array(4))
-                    mnode(4)=lib_node(subglbcnc(4)%array(5))
-                    mnode(5)=lib_node(subglbcnc(4)%array(6))
-                    mnode(6)=lib_node(subglbcnc(4)%array(7))          
-                    
-                    call update(elem%subelem(4),mnode=mnode)                   
-                    
-                    
-                case default
-                    write(msg_file,*)'wrong nbulk in update subcnc subxcoh'
-                    call exit_function
+                            allocate(subglbcnc(nsub))
+                            
+                            ! allocate 8 numerical nodes for sub elems
+                            do j=1, nsub
+                                allocate(subglbcnc(j)%array(8))
+                                subglbcnc(j)%array=0
+                                subglbcnc(j)%array(:)=elem%nodecnc(elem%subcnc(j)%array(:))
+                            end do
+                            
+                            !*** sub elem 1 mnode update
+                            
+                            call extract(elem%subelem(1),Tmatrix=Tmatrix,mnode=mnode)                                       
+                            
+                            ! extract ratio values from Tmatrix
+                            tratio1=Tmatrix(2,1)
+                            tratio2=Tmatrix(3,3)
+                            
+                            ! update the mnode array
+                            mnode(1)=lib_node(subglbcnc(1)%array(1))
+                            mnode(2)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
+                            mnode(3)=tratio2*lib_node(subglbcnc(1)%array(3))+(one-tratio2)*lib_node(subglbcnc(1)%array(4))
+                            mnode(4)=lib_node(subglbcnc(1)%array(4))
+                            mnode(5)=lib_node(subglbcnc(1)%array(5))
+                            mnode(6)=lib_node(subglbcnc(1)%array(6))
+                            mnode(7)=lib_node(subglbcnc(1)%array(7))
+                            mnode(8)=lib_node(subglbcnc(1)%array(8))                  
+                            
+                            call update(elem%subelem(1),mnode=mnode)
+                                             
+                            
+                            !*** sub elm 2 mnode update
+                            
+                            call extract(elem%subelem(2),Tmatrix=Tmatrix,mnode=mnode) 
+                            
+                            tratio1=Tmatrix(1,1)
+                            tratio2=Tmatrix(4,3)
+                            
+                            ! update the mnode array
+                            mnode(1)=tratio1*lib_node(subglbcnc(2)%array(1))+(one-tratio1)*lib_node(subglbcnc(2)%array(2))
+                            mnode(2)=lib_node(subglbcnc(2)%array(2))
+                            mnode(3)=lib_node(subglbcnc(2)%array(3))
+                            mnode(4)=tratio2*lib_node(subglbcnc(2)%array(3))+(one-tratio2)*lib_node(subglbcnc(2)%array(4))
+                            mnode(5)=lib_node(subglbcnc(2)%array(5))
+                            mnode(6)=lib_node(subglbcnc(2)%array(6))
+                            mnode(7)=lib_node(subglbcnc(2)%array(7))
+                            mnode(8)=lib_node(subglbcnc(2)%array(8))
+                            
+                            call update(elem%subelem(2),mnode=mnode)                
+                            
+                            
+                            
+                        case(4)
+                        ! four coh3d6 sub elems
+
+
+                            if(allocated(subglbcnc)) deallocate(subglbcnc)
+                            allocate(subglbcnc(nsub))
+                            do j=1, nsub   ! coh3d6 elem cnc
+                                allocate(subglbcnc(j)%array(7))
+                                subglbcnc(j)%array=0
+                                subglbcnc(j)%array(:)=elem%nodecnc(elem%subcnc(j)%array(:))
+                            end do
+
+                                        
+                            
+                            !*** sub elm 1 connec
+                            
+                            call extract(elem%subelem(1),Tmatrix=Tmatrix,mnode=mnode)
+                            
+                            tratio1=Tmatrix(1,1)
+                            tratio2=Tmatrix(3,2)
+                            
+                            mnode(1)=tratio1*lib_node(subglbcnc(1)%array(1))+(one-tratio1)*lib_node(subglbcnc(1)%array(2))
+                            mnode(2)=lib_node(subglbcnc(1)%array(2))
+                            mnode(3)=tratio2*lib_node(subglbcnc(1)%array(2))+(one-tratio2)*lib_node(subglbcnc(1)%array(3))
+                            mnode(4)=lib_node(subglbcnc(1)%array(5))
+                            mnode(5)=lib_node(subglbcnc(1)%array(6))
+                            mnode(6)=lib_node(subglbcnc(1)%array(7))
+                            
+                            call update(elem%subelem(1),mnode=mnode)
+                            
+         
+                            
+                            !*** sub elm 2 connec
+                            
+                            call extract(elem%subelem(2),Tmatrix=Tmatrix,mnode=mnode)
+                            
+                            tratio2=Tmatrix(1,1)
+                            
+                            mnode(1)=tratio2*lib_node(subglbcnc(2)%array(1))+(one-tratio2)*lib_node(subglbcnc(2)%array(2))
+                            mnode(2)=lib_node(subglbcnc(2)%array(2))
+                            mnode(3)=lib_node(subglbcnc(2)%array(3))
+                            mnode(4)=lib_node(subglbcnc(2)%array(5))
+                            mnode(5)=lib_node(subglbcnc(2)%array(6))
+                            mnode(6)=lib_node(subglbcnc(2)%array(7))        
+                            
+                            call update(elem%subelem(2),mnode=mnode)
+
+                            
+                            
+                            
+                            !*** sub elm 3 connec
+                            
+                            call extract(elem%subelem(3),Tmatrix=Tmatrix,mnode=mnode)
+                            
+                            tratio1=Tmatrix(3,2)
+                            
+                            mnode(1)=lib_node(subglbcnc(3)%array(1))
+                            mnode(2)=lib_node(subglbcnc(3)%array(2))
+                            mnode(3)=tratio1*lib_node(subglbcnc(3)%array(2))+(one-tratio1)*lib_node(subglbcnc(3)%array(3))
+                            mnode(4)=lib_node(subglbcnc(3)%array(5))
+                            mnode(5)=lib_node(subglbcnc(3)%array(6))
+                            mnode(6)=lib_node(subglbcnc(3)%array(7))
+              
+                            call update(elem%subelem(3),mnode=mnode)
+                            
+                            
+                            
+                            !*** sub elm 4 connec
+                            
+                            call extract(elem%subelem(4),Tmatrix=Tmatrix,mnode=mnode)
+                            
+                            tratio1=Tmatrix(1,1)
+                            tratio2=Tmatrix(2,2)
+                            
+                            mnode(1)=tratio1*lib_node(subglbcnc(4)%array(1))+(one-tratio1)*lib_node(subglbcnc(4)%array(2))
+                            mnode(2)=tratio2*lib_node(subglbcnc(4)%array(2))+(one-tratio2)*lib_node(subglbcnc(4)%array(3))
+                            mnode(3)=lib_node(subglbcnc(4)%array(4))
+                            mnode(4)=lib_node(subglbcnc(4)%array(5))
+                            mnode(5)=lib_node(subglbcnc(4)%array(6))
+                            mnode(6)=lib_node(subglbcnc(4)%array(7))          
+                            
+                            call update(elem%subelem(4),mnode=mnode)                   
+                            
+                            
+                        case default
+                            write(msg_file,*)'wrong nbulk in update subcnc subxcoh'
+                            call exit_function
+                end select
+
+            case default
+                write(msg_file,*)'partition status not supported in subxcoh update mnode!'
+                call exit_function
+                
         end select
             
         ! deallocate local array

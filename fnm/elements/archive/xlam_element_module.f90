@@ -6,13 +6,13 @@ module xlam_element_module
     use lib_mat_module                  ! global material library
     use lib_bcd_module                  ! global bcd library
     use xbrick_element_module
-    use xcoh_element_module
+    use coh3d8_element_module
 
     implicit none
     private
     
     ! parameters for no. nodes of ply-block element (xbrick) and interface element (coh3d8)
-    integer, parameter :: ndim=3, nndplyblk=24, nedgplyblk=8, nndinterf=24, nedginterf=8, ncorner=8
+    integer, parameter :: ndim=3, nndplyblk=24, nedgplyblk=8, nndinterf=8, ncorner=8
     
 
     type, public :: xlam_element
@@ -29,10 +29,10 @@ module xlam_element_module
         real(dp),allocatable:: layup(:,:)   ! angle and relative thickness of all plies
     
         type(xbrick_element),allocatable :: plyblk(:)
-        type(xcoh_element),allocatable :: interf(:)
+        type(coh3d8_element),allocatable :: interf(:)
         
         type(int_alloc_array), allocatable :: plyblknodecnc(:), plyblkedgecnc(:)      ! plyblk_elem connec to parent elem nodes
-        type(int_alloc_array), allocatable :: interfnodecnc(:), interfedgecnc(:)      ! interf_elem connec to parent elem nodes
+        type(int_alloc_array), allocatable :: interfcnc(:)      ! plyblk_elem connec to parent elem nodes
     
     end type xlam_element
     
@@ -83,8 +83,7 @@ module xlam_element_module
         if(allocated(elem%interf)) deallocate(elem%interf)
         if(allocated(elem%plyblknodecnc)) deallocate(elem%plyblknodecnc)
         if(allocated(elem%plyblkedgecnc)) deallocate(elem%plyblkedgecnc)
-        if(allocated(elem%interfnodecnc)) deallocate(elem%interfnodecnc)
-        if(allocated(elem%interfedgecnc)) deallocate(elem%interfedgecnc)
+        if(allocated(elem%interfcnc)) deallocate(elem%interfcnc)
 
     end subroutine empty_xlam_element
   
@@ -94,7 +93,7 @@ module xlam_element_module
     
     
     subroutine extract_xlam_element(elem,curr_status,key,bulkmat,cohmat,interfmat,nodecnc,edgecnc,layup &
-    & ,plyblk,interf,plyblknodecnc,plyblkedgecnc,interfnodecnc,interfedgecnc)
+    & ,plyblk,interf,plyblknodecnc,plyblkedgecnc,interfcnc)
     
         type(xlam_element),intent(in)  :: elem
         
@@ -109,10 +108,10 @@ module xlam_element_module
         real(dp),allocatable, optional, intent(out):: layup(:,:)
     
         type(xbrick_element),allocatable, optional, intent(out) :: plyblk(:)
-        type(xcoh_element),allocatable, optional, intent(out) :: interf(:)
+        type(coh3d8_element),allocatable, optional, intent(out) :: interf(:)
         
         type(int_alloc_array), allocatable, optional, intent(out) :: plyblknodecnc(:), plyblkedgecnc(:)
-        type(int_alloc_array), allocatable, optional, intent(out) :: interfnodecnc(:), interfedgecnc(:)
+        type(int_alloc_array), allocatable, optional, intent(out) :: interfcnc(:)
         
         
         
@@ -171,17 +170,10 @@ module xlam_element_module
             end if
         end if
         
-        if(present(interfnodecnc)) then
-            if(allocated(elem%interfnodecnc)) then
-                allocate( interfnodecnc(size(elem%interfnodecnc)))
-                interfnodecnc=elem%interfnodecnc
-            end if
-        end if
-        
-        if(present(interfedgecnc)) then
-            if(allocated(elem%interfedgecnc)) then
-                allocate( interfedgecnc(size(elem%interfedgecnc)))
-                interfedgecnc=elem%interfedgecnc
+        if(present(interfcnc)) then
+            if(allocated(elem%interfcnc)) then
+                allocate( interfcnc(size(elem%interfcnc)))
+                interfcnc=elem%interfcnc
             end if
         end if
     
@@ -246,7 +238,7 @@ module xlam_element_module
         integer :: ndof, nplyblk, ninterf
         
         ! lcl arrays to store temporarily the glb cnc of plyblock nodes, edges, and interface nodes
-        integer :: plyblknode(nndplyblk), plyblkedge(nedgplyblk), interfnode(nndinterf), interfedge(nedginterf) 
+        integer :: plyblknode(nndplyblk), plyblkedge(nedgplyblk), interfnode(nndinterf) 
         
         ! lcl arrays to store temporarily the cnc of dofs of each sub elem to parent elem dofs
         integer, allocatable :: dofcnc(:)
@@ -264,24 +256,13 @@ module xlam_element_module
         integer :: nd1, nd2, dof0, dof1, dof2
         real(dp), allocatable :: u0(:), u1(:), u2(:)
         
-        ! interface status variable
-        integer :: interfstat
-        
-        ! interface no. failed edges and indices of failed edges
-        integer :: nfe, ifailedge(nedginterf)
-        
-        ! ifailedge array of bottom and top plyblks of an interface
-        integer, allocatable :: ifedg1(:), ifedg2(:)
-        
-        
         ! initialize local variables
         i=0; j=0; l=0
         ndof=0; nplyblk=0; ninterf=0
-        plyblknode=0; plyblkedge=0; interfnode=0; interfedge=0
+        plyblknode=0; plyblkedge=0; interfnode=0
         shellthickness=zero
         Kpn=zero
         nd1=0; nd2=0; dof0=0; dof1=0; dof2=0
-        interfstat=0; nfe=0; ifailedge=0
         
         ! penalty stiffness = 1GPa
         Kpn=1000000._dp
@@ -325,46 +306,16 @@ module xlam_element_module
             end do
             
             ! ...and interface node cnc arrays
-            allocate(elem%interfnodecnc(ninterf))
-            allocate(elem%interfedgecnc(ninterf))
+            allocate(elem%interfcnc(ninterf))
             
             do i=1, ninterf
-                allocate(elem%interfnodecnc(i)%array(nndinterf))  
-                allocate(elem%interfedgecnc(i)%array(nedginterf))  
-                
-                ! following needs to be filled (real nodes first, then flo nodes)
-                           
-                ! 1st half of interface real nodes comes from bottom plyblk elem top surface (nodes 5-8)
-                !elem%interfnodecnc(i)%array(1 : ncorner/2)=&
-                !& [( j, j=(i-1)*nndplyblk+ncorner/2+1 , (i-1)*nndplyblk+ncorner )]
-                elem%interfnodecnc(i)%array(1 : ncorner/2)=&
-                & elem%plyblknodecnc(i)%array(ncorner/2+1 : ncorner)
-                
-                ! 2nd half of interface real nodes comes from top plyblk elem bottom surface (nodes 1-4)
-                !elem%interfnodecnc(i)%array(ncorner/2+1 : ncorner)=&
-                !& [( j, j=i*nndplyblk+1 , i*nndplyblk+ncorner/2 )]    
-                elem%interfnodecnc(i)%array(ncorner/2+1 : ncorner)=&
-                & elem%plyblknodecnc(i+1)%array(1 : ncorner/2)
-                
-                ! 1st half of interface flo nodes come from bottm plyblk elem top surface (nodes 17-24)
-                !elem%interfnodecnc(i)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)=&
-                !& [( j, j=(i-1)*nndplyblk+ncorner+(nndinterf-ncorner)/2+1 , (i-1)*nndplyblk+nndinterf)]
-                elem%interfnodecnc(i)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)=&
-                & elem%plyblknodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)
-                
-                ! 2nd half of interface flo nodes come from top plyblk elem bottom surface (nodes 9-16)
-                !elem%interfnodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)=&
-                !& [( j, j=i*nndplyblk+ncorner+1 , i*nndplyblk+ncorner+(nndinterf-ncorner)/2 )] 
-                elem%interfnodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)=&
-                & elem%plyblknodecnc(i+1)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)
-                
-                ! interface bottom edges are from bottom plyblk elem top edges 
-                elem%interfedgecnc(i)%array(1 : nedginterf/2)=elem%plyblkedgecnc(i)%array(nedginterf/2+1 : nedginterf)
-                
-                ! interface top edges are from top plyblk elem bottom edges
-                elem%interfedgecnc(i)%array(nedginterf/2+1 : nedginterf)=elem%plyblkedgecnc(i+1)%array(1 : nedginterf/2)
-                
-                       
+                allocate(elem%interfcnc(i)%array(nndinterf))               
+                ! 1st half of interface nodes comes from bottom plyblk elem top surface (nodes 5-8)
+                elem%interfcnc(i)%array(1 : nndinterf/2)=&
+                & [( j, j=(i-1)*nndplyblk+nndinterf/2+1 , (i-1)*nndplyblk+nndinterf )]
+                ! 2nd half of interface nodes comes from top plyblk elem bottom surface (nodes 1-4)
+                elem%interfcnc(i)%array(nndinterf/2+1 : nndinterf)=&
+                & [( j, j=i*nndplyblk+1 , i*nndplyblk+nndinterf/2 )]           
             end do
             
             
@@ -422,12 +373,10 @@ module xlam_element_module
             ! prepare interf elems
             do i=1, ninterf
                 ! extract the glb node cnc of this interface element from elem glb cnc and interface i's local cnc
-                interfnode(:)=elem%nodecnc(elem%interfnodecnc(i)%array(:))
-                interfedge(:)=elem%edgecnc(elem%interfedgecnc(i)%array(:))
+                interfnode(:)=elem%nodecnc(elem%interfcnc(i)%array(:))
                 
-                ! prepare each interface elem (here xcoh elem type)
-                !call prepare(elem%interf(i),key=0,connec=interfnode,matkey=elem%interfmat)
-                call prepare(elem%interf(i),key=0,matkey=elem%interfmat,nodecnc=interfnode,edgecnc=interfedge)
+                ! prepare each interface elem (here coh3d8 elem type)
+                call prepare(elem%interf(i),key=0,connec=interfnode,matkey=elem%interfmat)
             end do
         
         end if
@@ -466,59 +415,6 @@ module xlam_element_module
         ! integrate cohesive elements and assemble into global matrix
 
         do i=1, ninterf
-        
-        	! extract status of this interface
-        	call extract(elem%interf(i),curr_status=interfstat)
-        	
-        	! if this interface elem has not yet reached final partition,
-        	! update its ifailedge array before integration
-        	if(interfstat<elfail3) then 
-        
-        		! extract failed edges from bottom and top plyblk elems
-        		call extract(elem%plyblk(i),ifailedge=ifedg1)
-        		call extract(elem%plyblk(i+1),ifailedge=ifedg2)
-        	
-        		! no of failed edges in this interface
-        		nfe=0
-        		ifailedge=0
-        	
-        		! pass bottom plyblk failed edge info into this interface ifailedge
-        		do j=1, size(ifedg1)
-        			select case (ifedg1(j))
-        				! upper edges failed: pass into interface ifailedge as bottom edges
-        				case(5:8)
-        					nfe=nfe+1
-        					ifailedge(nfe)=ifedg1(j)-4	
-        				! bottom edges failed: ignored	
-        				case(0:4)
-        					continue
-        				case default
-        					write(msg_file,*)'wrong failed edge index in xlam integration'
-        					call exit_function
-        			end select
-        		end do
-        	
-        		! pass top plyblk failed edge info into this interface ifailedge
-        		do j=1, size(ifedg2)
-        			select case (ifedg2(j))
-        				! bottom edges failed: pass into interface ifailedge as top edges
-        				case(1:4)
-        					nfe=nfe+1
-        					ifailedge(nfe)=ifedg2(j)+4	
-        				! top edges failed: ignored	
-        				case(0,5:8)
-        					continue
-        				case default
-        					write(msg_file,*)'wrong failed edge index in xlam integration'
-        					call exit_function
-        			end select
-        		end do
-        	
-        		! update ifailedge array into this interface elem
-        		call update(elem%interf(i),ifailedge=ifailedge)
-        	
-        	end if
-        	
             call integrate(elem%interf(i),Ki,Fi)
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
@@ -526,7 +422,7 @@ module xlam_element_module
             do j=1, nndinterf ! no. of nodes in sub elem i
                 do l=1, ndim
                     ! dof indices of the jth node of sub elem i 
-                    dofcnc((j-1)*ndim+l)=(elem%interfnodecnc(i)%array(j)-1)*ndim+l
+                    dofcnc((j-1)*ndim+l)=(elem%interfcnc(i)%array(j)-1)*ndim+l
                 end do
             end do
             call assembleKF(K_matrix,F_vector,Ki,Fi,dofcnc)
@@ -591,8 +487,6 @@ module xlam_element_module
         if(allocated(u0)) deallocate(u0)
         if(allocated(u1)) deallocate(u1)
         if(allocated(u2)) deallocate(u2)
-        if(allocated(ifedg1)) deallocate(ifedg1)
-        if(allocated(ifedg2)) deallocate(ifedg2)
     
  
     end subroutine integrate_xlam_element

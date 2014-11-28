@@ -9,7 +9,7 @@
     include "elements/xbrick_element_module.f90"   
     include "elements/subxcoh_element_module.f90"
     include "elements/xcoh_element_module.f90"
-    include "elements/xlam2_element_module.f90"
+    include "elements/xlam_element_module.f90"
     include "elements/element_module.f90"                                 
                                                                           
                                                                           
