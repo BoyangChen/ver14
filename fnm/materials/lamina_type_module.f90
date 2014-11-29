@@ -4,8 +4,6 @@
     implicit none
     private
     
-    ! parameters
-    integer, parameter, public :: mfailed=10, mfonset=5, ffailed=20, ffonset=15
 
     type,public :: lamina_modulus
         real(kind=dp) :: E1,E2,G12,G23,nu12,nu23 ! elastic moduli
@@ -249,7 +247,7 @@
         end if
         
         
-        if(ffstat==ffailed) then
+        if(ffstat==fibre_failed) then
         ! already completely failed, no need to go through coh law; update dee and calculate stress
             df=sdv%r(1)
             call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)
@@ -277,15 +275,15 @@
 
 
         ! check and update mfstat
-        if(mfstat<mfonset) then               
+        if(mfstat<matrix_onset) then               
             ! go through failure criterion and update fstat
             call MatrixFailureCriterion(sig,this_mat%strength,mfstat)
         end if
         ! update sdv
-        if(mfstat>=mfonset) sdv%i(3)=mfstat
+        if(mfstat>=matrix_onset) sdv%i(3)=mfstat
         
         !~! degrade matrix stiffness if fibres have all failed
-        !~if(ffstat==ffailed .and. mfstat>=mfonset) then
+        !~if(ffstat==fibre_failed .and. mfstat>=matrix_onset) then
         !~    call deemat(E1,E2,E3,nu12,nu13,nu23,G12,G13,G23,dee,df,df,df)
         !~    ! update stress
         !~    sig=matmul(dee,strain)
@@ -423,7 +421,7 @@
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
         ! --------------------------------------------------------- !
-        if(fstat==ffailed) then    ! already failed
+        if(fstat==fibre_failed) then    ! already failed
             ! exit program
             return
         end if
@@ -474,7 +472,7 @@
             call FibreFailureCriterion(sigma,strength,fstat,findex)
             
             ! failure onset
-            if(fstat==ffonset) then
+            if(fstat==fibre_onset) then
             ! calculate u0, uf and go to next control
                 
                 u_eff=abs(strain(1))*clength
@@ -491,7 +489,7 @@
                     uf=two*GfcC/T0
                 end if
                 
-            else if(fstat==ffailed) then
+            else if(fstat==fibre_failed) then
             ! this is the case where strength is close to zero
                 dm=dmax
                 
@@ -502,12 +500,12 @@
         end if
         
         ! failure started
-        if(fstat==ffonset) then
+        if(fstat==fibre_onset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
                 dm=dmax
-                fstat=ffailed
+                fstat=fibre_failed
             else
                 ! effective jump and traction
                 u_eff=abs(strain(1))*clength
@@ -521,7 +519,7 @@
             ! check dm and update fstat
             if (dm>=dmax-tiny(one)) then
                 dm=dmax
-                fstat=ffailed
+                fstat=fibre_failed
             end if
         end if
      
@@ -580,10 +578,10 @@
             ! failure index for tensile failure; matrix crack perpendicular to shell plane, no z-dir stress components
             findex2=max(sigma(1),zero)/Xt + abs(min(sigma(1),zero)/Xc)
             
-            if(findex2>=one) fstat=ffonset
+            if(findex2>=one) fstat=fibre_onset
         else
             ! strength close to zero == already failed
-            fstat=ffailed
+            fstat=fibre_failed
         end if
         
         if(present(findex)) findex=findex2
@@ -645,10 +643,10 @@
             findex2=sqrt((max(sigma(2),zero)/Yt)**2 + (sigma(4)/Sl)**2)
             end if
             
-            if(findex2>=one) fstat=mfonset
+            if(findex2>=one) fstat=matrix_onset
         else
             ! strength close to zero == already failed
-            fstat=mfonset
+            fstat=matrix_onset
         end if
         
         if(present(findex)) findex=findex2

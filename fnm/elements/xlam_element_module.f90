@@ -335,26 +335,18 @@ module xlam_element_module
                 ! following needs to be filled (real nodes first, then flo nodes)
                            
                 ! 1st half of interface real nodes comes from bottom plyblk elem top surface (nodes 5-8)
-                !elem%interfnodecnc(i)%array(1 : ncorner/2)=&
-                !& [( j, j=(i-1)*nndplyblk+ncorner/2+1 , (i-1)*nndplyblk+ncorner )]
                 elem%interfnodecnc(i)%array(1 : ncorner/2)=&
                 & elem%plyblknodecnc(i)%array(ncorner/2+1 : ncorner)
                 
-                ! 2nd half of interface real nodes comes from top plyblk elem bottom surface (nodes 1-4)
-                !elem%interfnodecnc(i)%array(ncorner/2+1 : ncorner)=&
-                !& [( j, j=i*nndplyblk+1 , i*nndplyblk+ncorner/2 )]    
+                ! 2nd half of interface real nodes comes from top plyblk elem bottom surface (nodes 1-4)   
                 elem%interfnodecnc(i)%array(ncorner/2+1 : ncorner)=&
                 & elem%plyblknodecnc(i+1)%array(1 : ncorner/2)
                 
                 ! 1st half of interface flo nodes come from bottm plyblk elem top surface (nodes 17-24)
-                !elem%interfnodecnc(i)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)=&
-                !& [( j, j=(i-1)*nndplyblk+ncorner+(nndinterf-ncorner)/2+1 , (i-1)*nndplyblk+nndinterf)]
                 elem%interfnodecnc(i)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)=&
                 & elem%plyblknodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)
                 
                 ! 2nd half of interface flo nodes come from top plyblk elem bottom surface (nodes 9-16)
-                !elem%interfnodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)=&
-                !& [( j, j=i*nndplyblk+ncorner+1 , i*nndplyblk+ncorner+(nndinterf-ncorner)/2 )] 
                 elem%interfnodecnc(i)%array(ncorner+(nndinterf-ncorner)/2+1 : nndinterf)=&
                 & elem%plyblknodecnc(i+1)%array(ncorner+1 : ncorner+(nndinterf-ncorner)/2)
                 
@@ -426,7 +418,6 @@ module xlam_element_module
                 interfedge(:)=elem%edgecnc(elem%interfedgecnc(i)%array(:))
                 
                 ! prepare each interface elem (here xcoh elem type)
-                !call prepare(elem%interf(i),key=0,connec=interfnode,matkey=elem%interfmat)
                 call prepare(elem%interf(i),key=0,matkey=elem%interfmat,nodecnc=interfnode,edgecnc=interfedge)
             end do
         

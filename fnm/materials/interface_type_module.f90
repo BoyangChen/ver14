@@ -3,10 +3,6 @@
     
     implicit none
     private
-    
-    
-    ! parameters
-    integer, parameter :: failed=10, onset=5
 
 
     type,public :: interface_modulus
@@ -191,7 +187,7 @@
             end if
             fstat=sdv%i(1)
             ! check and update fstat
-            if(fstat<onset) then
+            if(fstat<cohmat_onset) then
                 ! calculate stress based on jump
                 ! dee is defined based on intact stiffness
                 sigma=matmul(dee,jump)               
@@ -199,7 +195,7 @@
                 call FailureCriterion(sigma,this_mat%strength,fstat)
             end if          
             ! update D matrix accord. to fstat and crack open/close status
-            if(fstat>=onset) dee=dee*(one-dmax)
+            if(fstat>=cohmat_onset) dee=dee*(one-dmax)
             if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! update stress
             if(present(stress)) stress=matmul(dee,jump)
@@ -278,7 +274,7 @@
         ! --------------------------------------------------------- !
         ! if already failed, calculate directly Dee and Sigma and exit
         ! --------------------------------------------------------- !
-        if(fstat==failed) then    ! already failed
+        if(fstat==cohmat_failed) then    ! already failed
             ! calculate penalty stiffness
             dee=dee*(one-dmax)
             dee=max(dee,Dres)
@@ -332,7 +328,7 @@
             call FailureCriterion(sigma,strength,fstat,findex)
             
             ! failure onset
-            if(fstat==onset) then
+            if(fstat==cohmat_onset) then
             ! calculate u0, uf and go to next control
             
                 ! normal and shear strain energy density
@@ -376,7 +372,7 @@
                 uf=two*Gmc/T0
                 
                 
-            else if(fstat==failed) then
+            else if(fstat==cohmat_failed) then
             ! this is the case where strength is close to zero
                 dm=dmax
                 
@@ -387,7 +383,7 @@
         end if
         
         ! failure started
-        if(fstat==onset) then
+        if(fstat==cohmat_onset) then
 
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure
@@ -410,7 +406,7 @@
             ! check dm and update fstat
             if (dm>=dmax) then
                 dm=dmax
-                fstat=failed
+                fstat=cohmat_failed
             end if
         end if
      
@@ -478,10 +474,10 @@
             findex2=sqrt((max(sigma(1),zero)/tau_nc)**2 + (sigma(2)/tau_tc)**2)
             end if
             
-            if(findex2>=one) fstat=onset
+            if(findex2>=one) fstat=cohmat_onset
         else
             ! strength close to zero == already failed
-            fstat=failed
+            fstat=cohmat_failed
         end if
         
         if(present(findex)) findex=findex2

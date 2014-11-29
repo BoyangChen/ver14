@@ -12,18 +12,7 @@
         integer, parameter :: eltypelength=30 ! character length of a system element type name
         integer, parameter :: setnamelength=30 ! character length of a set name
         integer, parameter :: dirlength=256 ! character length of a directory name
-
-        ! generic parameter for intact state (elem, edge, material, etc.)
-        integer, parameter :: intact=0
-
-    	! element status variable values
-    	integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfailm=5, elfailf=6 &
-    	& , elfail1=5, elfail2=6, elfail3=7
-
-    	! edge status variable values
-    	integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
-
-
+        
         ! some common real numbers
         real(kind=dp), parameter :: zero=0._dp,one=1._dp,two=2._dp, &
       & three=3._dp,four=4._dp,five=5._dp,six=6._dp,seven=7._dp,      &
@@ -32,12 +21,31 @@
       & one_eighth=one/eight,root3=one/sqrt(three),                   &
       & halfcirc=180._dp,pi=3.14159265359_dp,ninety=90._dp            &
       & ,tolerance=0.1_dp
-
-
+        
+        
         ! residual stiffness
-        real(kind=dp), parameter :: Kres=one    ! one MPa (or other unit) of residual stiffness after failure, to prevent nodes run wild
+        real(kind=dp), parameter :: Kres=one    ! one MPa (or other unit) of residual stiffness after failure, to prevent nodes run wild 
 
+        ! generic parameter for intact state (elem, edge, material, etc.)
+        integer, parameter :: intact=0 
+        
+        ! interface material module parameters
+        integer, parameter :: cohmat_onset=5, cohmat_failed=10
+        
+        ! lamina material module parameters
+        integer, parameter :: matrix_onset=5, matrix_failed=10, fibre_onset=15, fibre_failed=20
+        
+    	! edge status variable values
+    	integer, parameter :: egtrans=1, egref=2, egtip=3, wkcrack=3, cohcrack=4, strgcrack=5
+        
+    	! xbrick element status variable values
+    	integer, parameter :: eltrans=1, elref=2, eltip=3, elwake=4, elfailm=5, elfailf=15
+        
+        ! xcoh and subxcoh elem status variables 
+    	integer, parameter :: elfail1=5, elfail2=6, elfail3=7
 
+        
+        
         ! derived data type sdv_array, just to group 3 types of arrays together
         type :: sdv_array
             real(kind=dp),  allocatable :: r(:)
