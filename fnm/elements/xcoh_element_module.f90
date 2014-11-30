@@ -233,26 +233,27 @@ module xcoh_element_module
         i=0; j=0; l=0
         elstat=0; mainelstat=0
 
-        ! assign 1 coh3d8 elem as the main elem before failure, if not yet done
-        if(.not.allocated(elem%mainelem)) then 
-            allocate(elem%mainelem(1))
-            allocate(elem%maincnc(1))
-            allocate(elem%maincnc(1)%array(nndrl))   ! coh3d8 elem
-            allocate(mainglbcnc(1))
-            allocate(mainglbcnc(1)%array(nndrl))
-            ! main elm 1 connec
-            elem%maincnc(1)%array=[(i, i=1,nndrl)]
-            mainglbcnc(1)%array(:)=elem%nodecnc(elem%maincnc(1)%array(:))
-            ! create sub elements
-            call prepare(elem%mainelem(1),key=0,connec=mainglbcnc(1)%array,matkey=elem%matkey)   
-        end if   
-        
 
         ! extract current status value
         elstat=elem%curr_status  
-
+        
         ! if elem is intact
         if(elstat==intact) then
+        
+            ! assign 1 coh3d8 elem as the main elem before failure, if not yet done
+            if(.not.allocated(elem%mainelem)) then 
+                allocate(elem%mainelem(1))
+                allocate(elem%maincnc(1))
+                allocate(elem%maincnc(1)%array(nndrl))   ! coh3d8 elem
+                allocate(mainglbcnc(1))
+                allocate(mainglbcnc(1)%array(nndrl))
+                ! main elm 1 connec
+                elem%maincnc(1)%array=[(i, i=1,nndrl)]
+                mainglbcnc(1)%array(:)=elem%nodecnc(elem%maincnc(1)%array(:))
+                ! create sub elements
+                call prepare(elem%mainelem(1),key=0,connec=mainglbcnc(1)%array,matkey=elem%matkey)   
+            end if   
+            
             
             ! check if elem has started to fail; if so, no more edge status partitioning later
             call extract(elem%mainelem(1),curr_status=mainelstat)   
@@ -428,6 +429,7 @@ module xcoh_element_module
                             call exit_function            
                     end select   
                 end do
+                
                 
                 if(subelstat1<elfail2) call update(elem%subelem(1),ifailedge=ifailedge1)
                 if(subelstat2<elfail2) call update(elem%subelem(2),ifailedge=ifailedge2)  

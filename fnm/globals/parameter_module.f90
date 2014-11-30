@@ -4,7 +4,7 @@
 
         integer, parameter :: dp=selected_real_kind(14) !-equivalent to f77 double precision
 
-        integer, parameter :: msg_file=7 ! I/O file index for message file
+        integer, parameter :: msg_file=6 ! I/O file index for message file
 
         integer, parameter :: matnamelength=30 ! character length of a user-input material name
         integer, parameter :: mattypelength=30 ! character length of a system material type name

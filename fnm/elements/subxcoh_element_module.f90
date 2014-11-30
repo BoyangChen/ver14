@@ -270,6 +270,7 @@ module subxcoh_element_module
         ! extract current status value
         elstat=elem%curr_status     
         
+        
         ! if elem is intact
         if(elstat==intact) then
         
@@ -443,6 +444,7 @@ module subxcoh_element_module
         ! extract edge status variables from glb edge library
         edgstat(:)=lib_edge(elem%edgecnc(:))
         
+        
         ! extract nodal coords from glb node library
         do i=1, nnode
             call extract(lib_node(elem%nodecnc(i)),x=coord(i)%array)
@@ -464,7 +466,7 @@ module subxcoh_element_module
 !       update elstat w.r.t no. of failed edges and edge status
         if(nfailedge==0) then
         ! adj. ply elem remains intact, do nothing
-            if(elstat/=intact) then
+            if(.not.(elstat==intact .or. elstat==elfail1)) then
                 write(msg_file,*)'inconsistency btw elstat and nfailedge in subxcoh elem!'
                 call exit_function
             end if

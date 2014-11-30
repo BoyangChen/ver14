@@ -468,6 +468,7 @@ module xlam_element_module
         		! extract failed edges from bottom and top plyblk elems
         		call extract(elem%plyblk(i),ifailedge=ifedg1)
         		call extract(elem%plyblk(i+1),ifailedge=ifedg2)
+                
         	
         		! no of failed edges in this interface
         		nfe=0
@@ -504,7 +505,7 @@ module xlam_element_module
         					call exit_function
         			end select
         		end do
-        	
+                	
         		! update ifailedge array into this interface elem
         		call update(elem%interf(i),ifailedge=ifailedge)
         	
