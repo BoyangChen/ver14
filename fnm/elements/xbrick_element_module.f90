@@ -330,6 +330,15 @@ module xbrick_element_module
             !~    end do
             !~end if
             
+            ! during the increment of new partition, no fibre failure allowed
+            if(elem%newpartition) then
+                nofailure=.true.  ! no fibre failure modelling
+            else
+            ! after that increment, fibre failure is considered for fibre fail partition
+                nofailure=.false.
+            end if 
+            
+            
             ! integrate sub elems
             call integrate_assemble(elem,K_matrix,F_vector,nofailure)
             
@@ -339,6 +348,7 @@ module xbrick_element_module
                 call extract(elem%subelem(i),curr_status=subelstat)
                 if(subelstat>=fibre_onset) then
                     elem%curr_status=elfailf
+                    goto 10
                     exit
                 end if 
             end do
@@ -350,13 +360,13 @@ module xbrick_element_module
         if(elem%curr_status==elfailf) then
         ! element fibre is already failed, integrate and assemble subelem
             
-            !~! during the increment of new partition, no fibre failure allowed
-            !~if(elem%newpartition) then
-            !~    nofailure=.true.  ! no fibre failure modelling
-            !~else
-            !~! after that increment, fibre failure is considered for fibre fail partition
-            !~    nofailure=.false.
-            !~end if    
+            ! during the increment of new partition, no fibre failure allowed
+            if(elem%newpartition) then
+                nofailure=.true.  ! no fibre failure modelling
+            else
+            ! after that increment, fibre failure is considered for fibre fail partition
+                nofailure=.false.
+            end if    
             
             call integrate_assemble(elem,K_matrix,F_vector,nofailure)
 
@@ -367,7 +377,7 @@ module xbrick_element_module
         !---------------------------------------------------------------------!
         !               deallocate local arrays 
         !---------------------------------------------------------------------!
-        if(allocated(subglbcnc)) deallocate(subglbcnc)
+10        if(allocated(subglbcnc)) deallocate(subglbcnc)
 
     
  

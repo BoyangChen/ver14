@@ -874,6 +874,7 @@
                             write(outunit,*) fvar
                             
                             deallocate(igpnt)
+                            deallocate(mainelem)
                         else 
                         ! 
                             if(.not.allocated(subelem)) then
@@ -891,6 +892,8 @@
                             end do
                             
                             write(outunit,*) fvar
+                            
+                            deallocate(subelem)
                         
                         end if
                         

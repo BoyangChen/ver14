@@ -508,6 +508,9 @@ module xlam_element_module
                 	
         		! update ifailedge array into this interface elem
         		call update(elem%interf(i),ifailedge=ifailedge)
+                
+                deallocate(ifedg1)
+                deallocate(ifedg2)
         	
         	end if
         	
@@ -566,7 +569,12 @@ module xlam_element_module
                             K_matrix(dof2+l,dof0+l)=K_matrix(dof2+l,dof0+l)-Kpn
                             F_vector(dof0+l)=F_vector(dof0+l)+Kpn*(u0(l)-u2(l))
                             F_vector(dof2+l)=F_vector(dof2+l)-Kpn*(u0(l)-u2(l))
-                        end do   
+                        end do  
+
+                        deallocate(u0)
+                        deallocate(u1)
+                        deallocate(u2)
+                        
                     end do
                 end if
                 ! in the future, interpolate the disp. of floating nodes on bcd edges
