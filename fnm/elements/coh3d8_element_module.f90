@@ -378,7 +378,8 @@
             call init_ig(igxi,igwt)
         end if
 
-        
+        ! zero elem curr status for update
+        elem%curr_status=zero
          
         !-calculate strain,stress,stiffness,sdv etc. at each int point
       	do kig=1,nig 
@@ -436,9 +437,14 @@
             ! get D matrix dee accord. to material properties, and update intg point variables
             select case (mattype)
                 case ('interface')
-                    
+                
+                    if(nofail) then
+                    ! do not pass in sdv, then no cohesive law can be done, only linear elasticity stiffness and stress calculated
+                        call ddsdde(lib_interface(typekey), Dee, jump=delta, stress=Tau)
+                    else
                     ! calculate D matrix, update stress, and iterating sdv
-                    call ddsdde(lib_interface(typekey), Dee, jump=delta, stress=Tau, sdv=ig_sdv(2), dfail=dfail) 
+                        call ddsdde(lib_interface(typekey), Dee, jump=delta, stress=Tau, sdv=ig_sdv(2), dfail=dfail) 
+                    end if
                     
                 case default
                     write(msg_file,*) 'material type not supported for cohesive element!'

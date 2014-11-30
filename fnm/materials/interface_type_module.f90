@@ -98,8 +98,8 @@
 
         type(interface_type),       intent(in)  :: this_mat
         real(kind=dp),              intent(out) :: dee(:,:)
-        real(kind=dp),  optional,   intent(in)  :: jump(:)
-        real(kind=dp),  optional,   intent(out) :: stress(:)
+        real(kind=dp),              intent(in)  :: jump(:)
+        real(kind=dp),              intent(out) :: stress(:)
         type(sdv_array), optional,  intent(inout) :: sdv
         real(kind=dp),  optional,   intent(in)  :: dfail
         
@@ -111,7 +111,7 @@
         
         
         ! initialize variables
-        dee=zero; if(present(stress)) stress=zero ! intent(out) vars
+        dee=zero; stress=zero ! intent(out) vars
         Dnn0=zero; Dtt0=zero; Dll0=zero
         sigma=zero; dmax=zero
         nst=0; fstat=0
@@ -126,6 +126,7 @@
             write(msg_file,*) 'interface material modulus undefined!'
             call exit_function
         end if
+        
         
         ! extract the original linear elasticity stiffness
         Dnn0=this_mat%modulus%Dnn
@@ -143,30 +144,29 @@
         else
             write(msg_file,*) 'no. of jumps not supported for interface ddsdde!'
             call exit_function
-        end if        
-        
-        
-        ! if jump or sdv are not passed in, only linear elasticity can be done
-        if((.not.present(jump)) .or. (.not.present(sdv))) then
-            write(msg_file,*) 'WARNING: jump and sdv are not present in interface!'
-            write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.' 
-            return ! exit the program
         end if
         
-       
         ! if strength is not present, give a warning and do linear elasticity with stress
         if(.not.this_mat%strength_active) then
-            write(msg_file,*) 'WARNING: strength parameters are not present in interface!'
-            write(msg_file,*) 'Only linear elastic stiffness matrix and stress can be calculated.' 
-            ! update stress
-            if(present(stress)) stress=matmul(dee,jump)
+            !write(msg_file,*) 'WARNING: strength parameters are not present in interface!'
+            !write(msg_file,*) 'Only linear elastic stiffness matrix and stress can be calculated.' 
+            ! calculate stress based on intact stiffness
+            stress=matmul(dee,jump)
             return ! exit the program
         end if
         
+        ! if jump or sdv are not passed in, only linear elasticity can be done
+        if(.not.present(sdv)) then
+            !write(msg_file,*) 'WARNING: sdv are not present in interface!'
+            !write(msg_file,*) 'Only linear elastic stiffness matrix and stress can be calculated.' 
+            ! calculate stress based on intact stiffness
+            stress=matmul(dee,jump)
+            return ! exit the program
+        end if    
         
         
         ! --------------------------------------------------------- !
-        ! -- reaching here, jump, sdv and strength are present -- !
+        ! -- reaching here, sdv and strength are present -- !
         ! -- failure criterion can be done                          !
         ! --------------------------------------------------------- !
 
@@ -198,7 +198,7 @@
             if(fstat>=cohmat_onset) dee=dee*(one-dmax)
             if(jump(1)<zero) dee(1,1)=Dnn0 ! crack closes, no damage
             ! update stress
-            if(present(stress)) stress=matmul(dee,jump)
+            stress=matmul(dee,jump)
             ! update sdv
             sdv%i(1)=fstat          
             ! exit program 
@@ -218,7 +218,7 @@
         & this_mat%toughness,jump,dmax)
         
         ! update stress
-        if(present(stress)) stress=sigma 
+        stress=sigma 
         
         ! exit program
         return

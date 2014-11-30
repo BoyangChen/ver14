@@ -313,6 +313,9 @@
         
         ! update ig point xi and weight
         call init_ig(igxi,igwt)
+        
+        ! zero elem curr status for update
+        elem%curr_status=zero
           
         ! zero element stress and strain (used for output only) for update
         elem%stress=zero

@@ -221,7 +221,7 @@ module xcoh_element_module
         
         integer :: i,j,l, elstat, mainelstat
 
-        
+        logical :: nofailure
         
           
     
@@ -232,6 +232,8 @@ module xcoh_element_module
         ! initialize local variables
         i=0; j=0; l=0
         elstat=0; mainelstat=0
+        
+        nofailure=.false.
 
 
         ! extract current status value
@@ -265,23 +267,36 @@ module xcoh_element_module
             end if
 
             call partition(elem)
-            call integrate_assemble(elem,K_matrix,F_vector)
+            
+            ! no damage/failure modelling at the iteration of new partition
+            if(elem%curr_status/=elstat) nofailure=.true.
+            
+            call integrate_assemble(elem,K_matrix,F_vector,nofailure)
 
         else if(elstat==elfail1) then
         ! if main elem coh3d8 has started to fail
+        
             call partition(elem)
-            call integrate_assemble(elem,K_matrix,F_vector)   
+            
+            ! no damage/failure modelling at the iteration of new partition
+            if(elem%curr_status/=elstat) nofailure=.true.
+            
+            call integrate_assemble(elem,K_matrix,F_vector,nofailure)   
         
         else if(elstat==elfail2) then
         ! if elem has already been partitioned into 2 subxcoh elems,
         ! update their ifailedge arrays and elem curr status 
             
             call update_edgestatus(elem)
-            call integrate_assemble(elem,K_matrix,F_vector) 
+            
+            ! no damage/failure modelling at the iteration of new partition
+            if(elem%curr_status/=elstat) nofailure=.true.
+            
+            call integrate_assemble(elem,K_matrix,F_vector,nofailure) 
         
         else if(elstat==elfail3) then
         
-            call integrate_assemble(elem,K_matrix,F_vector) 
+            call integrate_assemble(elem,K_matrix,F_vector,nofailure) 
         
         else
 			write(msg_file,*)'unsupported elstat value in xcoh elem module'
@@ -448,13 +463,14 @@ module xcoh_element_module
   
   
   
-    subroutine integrate_assemble(elem,K_matrix,F_vector) 
+    subroutine integrate_assemble(elem,K_matrix,F_vector,nofailure) 
     !---------------------------------------------------------------------!
     !       integrate and assemble sub element system arrays
     !---------------------------------------------------------------------!        
     	! - passed in variables   
     	type(xcoh_element), intent(inout)	:: elem
     	real(kind=dp), 	intent(inout)			:: K_matrix(:,:), F_vector(:)
+        logical, intent(in)                 :: nofailure
     	! - local variables
     	real(kind=dp),	allocatable           	:: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
     	integer, 		allocatable 			:: dofcnc(:)
@@ -486,7 +502,7 @@ module xcoh_element_module
         else if(allocated(elem%subelem)) then
             
             do i=1, size(elem%subelem)
-                call integrate(elem%subelem(i),Ki,Fi)
+                call integrate(elem%subelem(i),Ki,Fi,nofailure)
                 if(allocated(dofcnc)) deallocate(dofcnc)
                 allocate(dofcnc(size(Fi))); dofcnc=0
                 do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i

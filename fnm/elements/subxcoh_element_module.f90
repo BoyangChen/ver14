@@ -206,10 +206,11 @@ module subxcoh_element_module
 
 
 
-    subroutine integrate_subxcoh_element(elem, K_matrix, F_vector)
+    subroutine integrate_subxcoh_element(elem, K_matrix, F_vector, nofailure)
     
         type(subxcoh_element),intent(inout)       :: elem 
         real(kind=dp),allocatable,intent(out)   :: K_matrix(:,:), F_vector(:)
+        logical, optional, intent(in)           :: nofailure
     
     
         ! local variables
@@ -217,13 +218,14 @@ module subxcoh_element_module
         
         integer :: i,j,l, elstat, subelstat
         
-        
            
         ! - glb clock step and increment no. extracted from glb clock module
         integer :: curr_step, curr_inc
         logical :: last_converged               ! true if last iteration has converged: a new increment/step has started
-  
-  
+        
+        ! control parameter to prevent damage modelling if true
+        logical :: nofail
+        
     
         ! initialize K & F
         allocate(K_matrix(ndof,ndof),F_vector(ndof))
@@ -234,6 +236,9 @@ module subxcoh_element_module
         elstat=0; subelstat=0
         curr_step=0; curr_inc=0
         last_converged=.false.
+        
+        ! by default, damage modelling is allowed, unless specified
+        nofail=.false.; if(present(nofailure)) nofail=nofailure
 
         ! assign 1 coh3d8 subelem if not yet done
         if(.not.allocated(elem%subelem)) then 
@@ -284,12 +289,12 @@ module subxcoh_element_module
             end if
             
             call edge_status_partition(elem)
-            call integrate_assemble(elem,K_matrix,F_vector) 
+            call integrate_assemble(elem,K_matrix,F_vector,nofail) 
             
     	else if(elstat==elfail1) then
     	! elem already delaminated
             call edge_status_partition(elem)
-    		call integrate_assemble(elem,K_matrix,F_vector) 
+    		call integrate_assemble(elem,K_matrix,F_vector,nofail) 
     	
     	else if(elstat==elfail2) then
     	! elem already edge partitioned; need to update mnodes, then integrate and assemble
@@ -297,7 +302,7 @@ module subxcoh_element_module
     		! update mnodes
     		call update_mnode(elem)
     		! integrate and assemble
-    		call integrate_assemble(elem,K_matrix,F_vector) 
+    		call integrate_assemble(elem,K_matrix,F_vector,nofail) 
     	
     	else
          	write(msg_file,*)'unsupported elstat value in subxcoh elem module'
@@ -309,7 +314,7 @@ module subxcoh_element_module
         !---------------------------------------------------------------------!
         !               update elem sdv for output 
         !---------------------------------------------------------------------!
-        call update_sdv(elem)
+        if(last_converged) call update_sdv(elem)
   
         
         !---------------------------------------------------------------------!
@@ -325,13 +330,14 @@ module subxcoh_element_module
 
 
 
-	subroutine integrate_assemble(elem,K_matrix,F_vector)
+	subroutine integrate_assemble(elem,K_matrix,F_vector,nofail)
 	!---------------------------------------------------------------------!
     !       integrate and assemble sub element system arrays
     !---------------------------------------------------------------------!     
     	! - passed in variables   
     	type(subxcoh_element), intent(inout)	:: elem
     	real(kind=dp), 	intent(inout)			:: K_matrix(:,:), F_vector(:)
+        logical, intent(in)                     :: nofail
     	! - local variables
     	real(kind=dp),	allocatable           	:: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
     	integer, 		allocatable 			:: dofcnc(:)
@@ -344,7 +350,7 @@ module subxcoh_element_module
      
         ! integrate sub elements and assemble into global matrix
         do i=1, size(elem%subelem)
-            call integrate(elem%subelem(i),Ki,Fi)
+            call integrate(elem%subelem(i),Ki,Fi,nofail)
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
             do j=1, size(elem%subcnc(i)%array) ! no. of nodes in sub elem i
@@ -1373,7 +1379,6 @@ module subxcoh_element_module
         integer :: i,j,l
         
         
-        
         ! initialize local variables
         subeltype=''
         rfvar=zero; ifvar=0
@@ -1415,12 +1420,12 @@ module subxcoh_element_module
             do j=1,size(igpnt)
                 call extract(igpnt(j),sdv=fsdv)
                 if(allocated(fsdv)) then
-                    ! update sdv values
-                    if(allocated(fsdv(2)%i)) ifvar=ifvar+fsdv(2)%i(1)
-                    if(allocated(fsdv(2)%r)) rfvar=rfvar+fsdv(2)%r(1)
-                
+                    ! update sdv values (equilibrium sdv values, stored in sdv(1))
+                    if(allocated(fsdv(1)%i)) ifvar=ifvar+fsdv(1)%i(1)
+                    if(allocated(fsdv(1)%r)) rfvar=rfvar+fsdv(1)%r(1)
                     deallocate(fsdv)
                 end if
+                
             end do 
             ! average fvar values in this sub element
             ifvar=int(ifvar/size(igpnt))
