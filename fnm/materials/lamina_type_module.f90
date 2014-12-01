@@ -213,7 +213,8 @@
         
         if(.not.present(sdv)) then
             !write(msg_file,*) 'WARNING: strain and sdv are not present in lamina type!'
-            !write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.' 
+            !write(msg_file,*) 'Only linear elastic stiffness matrix can be calculated.'
+            if(present(stress)) stress=matmul(dee,strain)
             return ! exit the program
         end if
 
@@ -489,6 +490,14 @@
                     uf=two*GfcC/T0
                 end if
                 
+                ! calculate dm to prevent overshoot of stress
+                if(uf <= u0 + tiny(one)) then ! brittle failure
+                    dm=dmax
+                    fstat=fibre_failed
+                else
+                    dm=one-one/sqrt(findex)
+                end if
+                
             else if(fstat==fibre_failed) then
             ! this is the case where strength is close to zero
                 dm=dmax
@@ -497,10 +506,10 @@
             ! fstat remains intact; dm, u0 and uf remain zero as initialized
                 continue
             end if
-        end if
+        !end if
         
         ! failure started
-        if(fstat==fibre_onset) then
+        else if(fstat==fibre_onset) then
         
             ! calculate dm
             if(uf <= u0 + tiny(one)) then ! brittle failure

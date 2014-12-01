@@ -276,6 +276,7 @@ module xbrick_element_module
                 elem%newpartition=.true.    ! new partition is true for this increment
                 nofailure=.true.            ! no material degradation/failure criterion partition for 1st iteration of new partition
             end if 
+            
 
             ! if elem matrix is not yet failed after the edge status partition
             ! integrate and check the failure criterion partition
@@ -290,10 +291,10 @@ module xbrick_element_module
                 ! 2nd and later iteration of new partition
                     
                     !***** check failure criterion *****
-                    ! failure criterion partitions elem into elfailm partition if sub elem fails
+                    ! failure criterion partitions elem into elfailm/elfailf partition if sub elem matrix fails/fibre fails
                     call failure_criterion_partition(elem)
                     
-                    if(elem%curr_status==elfailm) then
+                    if(elem%curr_status>=elfailm) then
                     ! elem partition is updated by failure criterion partition, i.e., new partiton is true
                         elem%newpartition=.true.
                         nofailure=.true.            ! no material degradation/failure criterion partition for 1st iteration of new partition
@@ -313,45 +314,40 @@ module xbrick_element_module
         ! bulk sub elems may undergo fibre damage and failure (only after coh sub elem starts failing)
             
             
-            !~! by default, no material degradation for fibre
-            !~! until cohesive sub elem starts to fail
-            !~nofailure=.true.
-            !~
-            !~! during the increment of new partition, no fibre material degradation allowed
-            !~if(elem%newpartition) then
-            !~    continue    ! nofailure remains true
-            !~else
-            !~! after that increment, fibre failure is considered for matrix fail partition only after coh sub elem starts failing
-            !~    do i=1, size(elem%subelem)
-            !~        call extract(elem%subelem(i),eltype=subeltype,curr_status=subelstat)
-            !~        if(subeltype=='coh3d6' .or. subeltype=='coh3d8') then
-            !~            if(subelstat > intact) nofailure=.false.
-            !~        end if
-            !~    end do
-            !~end if
+            ! by default, no material degradation for fibre
+            ! until cohesive sub elem starts to fail
+            nofailure=.true.
             
-            ! during the increment of new partition, no fibre failure allowed
+            ! during the increment of new partition, no fibre material degradation allowed
             if(elem%newpartition) then
-                nofailure=.true.  ! no fibre failure modelling
+                continue    ! nofailure remains true
             else
-            ! after that increment, fibre failure is considered for fibre fail partition
-                nofailure=.false.
-            end if 
+            ! after that increment, fibre failure is considered for matrix fail partition only after coh sub elem starts failing
+                do i=1, size(elem%subelem)
+                    call extract(elem%subelem(i),eltype=subeltype,curr_status=subelstat)
+                    if(subeltype=='coh3d6' .or. subeltype=='coh3d8') then
+                        if(subelstat > intact) nofailure=.false.
+                    end if
+                end do
+            end if
+             
             
             
             ! integrate sub elems
             call integrate_assemble(elem,K_matrix,F_vector,nofailure)
             
-            ! check if sub elems have reached fibre failure onset;
+            ! check if sub elems have reached fibre failure onset (only after it's allowed);
             ! if so, update curr status to fibre failure status elfailf (no need to update partition)
-            do i=1, size(elem%subelem)
-                call extract(elem%subelem(i),curr_status=subelstat)
-                if(subelstat>=fibre_onset) then
-                    elem%curr_status=elfailf
-                    goto 10
-                    exit
-                end if 
-            end do
+            if(.not.nofailure) then
+                do i=1, size(elem%subelem)
+                    call extract(elem%subelem(i),curr_status=subelstat)
+                    if(subelstat>=fibre_onset) then
+                        elem%curr_status=elfailf
+                        goto 10
+                        exit
+                    end if 
+                end do
+            end if
         
         end if
         
@@ -399,6 +395,7 @@ module xbrick_element_module
     	real(kind=dp),	allocatable           	:: Ki(:,:), Fi(:)   ! sub_elem K matrix and F vector
     	integer, 		allocatable 			:: dofcnc(:)
         integer :: i,j,l
+        character(len=eltypelength) ::  subeltype
         
         i=0;j=0;l=0
         
@@ -409,8 +406,14 @@ module xbrick_element_module
         
         ! integrate sub elements and assemble into global matrix
         do i=1, size(elem%subelem)
+        
+            call extract(elem%subelem(i),eltype=subeltype)
             
-            call integrate(elem%subelem(i),Ki,Fi,nofailure)  
+            if(subeltype=='coh3d6' .or. subeltype=='coh3d8') then
+                call integrate(elem%subelem(i),Ki,Fi)
+            else
+                call integrate(elem%subelem(i),Ki,Fi,nofailure)  
+            end if
             
             if(allocated(dofcnc)) deallocate(dofcnc)
             allocate(dofcnc(size(Fi))); dofcnc=0
@@ -923,6 +926,7 @@ module xbrick_element_module
     integer :: i, j, l, k       ! counters
     integer :: subelstat        ! sub elem status
     logical :: failed           ! true if elem is failed (one of the sub elems reached failure onset)
+    logical :: fbfail           ! true if elem has fibre failure (intact elem reached fibre failure onset)
     
       
     real(dp) :: xp1, yp1, xp2, yp2      ! (x,y) of point 1 and point 2 on the crack line
@@ -1002,6 +1006,7 @@ module xbrick_element_module
 !-----------------------------------------------------------------------!
 !           check failure criterion on all sub elements
 !   elem is judged failed a.l.a. 1 sub elem has reached failure onset
+!   elem is judged fibre failed if elstat=intact and subelstat=fibre_onset
 !-----------------------------------------------------------------------!
 
         do i=1, size(elem%subelem)
@@ -1010,7 +1015,12 @@ module xbrick_element_module
             if(failed) exit
         end do
 
-        
+        if (elstat==intact .and. subelstat>=fibre_onset) then
+            fbfail=.true.
+        end if
+!-----------------------------------------------------------------------!
+
+       
             
         if(failed) then
         ! element failed, find newly broken edge and update edge status vars
@@ -1302,14 +1312,12 @@ module xbrick_element_module
            
           
             ! update the elstat to failed status value
-            !~if(elstat==intact .and. subelstat>=fibre_onset) then
-            !~! if intact elem reaches fibre failure onset, new elem partition is named elfailf
-            !~    elstat=elfailf
-            !~else
-            !~    elstat=elfailm
-            !~end if     
-
-            elstat=elfailm
+            if(fbfail) then
+            ! if intact elem reaches fibre failure onset, new elem partition is named elfailf
+                elstat=elfailf
+            else
+                elstat=elfailm
+            end if
            
     !       update element curr_status and sub-element cnc matrices
             
